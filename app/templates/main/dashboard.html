@@ -1,0 +1,117 @@
+{% set active_nav = 'dashboard' %}
+{% extends "base.html" %}
+{% block title %}Dashboard | Sahayogi{% endblock %}
+{% block content %}
+  <header class="page-header">
+    <div>
+      <span class="eyebrow">Personal workspace</span>
+      <h1 class="h2 mb-1">Dashboard</h1>
+      <p class="page-subtitle">Track listings, requests, exchanges, and notifications from one place.</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a class="btn btn-accent" href="{{ url_for('listings.create') }}">Post listing</a>
+      <a class="btn btn-outline-primary" href="{{ url_for('profile.edit') }}">Edit profile</a>
+    </div>
+  </header>
+
+  <div class="row g-4 mb-4">
+    {% for label, value in [('Listings', my_listings|length), ('Pending requests', pending_requests|length), ('Active exchanges', exchanges|length), ('Unread notices', notifications|length)] %}
+      <div class="col-md-6 col-xl-3">
+        <section class="metric-card">
+          <div class="stat-value">{{ value }}</div>
+          <div class="stat-label">{{ label }}</div>
+        </section>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="row g-4">
+    <div class="col-xl-6">
+      <section class="table-card h-100">
+        <div class="table-card-header">
+          <h2 class="h4 mb-0">My listings</h2>
+          <a class="fw-bold" href="{{ url_for('listings.mine') }}">Manage</a>
+        </div>
+        <div class="clean-list">
+          {% for listing in my_listings %}
+            <a class="clean-row" href="{{ url_for('listings.detail', listing_id=listing.id) }}">
+              <div>
+                <strong>{{ listing.title }}</strong>
+                <div class="small text-muted">{{ listing.skill.name }} &middot; {{ listing.exchange_type|title }}</div>
+              </div>
+              <span class="badge text-bg-light">{{ listing.status|title }}</span>
+            </a>
+          {% else %}
+            <div class="empty-state m-4">No listings yet. Publish your first skill offer.</div>
+          {% endfor %}
+        </div>
+      </section>
+    </div>
+
+    <div class="col-xl-6">
+      <section class="table-card h-100">
+        <div class="table-card-header">
+          <h2 class="h4 mb-0">Pending requests</h2>
+          <a class="fw-bold" href="{{ url_for('requests_bp.inbox') }}">Inbox</a>
+        </div>
+        <div class="clean-list">
+          {% for item in pending_requests %}
+            <article class="clean-row">
+              <div>
+                <strong>{{ item.sender.full_name }}</strong> requested <em>{{ item.listing.title }}</em>
+                <div class="small text-muted">{{ item.request_type|title }} request</div>
+              </div>
+              <span class="badge text-bg-warning">Pending</span>
+            </article>
+          {% else %}
+            <div class="empty-state m-4">No pending requests.</div>
+          {% endfor %}
+        </div>
+      </section>
+    </div>
+
+    <div class="col-xl-6">
+      <section class="table-card h-100">
+        <div class="table-card-header">
+          <h2 class="h4 mb-0">Active exchanges</h2>
+          <a class="fw-bold" href="{{ url_for('exchanges.index') }}">History</a>
+        </div>
+        <div class="clean-list">
+          {% for exchange in exchanges %}
+            <a class="clean-row" href="{{ url_for('exchanges.detail', exchange_id=exchange.id) }}">
+              <div>
+                <strong>{{ exchange.listing.title }}</strong>
+                <div class="small text-muted">{{ exchange.exchange_type|title }} &middot; {{ exchange.created_at.strftime('%Y-%m-%d') }}</div>
+              </div>
+              <span class="badge text-bg-light">{{ exchange.status|title }}</span>
+            </a>
+          {% else %}
+            <div class="empty-state m-4">No exchanges yet.</div>
+          {% endfor %}
+        </div>
+      </section>
+    </div>
+
+    <div class="col-xl-6">
+      <section class="table-card h-100">
+        <div class="table-card-header">
+          <h2 class="h4 mb-0">Recent notifications</h2>
+          <a class="fw-bold" href="{{ url_for('notifications.index') }}">View all</a>
+        </div>
+        <div class="clean-list">
+          {% for item in notifications %}
+            <a class="clean-row" href="{{ item.url or url_for('notifications.index') }}">
+              <div>
+                <strong>{{ item.title }}</strong>
+                <div class="small text-muted">{{ item.body }}</div>
+              </div>
+              {% if not item.is_read %}<span class="badge text-bg-danger">New</span>{% endif %}
+            </a>
+          {% else %}
+            <div class="empty-state m-4">No notifications yet.</div>
+          {% endfor %}
+        </div>
+      </section>
+    </div>
+  </div>
+{% endblock %}

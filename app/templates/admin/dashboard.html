@@ -1,0 +1,43 @@
+{% set active_nav = 'admin' %}
+{% extends "base.html" %}
+{% block title %}Admin Dashboard | Sahayogi{% endblock %}
+{% block content %}
+  <header class="page-header">
+    <div>
+      <span class="eyebrow">Moderation command center</span>
+      <h1 class="h2 mb-1">Admin dashboard</h1>
+      <p class="page-subtitle">Monitor platform activity, approvals, reports, users, and controlled taxonomy.</p>
+    </div>
+  </header>
+
+  <div class="row g-4 mb-4">
+    {% for label, value, endpoint in [('Pending listings', stats.pending_listings, 'admin.listings'), ('Pending certificates', stats.pending_certificates, 'admin.certificates'), ('Open reports', stats.open_reports, 'admin.reports'), ('Users', stats.users, 'admin.users')] %}
+      <div class="col-md-6 col-xl-3">
+        <a class="metric-card text-decoration-none" href="{{ url_for(endpoint) }}">
+          <div class="stat-value">{{ value }}</div>
+          <div class="stat-label">{{ label }}</div>
+        </a>
+      </div>
+    {% endfor %}
+  </div>
+
+  <section class="balance-card mb-4">
+    <div class="d-flex flex-column flex-lg-row justify-content-between gap-4 align-items-lg-end">
+      <div>
+        <div class="balance-label mb-2">Role-based access</div>
+        <div class="balance-value"><strong>Admin</strong><span>Controls</span></div>
+        <p class="text-faint mb-0">All sensitive actions are logged through moderation and audit workflows.</p>
+      </div>
+      <a class="btn btn-accent" href="{{ url_for('admin.listings') }}">Review queue</a>
+    </div>
+  </section>
+
+  <div class="admin-action-grid">
+    <a class="admin-action" href="{{ url_for('admin.listings') }}"><strong>Listing approvals</strong><span class="text-muted">Approve or reject pending skill offers</span></a>
+    <a class="admin-action" href="{{ url_for('admin.certificates') }}"><strong>Certificates</strong><span class="text-muted">Verify uploaded proof documents</span></a>
+    <a class="admin-action" href="{{ url_for('admin.reports') }}"><strong>User reports</strong><span class="text-muted">Resolve safety and conduct issues</span></a>
+    <a class="admin-action" href="{{ url_for('admin.users') }}"><strong>User enforcement</strong><span class="text-muted">Suspend, ban, or reactivate accounts</span></a>
+    <a class="admin-action" href="{{ url_for('admin.categories') }}"><strong>Categories</strong><span class="text-muted">Maintain navigation taxonomy</span></a>
+    <a class="admin-action" href="{{ url_for('admin.skills') }}"><strong>Skills</strong><span class="text-muted">Manage skills inside categories</span></a>
+  </div>
+{% endblock %}

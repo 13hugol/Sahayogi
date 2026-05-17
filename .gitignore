@@ -1,0 +1,15 @@
+.env
+.pytest_cache/
+__pycache__/
+*.py[cod]
+instance/*
+!instance/.gitkeep
+!instance/uploads/
+!instance/uploads/.gitkeep
+graphify-out/
+venv/
+tests/
+.env.example
+docs/
+migrations/
+*.log

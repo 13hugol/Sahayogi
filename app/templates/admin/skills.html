@@ -1,0 +1,36 @@
+{% set active_nav = 'admin' %}
+{% extends "base.html" %}
+{% block title %}Skills | Sahayogi{% endblock %}
+{% block content %}
+  <div class="row g-4">
+    <div class="col-lg-5">
+      <div class="card card-shell">
+        <div class="card-body">
+          <h1 class="h4 mb-3">Create skill</h1>
+          <form method="post">
+            {{ form.hidden_tag() }}
+            <div class="mb-3">{{ form.name.label(class="form-label") }}{{ form.name(class="form-control") }}</div>
+            <div class="mb-3">{{ form.category_id.label(class="form-label") }}{{ form.category_id(class="form-select") }}</div>
+            <div class="mb-3">{{ form.description.label(class="form-label") }}{{ form.description(class="form-control") }}</div>
+            {{ form.submit(class="btn btn-accent") }}
+          </form>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-7">
+      <div class="card card-shell">
+        <div class="card-body">
+          <h2 class="h5 mb-3">Existing skills</h2>
+          <div class="list-group list-group-flush">
+            {% for skill in skills %}
+              <div class="list-group-item">
+                <strong>{{ skill.name }}</strong>
+                <div class="small text-muted">{{ skill.category.name }} &middot; {{ skill.description }}</div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

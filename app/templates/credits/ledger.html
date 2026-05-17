@@ -1,0 +1,131 @@
+{% set active_nav = 'credits' %}
+{% extends "base.html" %}
+{% block title %}Wallet | Sahayogi{% endblock %}
+{% block content %}
+  <header class="page-header">
+    <div>
+      <h1 class="h2 mb-1">Wallet</h1>
+      <p class="page-subtitle">Manage your credits and view transaction history.</p>
+    </div>
+  </header>
+
+  <div class="wallet-grid">
+    <div class="wallet-column">
+      <section class="balance-card">
+        <div class="d-flex flex-column flex-lg-row justify-content-between gap-4 align-items-lg-end">
+          <div>
+            <div class="balance-label mb-2">Available balance</div>
+            <div class="balance-value">
+              <strong>{{ current_user.available_credit_balance }}</strong>
+              <span>Credits</span>
+            </div>
+            <p class="text-faint mb-0">Equivalent to approx. {{ (current_user.available_credit_balance // 100) or 0 }} hours of specialized service.</p>
+          </div>
+          <div class="d-flex flex-wrap gap-2">
+            <button class="btn btn-outline-light" type="button">Transfer</button>
+            <button class="btn btn-accent" type="button">Top Up</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="table-card">
+        <div class="table-card-header">
+          <h2 class="h4 mb-0">Recent Transactions</h2>
+          <span class="small fw-bold text-muted">View All</span>
+        </div>
+        <div class="transaction-list">
+          {% for entry in entries %}
+            <article class="transaction-row">
+              <div class="d-flex align-items-center gap-3">
+                <span class="transaction-icon">{% if entry.amount_delta >= 0 %}+{% else %}-{% endif %}</span>
+                <div>
+                  <strong>{{ entry.description }}</strong>
+                  <div class="text-muted small">
+                    {{ entry.entry_type|replace('_', ' ')|title }} &middot; {{ entry.created_at.strftime('%b %d, %Y') }}
+                  </div>
+                </div>
+              </div>
+              <div class="text-end">
+                <div class="transaction-amount {% if entry.amount_delta >= 0 %}positive{% endif %}">
+                  {{ "%+d"|format(entry.amount_delta) }} <span class="small text-muted">CR</span>
+                </div>
+                <span class="badge text-bg-light">Completed</span>
+              </div>
+            </article>
+          {% else %}
+            <div class="empty-state m-4">No credit history yet.</div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="table-card">
+        <div class="table-card-header">
+          <h2 class="h4 mb-0">Reserved Credits</h2>
+          <span class="badge text-bg-light">{{ holds|length }} active</span>
+        </div>
+        <div class="transaction-list">
+          {% for hold in holds %}
+            <article class="transaction-row">
+              <div class="d-flex align-items-center gap-3">
+                <span class="transaction-icon">H</span>
+                <div>
+                  <strong>{{ hold.amount }} credits reserved</strong>
+                  <div class="text-muted small">Request #{{ hold.request_id }}</div>
+                </div>
+              </div>
+              <span class="badge text-bg-warning">{{ hold.status|title }}</span>
+            </article>
+          {% else %}
+            <div class="empty-state m-4">No active credit holds.</div>
+          {% endfor %}
+        </div>
+      </section>
+    </div>
+
+    <aside class="wallet-card add-credits-card">
+      <h2 class="h4 mb-4">Add Credits</h2>
+      <div class="mb-4">
+        <div class="form-label">Select Amount</div>
+        <div class="amount-grid">
+          <button class="amount-chip" type="button">100</button>
+          <button class="amount-chip active" type="button">500</button>
+          <button class="amount-chip" type="button">1000</button>
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="customCredits">Custom</label>
+        <input class="form-control" id="customCredits" placeholder="Enter amount" disabled>
+      </div>
+      <p class="text-end text-muted">Total: $50.00 USD</p>
+
+      <div class="mb-4">
+        <div class="form-label">Payment Method</div>
+        <div class="d-grid gap-3">
+          <div class="payment-option">
+            <div class="d-flex align-items-center gap-3">
+              <span class="payment-radio active"></span>
+              <div>
+                <strong>Credit Card</strong>
+                <div class="text-muted">**** **** **** 4242</div>
+              </div>
+            </div>
+            <span class="text-muted fw-bold">Card</span>
+          </div>
+          <div class="payment-option">
+            <div class="d-flex align-items-center gap-3">
+              <span class="payment-radio"></span>
+              <div>
+                <strong>PayPal</strong>
+                <div class="text-muted">{{ current_user.email }}</div>
+              </div>
+            </div>
+            <span class="text-muted fw-bold">Pay</span>
+          </div>
+          <button class="btn btn-outline-secondary w-100" type="button" disabled>+ Add New Method</button>
+        </div>
+      </div>
+      <button class="btn btn-accent w-100" type="button" disabled>Pay $50.00</button>
+      <p class="text-center text-muted mt-3 mb-0">Payment top-up is a UI placeholder until a real payment backend is added.</p>
+    </aside>
+  </div>
+{% endblock %}

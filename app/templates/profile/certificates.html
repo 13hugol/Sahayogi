@@ -1,0 +1,60 @@
+{% set active_nav = 'profile' %}
+{% extends "base.html" %}
+{% block title %}Certificates | Sahayogi{% endblock %}
+{% block content %}
+  <header class="page-header">
+    <div>
+      <span class="eyebrow">Identity and skill verification</span>
+      <h1 class="h2 mb-1">Certificates</h1>
+      <p class="page-subtitle">Upload proof for a skill and wait for admin review before the verified badge appears.</p>
+    </div>
+  </header>
+
+  <div class="row g-4">
+    <div class="col-lg-5">
+      <section class="verification-panel">
+        <h2 class="h4 mb-2">Upload skill certificate</h2>
+        <p class="text-muted">PDF, PNG, JPG, or JPEG up to the configured upload limit.</p>
+        <div class="stepper">
+          <div class="stepper-item complete"><span class="stepper-dot">1</span>Profile</div>
+          <div class="stepper-item active"><span class="stepper-dot">2</span>Document</div>
+          <div class="stepper-item"><span class="stepper-dot">3</span>Review</div>
+        </div>
+        <form method="post" enctype="multipart/form-data">
+          {{ form.hidden_tag() }}
+          <div class="mb-3">{{ form.skill_id.label(class="form-label") }}{{ form.skill_id(class="form-select") }}</div>
+          <div class="upload-zone mb-3">
+            <div class="w-100">
+              <strong>Click to upload or drag and drop</strong>
+              <p class="text-muted mb-3">Certificate files are sent to admins for manual verification.</p>
+              {{ form.certificate(class="form-control") }}
+            </div>
+          </div>
+          {{ form.submit(class="btn btn-accent w-100") }}
+        </form>
+      </section>
+    </div>
+    <div class="col-lg-7">
+      <section class="table-card">
+        <div class="table-card-header">
+          <h2 class="h4 mb-0">Submission history</h2>
+          <span class="badge text-bg-light">{{ certificates|length }} total</span>
+        </div>
+        <div class="clean-list">
+          {% for item in certificates %}
+            <article class="clean-row">
+              <div>
+                <strong>{{ item.skill.name }}</strong>
+                <div class="small text-muted">{{ item.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+                {% if item.review_notes %}<div class="small mt-2">{{ item.review_notes }}</div>{% endif %}
+              </div>
+              <span class="badge {% if item.status == 'approved' %}text-bg-success{% elif item.status == 'rejected' %}text-bg-danger{% else %}text-bg-warning{% endif %}">{{ item.status|title }}</span>
+            </article>
+          {% else %}
+            <div class="empty-state m-4">No certificates uploaded yet.</div>
+          {% endfor %}
+        </div>
+      </section>
+    </div>
+  </div>
+{% endblock %}

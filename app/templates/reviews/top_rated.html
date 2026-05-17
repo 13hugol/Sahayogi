@@ -1,0 +1,32 @@
+{% set active_nav = 'profile' %}
+{% extends "base.html" %}
+{% block title %}Top Rated Members | Sahayogi{% endblock %}
+{% block content %}
+  <div class="section-head mb-4">
+    <div><span class="eyebrow">Leaderboard</span><h1 class="h2 mb-0">Top-rated members</h1></div>
+  </div>
+  <div class="row g-4">
+    {% for profile in profiles %}
+      <div class="col-lg-4">
+        <div class="card card-shell h-100">
+          <div class="card-body">
+            <div class="d-flex justify-content-between mb-3">
+              <div>
+                <h2 class="h5 mb-1">{{ profile.user.full_name }}</h2>
+                <div class="text-muted">@{{ profile.username }}</div>
+              </div>
+              <span class="badge text-bg-success">{{ profile.reputation_score }}/5</span>
+            </div>
+            <div class="small text-muted mb-3">
+              <div>Reviews: {{ profile.review_count }}</div>
+              <div>Completed exchanges: {{ profile.completed_exchange_count }}</div>
+            </div>
+            <a class="btn btn-outline-primary" href="{{ url_for('profile.view', user_id=profile.user_id) }}">View profile</a>
+          </div>
+        </div>
+      </div>
+    {% else %}
+      <div class="col-12"><div class="card card-shell"><div class="card-body text-muted">Members appear here once they have at least 3 reviews.</div></div></div>
+    {% endfor %}
+  </div>
+{% endblock %}

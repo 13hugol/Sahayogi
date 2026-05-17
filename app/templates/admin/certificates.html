@@ -1,0 +1,31 @@
+{% set active_nav = 'admin' %}
+{% extends "base.html" %}
+{% block title %}Moderate Certificates | Sahayogi{% endblock %}
+{% block content %}
+  <div class="section-head mb-4"><div><span class="eyebrow">Verification</span><h1 class="h2 mb-0">Certificate review queue</h1></div></div>
+  {% for certificate in certificates %}
+    <div class="card card-shell mb-4">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <div>
+            <h2 class="h5 mb-1">{{ certificate.user.full_name }}</h2>
+            <div class="small text-muted">{{ certificate.skill.name }} &middot; Submitted {{ certificate.created_at.strftime('%Y-%m-%d') }}</div>
+          </div>
+          <a class="btn btn-outline-primary btn-sm" href="{{ url_for('main.media', filename=certificate.file_path) }}" target="_blank">Open file</a>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+          <form method="post" action="{{ url_for('admin.approve_certificate', certificate_id=certificate.id) }}" class="d-flex gap-2">
+            <input class="form-control form-control-sm" name="notes" placeholder="Optional approval note">
+            <button class="btn btn-accent btn-sm">Approve</button>
+          </form>
+          <form method="post" action="{{ url_for('admin.reject_certificate', certificate_id=certificate.id) }}" class="d-flex gap-2">
+            <input class="form-control form-control-sm" name="notes" placeholder="Rejection note">
+            <button class="btn btn-outline-danger btn-sm">Reject</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  {% else %}
+    <div class="card card-shell"><div class="card-body text-muted">No pending certificates.</div></div>
+  {% endfor %}
+{% endblock %}

@@ -1,0 +1,25 @@
+{% set active_nav = 'messages' %}
+{% extends "base.html" %}
+{% block title %}Messages | Sahayogi{% endblock %}
+{% block content %}
+  <div class="section-head mb-4">
+    <div><span class="eyebrow">Communication</span><h1 class="h2 mb-0">Conversations</h1></div>
+  </div>
+  <div class="card card-shell">
+    <div class="card-body">
+      <div class="list-group list-group-flush">
+        {% for conversation in conversations %}
+          <a class="list-group-item list-group-item-action" href="{{ url_for('messages.detail', conversation_id=conversation.id) }}">
+            <div class="d-flex justify-content-between">
+              <strong>{{ conversation.subject }}</strong>
+              <span class="small text-muted">{{ conversation.created_at.strftime('%Y-%m-%d') }}</span>
+            </div>
+            <div class="small text-muted">With {{ conversation.other_participant(current_user.id).full_name if conversation.other_participant(current_user.id) else 'participant' }}</div>
+          </a>
+        {% else %}
+          <div class="text-muted">Messages become available after an exchange request is accepted.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+{% endblock %}

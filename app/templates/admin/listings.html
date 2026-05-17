@@ -1,0 +1,29 @@
+{% set active_nav = 'admin' %}
+{% extends "base.html" %}
+{% block title %}Moderate Listings | Sahayogi{% endblock %}
+{% block content %}
+  <div class="section-head mb-4"><div><span class="eyebrow">Queue</span><h1 class="h2 mb-0">Pending listings</h1></div></div>
+  {% for listing in listings %}
+    <div class="card card-shell mb-4">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <div>
+            <h2 class="h5 mb-1">{{ listing.title }}</h2>
+            <div class="small text-muted">{{ listing.user.full_name }} &middot; {{ listing.skill.name }}</div>
+          </div>
+          <a class="btn btn-outline-primary btn-sm" href="{{ url_for('listings.detail', listing_id=listing.id) }}">Preview</a>
+        </div>
+        <p>{{ listing.description }}</p>
+        <div class="d-flex flex-wrap gap-2">
+          <form method="post" action="{{ url_for('admin.approve_listing', listing_id=listing.id) }}"><button class="btn btn-accent btn-sm">Approve</button></form>
+          <form method="post" action="{{ url_for('admin.reject_listing', listing_id=listing.id) }}" class="d-flex gap-2">
+            <input class="form-control form-control-sm" name="reason" placeholder="Rejection reason">
+            <button class="btn btn-outline-danger btn-sm">Reject</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  {% else %}
+    <div class="card card-shell"><div class="card-body text-muted">No pending listings.</div></div>
+  {% endfor %}
+{% endblock %}

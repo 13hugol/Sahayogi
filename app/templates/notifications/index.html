@@ -1,0 +1,24 @@
+{% set active_nav = 'notifications' %}
+{% extends "base.html" %}
+{% block title %}Notifications | Sahayogi{% endblock %}
+{% block content %}
+  <div class="section-head mb-4">
+    <div><span class="eyebrow">Activity feed</span><h1 class="h2 mb-0">Notifications</h1></div>
+    <form method="post" action="{{ url_for('notifications.mark_all_read') }}"><button class="btn btn-outline-primary">Mark all as read</button></form>
+  </div>
+  <div class="card card-shell">
+    <div class="card-body">
+      {% for item in notifications %}
+        <a class="list-group-item list-group-item-action border-bottom d-block py-3 {% if not item.is_read %}bg-light-subtle{% endif %}" href="{{ url_for('notifications.open_item', notification_id=item.id) }}">
+          <div class="d-flex justify-content-between">
+            <strong>{{ item.title }}</strong>
+            {% if not item.is_read %}<span class="badge text-bg-danger">New</span>{% endif %}
+          </div>
+          <div class="text-muted small">{{ item.body }}</div>
+        </a>
+      {% else %}
+        <div class="text-muted">No notifications yet.</div>
+      {% endfor %}
+    </div>
+  </div>
+{% endblock %}

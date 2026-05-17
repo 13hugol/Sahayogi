@@ -1,0 +1,37 @@
+{% set active_nav = 'listings' %}
+{% extends "base.html" %}
+{% block title %}My Listings | Sahayogi{% endblock %}
+{% block content %}
+  <div class="section-head mb-4">
+    <div><span class="eyebrow">Ownership</span><h1 class="h2 mb-0">My listings</h1></div>
+    <a class="btn btn-accent" href="{{ url_for('listings.create') }}">Create listing</a>
+  </div>
+  <div class="row g-4">
+    {% for listing in listings %}
+      <div class="col-lg-6">
+        <div class="card card-shell h-100">
+          <div class="card-body">
+            <div class="d-flex justify-content-between mb-2">
+              <h2 class="h5">{{ listing.title }}</h2>
+              <span class="badge text-bg-light">{{ listing.status }}</span>
+            </div>
+            <div class="small text-muted mb-3">{{ listing.skill.name }} &middot; {{ listing.exchange_type|title }}</div>
+            <p>{{ listing.description[:150] }}{% if listing.description|length > 150 %}...{% endif %}</p>
+            <div class="d-flex gap-2">
+              <a class="btn btn-outline-primary btn-sm" href="{{ url_for('listings.detail', listing_id=listing.id) }}">View</a>
+              <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('listings.edit', listing_id=listing.id) }}">Edit</a>
+              <form method="post" action="{{ url_for('listings.delete', listing_id=listing.id) }}">
+                <button class="btn btn-outline-danger btn-sm" type="submit">Delete</button>
+              </form>
+            </div>
+            {% if listing.rejection_reason %}
+              <div class="alert alert-warning mt-3 mb-0">{{ listing.rejection_reason }}</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    {% else %}
+      <div class="col-12"><div class="card card-shell"><div class="card-body text-muted">No listings created yet.</div></div></div>
+    {% endfor %}
+  </div>
+{% endblock %}

@@ -1,0 +1,46 @@
+{% set active_nav = 'exchanges' %}
+{% extends "base.html" %}
+{% block title %}Exchanges | Sahayogi{% endblock %}
+{% block content %}
+  <div class="section-head mb-4">
+    <div><span class="eyebrow">History</span><h1 class="h2 mb-0">Exchange dashboard</h1></div>
+  </div>
+  <form class="mb-4">
+    <div class="row g-3 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label" for="status">Filter by status</label>
+        <select class="form-select" id="status" name="status">
+          <option value="">All</option>
+          {% for value in ['active', 'completed', 'declined', 'cancelled'] %}
+            <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ value|title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2"><button class="btn btn-accent w-100" type="submit">Apply</button></div>
+    </div>
+  </form>
+  <div class="row g-4">
+    {% for exchange in exchanges %}
+      <div class="col-lg-6">
+        <div class="card card-shell h-100">
+          <div class="card-body">
+            <div class="d-flex justify-content-between mb-2">
+              <h2 class="h5">{{ exchange.listing.title }}</h2>
+              <span class="badge text-bg-light">{{ exchange.status }}</span>
+            </div>
+            <div class="small text-muted mb-3">
+              {{ exchange.exchange_type|title }} &middot; Created {{ exchange.created_at.strftime('%Y-%m-%d') }}
+            </div>
+            <div class="mb-3">
+              <div>Teacher: {{ exchange.teacher.full_name }}</div>
+              <div>Learner: {{ exchange.learner.full_name }}</div>
+            </div>
+            <a class="btn btn-outline-primary" href="{{ url_for('exchanges.detail', exchange_id=exchange.id) }}">Open exchange</a>
+          </div>
+        </div>
+      </div>
+    {% else %}
+      <div class="col-12"><div class="card card-shell"><div class="card-body text-muted">No exchanges found.</div></div></div>
+    {% endfor %}
+  </div>
+{% endblock %}

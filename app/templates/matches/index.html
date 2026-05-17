@@ -1,0 +1,31 @@
+{% set active_nav = 'matches' %}
+{% extends "base.html" %}
+{% block title %}Matches | Sahayogi{% endblock %}
+{% block content %}
+  <div class="section-head mb-4">
+    <div><span class="eyebrow">Mutual fit</span><h1 class="h2 mb-0">Skill matches</h1></div>
+  </div>
+  <div class="row g-4">
+    {% for match in matches %}
+      <div class="col-lg-6">
+        <div class="card card-shell h-100">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+              <div>
+                <h2 class="h5 mb-1">{{ match.user.full_name }}</h2>
+                <div class="small text-muted">{{ match.user.profile.location or "Location not provided" }}</div>
+              </div>
+              <span class="badge text-bg-light">{{ match.user.profile.reputation_score }}/5</span>
+            </div>
+            <p>{{ match.summary }}</p>
+            <div class="d-flex gap-2">
+              <a class="btn btn-outline-primary" href="{{ url_for('profile.view', user_id=match.user.id) }}">Profile</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% else %}
+      <div class="col-12"><div class="card card-shell"><div class="card-body text-muted">Add offered and wanted skills to your profile to generate mutual matches.</div></div></div>
+    {% endfor %}
+  </div>
+{% endblock %}

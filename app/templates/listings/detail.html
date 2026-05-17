@@ -1,0 +1,65 @@
+{% set active_nav = 'listings' %}
+{% extends "base.html" %}
+{% block title %}{{ listing.title }} | Sahayogi{% endblock %}
+{% block content %}
+  <div class="row g-4">
+    <div class="col-lg-8">
+      <div class="card card-shell">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+            <div>
+              <span class="badge text-bg-light">{{ listing.category.name }}</span>
+              <span class="badge {% if listing.exchange_type == 'credit' %}text-bg-warning{% else %}text-bg-success{% endif %}">{{ listing.exchange_type|title }}</span>
+              {% if listing.user.has_verified_skill(listing.skill_id) %}<span class="badge text-bg-info">Verified skill</span>{% endif %}
+              <h1 class="h2 mt-3">{{ listing.title }}</h1>
+              <div class="text-muted">{{ listing.skill.name }} by <a href="{{ url_for('profile.view', user_id=listing.user_id) }}">{{ listing.user.full_name }}</a></div>
+            </div>
+            {% if current_user.is_authenticated and current_user.id == listing.user_id %}
+              <a class="btn btn-outline-primary" href="{{ url_for('listings.edit', listing_id=listing.id) }}">Edit listing</a>
+            {% endif %}
+          </div>
+          <p class="lead">{{ listing.description }}</p>
+          <div class="row g-3 mb-4">
+            <div class="col-md-4"><strong>Location</strong><div class="text-muted">{{ listing.location_text or listing.user.profile.location or "Flexible" }}</div></div>
+            <div class="col-md-4"><strong>Contact</strong><div class="text-muted">{{ listing.contact_method or listing.user.profile.contact_email or "In-app messaging" }}</div></div>
+            <div class="col-md-4"><strong>Reputation</strong><div class="text-muted">{{ listing.user.profile.reputation_score }} / 5</div></div>
+          </div>
+          <div>
+            <h2 class="h5">Availability</h2>
+            <ul class="list-unstyled">
+              {% for item in listing.availability %}
+                <li>{{ item.label }}</li>
+              {% else %}
+                <li class="text-muted">Availability will be agreed in conversation.</li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="card card-shell">
+        <div class="card-body">
+          <h2 class="h5 mb-3">Request this skill</h2>
+          {% if not current_user.is_authenticated %}
+            <p class="text-muted">Register or log in to request this listing.</p>
+            <a class="btn btn-accent w-100" href="{{ url_for('auth.register') }}">Create account</a>
+          {% elif current_user.id == listing.user_id %}
+            <p class="text-muted mb-0">This is your own listing.</p>
+          {% else %}
+            <form method="post" action="{{ url_for('requests_bp.create', listing_id=listing.id) }}">
+              {{ request_form.hidden_tag() }}
+              {% if listing.exchange_type == 'teach' %}
+                <div class="mb-3">{{ request_form.offered_skill_id.label(class="form-label") }}{{ request_form.offered_skill_id(class="form-select") }}</div>
+              {% else %}
+                <div class="alert alert-warning">This request will reserve {{ listing.min_credits }} credits until the request is accepted or cancelled.</div>
+              {% endif %}
+              <div class="mb-3">{{ request_form.requested_message.label(class="form-label") }}{{ request_form.requested_message(class="form-control", rows="4", placeholder="Share your learning goal or proposed barter") }}</div>
+              {{ request_form.submit(class="btn btn-accent w-100") }}
+            </form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

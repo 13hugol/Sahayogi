@@ -1,0 +1,21 @@
+{% set active_nav = 'admin' %}
+{% extends "base.html" %}
+{% block title %}Edit Category | Sahayogi{% endblock %}
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-lg-6">
+      <div class="card card-shell">
+        <div class="card-body">
+          <h1 class="h4 mb-3">Edit category</h1>
+          <form method="post">
+            {{ form.hidden_tag() }}
+            <div class="mb-3">{{ form.name.label(class="form-label") }}{{ form.name(class="form-control") }}</div>
+            <div class="mb-3">{{ form.slug.label(class="form-label") }}{{ form.slug(class="form-control") }}</div>
+            <div class="mb-3">{{ form.description.label(class="form-label") }}{{ form.description(class="form-control") }}</div>
+            {{ form.submit(class="btn btn-accent") }}
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

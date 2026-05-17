@@ -1,0 +1,28 @@
+{% set active_nav = 'admin' %}
+{% extends "base.html" %}
+{% block title %}Reports | Sahayogi{% endblock %}
+{% block content %}
+  <div class="section-head mb-4"><div><span class="eyebrow">Safety</span><h1 class="h2 mb-0">User reports</h1></div></div>
+  {% for report in reports %}
+    <div class="card card-shell mb-4">
+      <div class="card-body">
+        <div class="d-flex justify-content-between mb-2">
+          <div>
+            <h2 class="h5 mb-1">{{ report.reason|replace('_', ' ')|title }}</h2>
+            <div class="small text-muted">Reporter: {{ report.reporter.full_name }} &middot; Reported user: {{ report.reported_user.full_name }}</div>
+          </div>
+          <span class="badge text-bg-light">{{ report.status }}</span>
+        </div>
+        <p>{{ report.description or "No extra detail supplied." }}</p>
+        {% if report.status == 'open' %}
+          <div class="d-flex gap-2">
+            <form method="post" action="{{ url_for('admin.resolve_report', report_id=report.id, decision='resolved') }}"><button class="btn btn-accent btn-sm">Resolve</button></form>
+            <form method="post" action="{{ url_for('admin.resolve_report', report_id=report.id, decision='dismissed') }}"><button class="btn btn-outline-secondary btn-sm">Dismiss</button></form>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  {% else %}
+    <div class="card card-shell"><div class="card-body text-muted">No reports submitted.</div></div>
+  {% endfor %}
+{% endblock %}

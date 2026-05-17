@@ -1,0 +1,72 @@
+{% set active_nav = 'exchanges' %}
+{% extends "base.html" %}
+{% block title %}Exchange #{{ exchange.id }} | Sahayogi{% endblock %}
+{% block content %}
+  <div class="row g-4">
+    <div class="col-lg-8">
+      <div class="card card-shell mb-4">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+              <span class="eyebrow">Exchange record</span>
+              <h1 class="h3 mb-1">{{ exchange.listing.title }}</h1>
+              <div class="text-muted">{{ exchange.exchange_type|title }} exchange &middot; Status: {{ exchange.status }}</div>
+            </div>
+            {% if exchange.conversation %}
+              <a class="btn btn-outline-primary" href="{{ url_for('messages.detail', conversation_id=exchange.conversation.id) }}">Open chat</a>
+            {% endif %}
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6"><strong>Teacher</strong><div>{{ exchange.teacher.full_name }}</div></div>
+            <div class="col-md-6"><strong>Learner</strong><div>{{ exchange.learner.full_name }}</div></div>
+            {% if exchange.barter_skill %}
+              <div class="col-md-6"><strong>Barter skill</strong><div>{{ exchange.barter_skill.name }}</div></div>
+            {% endif %}
+            {% if exchange.request.credits_reserved %}
+              <div class="col-md-6"><strong>Credits reserved</strong><div>{{ exchange.request.credits_reserved }}</div></div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="card card-shell">
+        <div class="card-body">
+          <h2 class="h5 mb-3">Completion status</h2>
+          <ul class="list-unstyled">
+            {% for mark in exchange.completion_marks %}
+              <li>{{ mark.user.full_name }} marked complete on {{ mark.completed_at.strftime('%Y-%m-%d %H:%M') }}</li>
+            {% else %}
+              <li class="text-muted">No completion confirmations yet.</li>
+            {% endfor %}
+          </ul>
+          <div class="d-flex flex-wrap gap-2">
+            {% if can_mark_complete %}
+              <form method="post" action="{{ url_for('exchanges.mark_complete', exchange_id=exchange.id) }}"><button class="btn btn-accent">Mark complete</button></form>
+            {% endif %}
+            {% if can_review %}
+              <a class="btn btn-outline-primary" href="{{ url_for('reviews.create', exchange_id=exchange.id) }}">Leave review</a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="card card-shell">
+        <div class="card-body">
+          <h2 class="h5 mb-3">Reviews on this exchange</h2>
+          {% for review in reviews %}
+            <article class="border-bottom pb-3 mb-3">
+              <div class="d-flex justify-content-between">
+                <strong>{{ review.reviewer.full_name }}</strong>
+                <span>{{ review.rating }}/5</span>
+              </div>
+              <p class="mb-0">{{ review.comment or "No written comment." }}</p>
+            </article>
+          {% else %}
+            <div class="text-muted">Reviews unlock after both parties mark the exchange complete.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

@@ -1,0 +1,117 @@
+{% set active_nav = 'profile' %}
+{% extends "base.html" %}
+{% block title %}{{ user.full_name }} | Sahayogi{% endblock %}
+{% block content %}
+  <div class="row g-4">
+    <div class="col-lg-4">
+      <section class="card card-shell h-100">
+        <div class="card-body">
+          {% if user.profile.avatar_path %}
+            <img class="avatar-large mb-3" src="{{ url_for('main.media', filename=user.profile.avatar_path) }}" alt="{{ user.full_name }}">
+          {% else %}
+            <div class="profile-avatar-placeholder mb-3">{{ user.full_name[:1] }}</div>
+          {% endif %}
+          <h1 class="h3 mb-1">{{ user.full_name }}</h1>
+          <p class="text-muted">@{{ user.profile.username }}</p>
+          <p>{{ user.profile.headline or "Skill exchange member" }}</p>
+          <div class="small text-muted mb-3">
+            <div>Location: {{ user.profile.location or "Not provided" }}</div>
+            <div>Reputation: {{ user.profile.reputation_score }} / 5</div>
+            <div>Completed exchanges: {{ user.profile.completed_exchange_count }}</div>
+          </div>
+          <p>{{ user.profile.bio or "No bio yet." }}</p>
+          {% if current_user.is_authenticated and current_user.id == user.id %}
+            <div class="d-grid gap-2">
+              <a class="btn btn-accent" href="{{ url_for('profile.edit') }}">Edit profile</a>
+              <a class="btn btn-outline-primary" href="{{ url_for('profile.certificates') }}">Manage certificates</a>
+            </div>
+          {% elif current_user.is_authenticated %}
+            <form method="post" action="{{ url_for('profile.report', user_id=user.id) }}" class="mt-3">
+              {{ report_form.hidden_tag() }}
+              <div class="mb-2">{{ report_form.reason(class="form-select") }}</div>
+              <div class="mb-2">{{ report_form.description(class="form-control", rows="3", placeholder="Optional details") }}</div>
+              {{ report_form.submit(class="btn btn-outline-danger btn-sm") }}
+            </form>
+          {% endif %}
+        </div>
+      </section>
+    </div>
+    <div class="col-lg-8">
+      <section class="card card-shell mb-4">
+        <div class="card-body">
+          <div class="section-head mb-3"><h2 class="h5 mb-0">Skills</h2></div>
+          <div class="row">
+            <div class="col-md-6">
+              <h3 class="h6">Offers</h3>
+              <ul class="list-unstyled">
+                {% for item in user.offered_skills %}
+                  <li class="mb-2"><span class="badge text-bg-light">{{ item.skill.name }}</span></li>
+                {% else %}
+                  <li class="text-muted">No offered skills listed.</li>
+                {% endfor %}
+              </ul>
+            </div>
+            <div class="col-md-6">
+              <h3 class="h6">Wants to learn</h3>
+              <ul class="list-unstyled">
+                {% for item in user.wanted_skills %}
+                  <li class="mb-2"><span class="badge text-bg-light">{{ item.skill.name }}</span></li>
+                {% else %}
+                  <li class="text-muted">No learning goals listed.</li>
+                {% endfor %}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card card-shell mb-4">
+        <div class="card-body">
+          <div class="section-head mb-3"><h2 class="h5 mb-0">Verified certificates</h2><a href="{{ url_for('reviews.user_reviews', user_id=user.id) }}">View all reviews</a></div>
+          <div class="d-flex flex-wrap gap-2">
+            {% for certificate in approved_certificates %}
+              <span class="badge text-bg-info">{{ certificate.skill.name }} verified</span>
+            {% else %}
+              <span class="text-muted">No verified certificates yet.</span>
+            {% endfor %}
+          </div>
+        </div>
+      </section>
+
+      <section class="card card-shell mb-4">
+        <div class="card-body">
+          <div class="section-head mb-3"><h2 class="h5 mb-0">Active listings</h2></div>
+          {% if approved_listings %}
+            <div class="list-group list-group-flush">
+              {% for listing in approved_listings %}
+                <a class="list-group-item list-group-item-action" href="{{ url_for('listings.detail', listing_id=listing.id) }}">
+                  <strong>{{ listing.title }}</strong>
+                  <div class="small text-muted">{{ listing.skill.name }} &middot; {{ listing.exchange_type|title }}</div>
+                </a>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="empty-state">No public listings yet.</div>
+          {% endif %}
+        </div>
+      </section>
+
+      <section class="card card-shell">
+        <div class="card-body">
+          <div class="section-head mb-3"><h2 class="h5 mb-0">Recent reviews</h2></div>
+          {% for review in recent_reviews %}
+            <article class="border-bottom pb-3 mb-3">
+              <div class="d-flex justify-content-between">
+                <strong>{{ review.reviewer.full_name }}</strong>
+                <span>{{ review.rating }}/5</span>
+              </div>
+              <p class="mb-0">{{ review.comment or "No written comment." }}</p>
+            </article>
+          {% else %}
+            <div class="empty-state">No reviews yet.</div>
+          {% endfor %}
+        </div>
+      </section>
+    </div>
+  </div>
+{% endblock %}

@@ -1,0 +1,21 @@
+{% set active_nav = 'exchanges' %}
+{% extends "base.html" %}
+{% block title %}Leave Review | Sahayogi{% endblock %}
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-lg-6">
+      <div class="card card-shell">
+        <div class="card-body">
+          <h1 class="h3 mb-3">Review {{ reviewee.full_name }}</h1>
+          <p class="text-muted">Exchange: {{ exchange.listing.title }}</p>
+          <form method="post">
+            {{ form.hidden_tag() }}
+            <div class="mb-3">{{ form.rating.label(class="form-label") }}{{ form.rating(class="form-select") }}</div>
+            <div class="mb-3">{{ form.comment.label(class="form-label") }}{{ form.comment(class="form-control", rows="5") }}</div>
+            {{ form.submit(class="btn btn-accent") }}
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

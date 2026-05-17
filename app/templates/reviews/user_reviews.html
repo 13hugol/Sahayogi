@@ -1,0 +1,24 @@
+{% set active_nav = 'profile' %}
+{% extends "base.html" %}
+{% block title %}Reviews for {{ review_user.full_name }} | Sahayogi{% endblock %}
+{% block content %}
+  <div class="section-head mb-4">
+    <div><span class="eyebrow">Trust history</span><h1 class="h2 mb-0">Reviews for {{ review_user.full_name }}</h1></div>
+  </div>
+  <div class="card card-shell">
+    <div class="card-body">
+      {% for review in reviews %}
+        <article class="border-bottom pb-3 mb-3">
+          <div class="d-flex justify-content-between">
+            <strong>{{ review.reviewer.full_name }}</strong>
+            <span>{{ review.rating }}/5</span>
+          </div>
+          <div class="small text-muted">Submitted {{ review.created_at.strftime('%Y-%m-%d') }}</div>
+          <p class="mb-0 mt-2">{{ review.comment or "No written comment." }}</p>
+        </article>
+      {% else %}
+        <div class="text-muted">No reviews published yet.</div>
+      {% endfor %}
+    </div>
+  </div>
+{% endblock %}
