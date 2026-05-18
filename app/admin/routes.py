@@ -8,7 +8,7 @@ from flask_login import current_user
 from ..decorators import admin_required
 from ..extensions import db
 from ..forms import CategoryForm, SkillForm, SuspensionForm
-from ..models import Category, Certificate, Listing, Report, Role, Skill, User, utcnow
+from ..models import Category, Certificate, Exchange, Listing, Report, Role, Skill, User, utcnow
 from ..services import audit, create_notification
 from . import admin_bp
 
@@ -17,10 +17,11 @@ from . import admin_bp
 @admin_required
 def dashboard():
     stats = {
-        "pending_listings": Listing.query.filter_by(status="pending").count(),
-        "pending_certificates": Certificate.query.filter_by(status="pending").count(),
+        "total_users": User.query.count(),
+        "active_listings": Listing.query.filter_by(status="approved").count(),
+        "pending_approvals": Listing.query.filter_by(status="pending").count() + Certificate.query.filter_by(status="pending").count(),
         "open_reports": Report.query.filter_by(status="open").count(),
-        "users": User.query.count(),
+        "daily_exchanges": Exchange.query.filter(Exchange.created_at >= utcnow() - timedelta(days=1)).count(),
     }
     return render_template("admin/dashboard.html", stats=stats)
 
