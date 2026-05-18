@@ -2,6 +2,7 @@
 {% extends "base.html" %}
 {% block title %}Manage Users | Sahayogi{% endblock %}
 {% block content %}
+  {% include "admin/_nav.html" %}
   <div class="section-head mb-4"><div><span class="eyebrow">Enforcement</span><h1 class="h2 mb-0">User management</h1></div></div>
   {% if target_user %}
     <div class="card card-shell mb-4">

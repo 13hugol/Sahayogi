@@ -2,6 +2,7 @@
 {% extends "base.html" %}
 {% block title %}Moderate Listings | Sahayogi{% endblock %}
 {% block content %}
+  {% include "admin/_nav.html" %}
   <div class="section-head mb-4"><div><span class="eyebrow">Queue</span><h1 class="h2 mb-0">Pending listings</h1></div></div>
   {% for listing in listings %}
     <div class="card card-shell mb-4">

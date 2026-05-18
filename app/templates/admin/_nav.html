@@ -1,0 +1,25 @@
+<div class="mb-4">
+  <ul class="nav nav-pills gap-2 bg-light p-2 rounded-3 shadow-sm border" style="background-color: #f8f9fa; border-radius: 10px;">
+    <li class="nav-item">
+      <a class="nav-link {% if request.endpoint == 'admin.dashboard' %}active text-white bg-dark{% else %}text-secondary{% endif %} rounded-pill px-3 py-1.5" style="font-weight: 500; font-size: 0.9rem;" href="{{ url_for('admin.dashboard') }}">Dashboard</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if request.endpoint == 'admin.users' %}active text-white bg-dark{% else %}text-secondary{% endif %} rounded-pill px-3 py-1.5" style="font-weight: 500; font-size: 0.9rem;" href="{{ url_for('admin.users') }}">Users</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if request.endpoint == 'admin.listings' %}active text-white bg-dark{% else %}text-secondary{% endif %} rounded-pill px-3 py-1.5" style="font-weight: 500; font-size: 0.9rem;" href="{{ url_for('admin.listings') }}">Listings</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if request.endpoint == 'admin.reports' %}active text-white bg-dark{% else %}text-secondary{% endif %} rounded-pill px-3 py-1.5" style="font-weight: 500; font-size: 0.9rem;" href="{{ url_for('admin.reports') }}">Reports</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if request.endpoint == 'admin.reviews' %}active text-white bg-dark{% else %}text-secondary{% endif %} rounded-pill px-3 py-1.5" style="font-weight: 500; font-size: 0.9rem;" href="{{ url_for('admin.reviews') }}">Reviews</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if request.endpoint == 'admin.categories' %}active text-white bg-dark{% else %}text-secondary{% endif %} rounded-pill px-3 py-1.5" style="font-weight: 500; font-size: 0.9rem;" href="{{ url_for('admin.categories') }}">Categories</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if request.endpoint == 'admin.skills' %}active text-white bg-dark{% else %}text-secondary{% endif %} rounded-pill px-3 py-1.5" style="font-weight: 500; font-size: 0.9rem;" href="{{ url_for('admin.skills') }}">Skills</a>
+    </li>
+  </ul>
+</div>
