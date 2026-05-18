@@ -1,0 +1,80 @@
+{% set active_nav = 'admin' %}
+{% extends "base.html" %}
+{% block title %}Moderate Reviews | Sahayogi{% endblock %}
+{% block content %}
+  <div class="section-head mb-4">
+    <div>
+      <span class="eyebrow">Moderation Queue</span>
+      <h1 class="h2 mb-0">Review Moderation</h1>
+      <p class="text-muted small mb-0">Monitor and delete inappropriate or abusive user feedback.</p>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-12">
+      {% for review in reviews %}
+        <div class="card card-shell mb-4 border-0 shadow-sm" style="transition: transform 0.2s, box-shadow 0.2s; border-radius: 12px; overflow: hidden;">
+          <div class="card-body p-4">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-3 mb-3">
+              <div>
+                <div class="d-flex align-items-center gap-2 mb-2">
+                  <div class="d-flex text-warning fs-5">
+                    {% for i in range(5) %}
+                      {% if i < review.rating %}
+                        ★
+                      {% else %}
+                        ☆
+                      {% endif %}
+                    {% endfor %}
+                  </div>
+                  <span class="badge rounded-pill text-bg-warning px-2.5 py-1 small" style="font-weight: 600;">{{ review.rating }} / 5 Stars</span>
+                </div>
+                <div class="small text-muted" style="font-size: 0.9rem;">
+                  Written by <span class="text-dark font-medium" style="font-weight: 500;">{{ review.reviewer.full_name }}</span> 
+                  for <span class="text-dark font-medium" style="font-weight: 500;">{{ review.reviewee.full_name }}</span>
+                  &middot; <span class="text-faint">{{ review.created_at.strftime('%Y-%m-%d %H:%M') }} UTC</span>
+                </div>
+              </div>
+              <div>
+                <form method="post" action="{{ url_for('admin.reject_review', review_id=review.id) }}" onsubmit="return confirm('Are you sure you want to reject and delete this review? This action will permanently remove the review and recalculate the recipient\'s reputation.');">
+                  <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill px-3 py-1.5" style="font-weight: 500; font-size: 0.85rem;">
+                    Reject & Delete
+                  </button>
+                </form>
+              </div>
+            </div>
+            
+            {% if review.comment %}
+              <div class="p-3 bg-light rounded-3 mb-3" style="border-left: 4px solid #ffc107;">
+                <p class="mb-0 text-secondary" style="font-style: italic; font-size: 0.95rem; line-height: 1.5;">
+                  "{{ review.comment }}"
+                </p>
+              </div>
+            {% else %}
+              <div class="p-3 bg-light rounded-3 mb-3">
+                <p class="mb-0 text-muted small" style="font-style: italic;">
+                  No text feedback was submitted with this review.
+                </p>
+              </div>
+            {% endif %}
+            
+            <div class="d-flex align-items-center gap-2 pt-2" style="font-size: 0.85rem;">
+              <span class="text-muted">Associated Exchange:</span>
+              <a href="{{ url_for('exchanges.detail', exchange_id=review.exchange_id) }}" class="text-decoration-none" style="color: #4f46e5; font-weight: 500;">
+                Exchange #{{ review.exchange_id }} &rarr;
+              </a>
+            </div>
+          </div>
+        </div>
+      {% else %}
+        <div class="card card-shell border-0 shadow-sm text-center py-5" style="border-radius: 12px;">
+          <div class="card-body text-muted">
+            <div class="fs-1 mb-2">✍️</div>
+            <h3 class="h5 mb-1 text-dark">No reviews found</h3>
+            <p class="mb-0 small text-secondary">There are currently no user-submitted reviews in the database.</p>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+{% endblock %}
