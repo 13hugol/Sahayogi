@@ -10,10 +10,16 @@
     </div>
   </header>
 
-  <div class="row g-4 mb-4">
-    {% for label, value, endpoint in [('Pending listings', stats.pending_listings, 'admin.listings'), ('Pending certificates', stats.pending_certificates, 'admin.certificates'), ('Open reports', stats.open_reports, 'admin.reports'), ('Users', stats.users, 'admin.users')] %}
-      <div class="col-md-6 col-xl-3">
-        <a class="metric-card text-decoration-none" href="{{ url_for(endpoint) }}">
+  <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-5 g-3 mb-4">
+    {% for label, value, endpoint in [
+      ('Total users', stats.total_users, 'admin.users'),
+      ('Active listings', stats.active_listings, 'admin.listings'),
+      ('Pending approvals', stats.pending_approvals, 'admin.listings'),
+      ('Open reports', stats.open_reports, 'admin.reports'),
+      ('Daily exchanges', stats.daily_exchanges, 'admin.dashboard')
+    ] %}
+      <div class="col">
+        <a class="metric-card text-decoration-none h-100 d-flex flex-column justify-content-between" href="{{ url_for(endpoint) }}">
           <div class="stat-value">{{ value }}</div>
           <div class="stat-label">{{ label }}</div>
         </a>
@@ -37,6 +43,7 @@
     <a class="admin-action" href="{{ url_for('admin.certificates') }}"><strong>Certificates</strong><span class="text-muted">Verify uploaded proof documents</span></a>
     <a class="admin-action" href="{{ url_for('admin.reports') }}"><strong>User reports</strong><span class="text-muted">Resolve safety and conduct issues</span></a>
     <a class="admin-action" href="{{ url_for('admin.users') }}"><strong>User enforcement</strong><span class="text-muted">Suspend, ban, or reactivate accounts</span></a>
+    <a class="admin-action" href="{{ url_for('admin.reviews') }}"><strong>Review moderation</strong><span class="text-muted">Remove or moderate user-submitted reviews</span></a>
     <a class="admin-action" href="{{ url_for('admin.categories') }}"><strong>Categories</strong><span class="text-muted">Maintain navigation taxonomy</span></a>
     <a class="admin-action" href="{{ url_for('admin.skills') }}"><strong>Skills</strong><span class="text-muted">Manage skills inside categories</span></a>
   </div>
