@@ -8,8 +8,8 @@ from flask_login import current_user
 from ..decorators import admin_required
 from ..extensions import db
 from ..forms import CategoryForm, SkillForm, SuspensionForm
-from ..models import Category, Certificate, Exchange, Listing, Report, Role, Skill, User, utcnow
-from ..services import audit, create_notification
+from ..models import Category, Certificate, Exchange, Listing, Report, Review, Role, Skill, User, utcnow
+from ..services import audit, create_notification, recalculate_reputation
 from . import admin_bp
 
 
@@ -236,3 +236,25 @@ def skills():
         return redirect(url_for("admin.skills"))
     items = Skill.query.order_by(Skill.name).all()
     return render_template("admin/skills.html", skills=items, form=form)
+
+
+@admin_bp.route("/reviews")
+@admin_required
+def reviews():
+    items = Review.query.order_by(Review.created_at.desc()).all()
+    return render_template("admin/reviews.html", reviews=items)
+
+
+@admin_bp.route("/reviews/<int:review_id>/reject", methods=["POST"])
+@admin_required
+def reject_review(review_id: int):
+    review = Review.query.get_or_404(review_id)
+    reviewee = review.reviewee
+    detail = f"Rejected review by {review.reviewer.full_name} for {reviewee.full_name} with comment: {review.comment}"
+    audit("reject_review", "Review", review.id, detail)
+    db.session.delete(review)
+    db.session.flush()
+    recalculate_reputation(reviewee)
+    db.session.commit()
+    flash("Review rejected and deleted. Reputation score has been recalculated.", "success")
+    return redirect(url_for("admin.reviews"))
