@@ -1,0 +1,196 @@
+# Sahayogi - Skill Exchange Platform
+
+A Flask-based skill exchange platform where users can teach and learn skills from each other.
+
+## Prerequisites
+
+- **Python 3.10+**
+- **MySQL Server** (9.x or 8.x) - must be installed and running
+- **Git**
+
+## Quick Setup (Recommended)
+
+Run the automated setup script on a fresh machine:
+
+```bash
+py setup.py
+```
+
+This will:
+1. Detect your MySQL installation
+2. Prompt for your MySQL root password
+3. Create the `sahayogi` database
+4. Set up a Python virtual environment
+5. Install all dependencies
+6. Generate `.env` with your database credentials
+7. Run database migrations
+8. Seed reference data (skills, categories, roles)
+9. Seed demo users, listings, and exchanges
+
+After setup, start the server:
+
+```bash
+py run.py
+```
+
+Visit `http://localhost:5000` in your browser.
+
+## Manual Setup
+
+If you prefer to set up manually:
+
+### 1. Clone the repository
+
+```bash
+git clone <repository-url>
+cd Sahayogi
+```
+
+### 2. Create and activate a virtual environment
+
+```bash
+py -m venv venv
+venv\Scripts\activate
+```
+
+### 3. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Configure the database
+
+Create a `.env` file in the project root:
+
+```env
+SECRET_KEY=change-me
+DATABASE_URL=mysql+pymysql://root:your-password@localhost:3306/sahayogi
+TEST_DATABASE_URL=mysql+pymysql://root:your-password@localhost:3306/sahayogi_test
+MAIL_SERVER=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USE_TLS=true
+MAIL_USERNAME=your-email@gmail.com
+MAIL_PASSWORD=your-app-password
+MAIL_DEFAULT_SENDER=your-email@gmail.com
+DEFAULT_ADMIN_EMAIL=admin@example.com
+DEFAULT_ADMIN_PASSWORD=Admin123!
+DEFAULT_ADMIN_NAME=Sahayogi Admin
+INITIAL_CREDITS=10
+```
+
+### 5. Create the MySQL database
+
+Open MySQL Workbench or use the command line:
+
+```sql
+CREATE DATABASE sahayogi CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE sahayogi_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+### 6. Run migrations
+
+```bash
+flask db upgrade
+```
+
+### 7. Seed reference data
+
+```bash
+flask seed-reference-data
+```
+
+### 8. Seed demo data (optional)
+
+```bash
+flask seed-demo-data
+```
+
+### 9. Start the server
+
+```bash
+py run.py
+```
+
+## Demo Users
+
+After running `flask seed-demo-data`, these accounts are available:
+
+| User | Email | Password | Offers | Wants |
+|------|-------|----------|--------|-------|
+| Anisha Sharma | anisha@demo.local | Demo1234! | Python, Flask, SQL | Graphic Design, Photography |
+| Rajesh Tamang | rajesh@demo.local | Demo1234! | Graphic Design, Photography | Python, JavaScript |
+| Sunita Gurung | sunita@demo.local | Demo1234! | Marketing, Public Speaking | English, Video Editing |
+| Bikash Rai | bikash@demo.local | Demo1234! | English, Nepali Basics | Photography, Writing |
+
+**Admin:** `admin@example.com` / `Admin123!`
+
+## Email Configuration
+
+The platform sends verification emails on registration. To use Gmail:
+
+1. Enable [2-Step Verification](https://myaccount.google.com/security) on your Google account
+2. Generate an [App Password](https://myaccount.google.com/apppasswords)
+3. Update `MAIL_USERNAME` and `MAIL_PASSWORD` in `.env`
+
+Without email configuration, verification emails are logged to `instance/mail.log`.
+
+## Available Commands
+
+| Command | Description |
+|---------|-------------|
+| `flask init-db` | Create database tables |
+| `flask seed-reference-data` | Seed roles, categories, skills, and admin |
+| `flask seed-demo-data` | Seed demo users, listings, and exchanges |
+| `flask run-maintenance` | Run scheduled maintenance tasks |
+| `flask elevate-user <email>` | Promote a user to admin |
+
+## Testing
+
+```bash
+python -m pytest tests/ -v
+```
+
+Tests require `TEST_DATABASE_URL` and use the separate MySQL database configured there.
+
+## Database Management
+
+Use **MySQL Workbench** to manage the database:
+
+1. Create a new connection: `localhost`, port `3306`, user `root`
+2. Select the `sahayogi` schema
+3. Browse tables, run queries, and manage data
+
+## Project Structure
+
+```
+Sahayogi/
+├── app/
+│   ├── admin/          # Admin dashboard
+│   ├── auth/           # Authentication (login, register, verification)
+│   ├── credits/        # Credit system
+│   ├── exchanges/      # Exchange management
+│   ├── listings/       # Skill listings
+│   ├── main/           # Home and dashboard
+│   ├── matches/        # Skill matching
+│   ├── messages/       # Messaging system
+│   ├── notifications/  # Notifications
+│   ├── profile/        # User profiles
+│   ├── requests_bp/    # Exchange requests
+│   ├── reviews/        # Reviews and ratings
+│   ├── static/         # CSS, JS, images
+│   ├── templates/      # HTML templates
+│   ├── __init__.py     # App factory
+│   ├── commands.py     # CLI commands
+│   ├── decorators.py   # Custom decorators
+│   ├── extensions.py   # Flask extensions
+│   ├── forms.py        # WTForms
+│   ├── models.py       # SQLAlchemy models
+│   └── services.py     # Business logic
+├── migrations/         # Alembic migrations
+├── tests/              # Test suite
+├── config.py           # Configuration
+├── requirements.txt    # Python dependencies
+├── run.py              # Entry point
+└── setup.py            # Automated setup script
+```

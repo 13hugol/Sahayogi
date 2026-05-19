@@ -18,6 +18,7 @@ def create_app(config_object: type[Config] = Config) -> Flask:
     load_dotenv()
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_object(config_object)
+    config_object.validate()
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
     os.makedirs(app.instance_path, exist_ok=True)
 

@@ -106,7 +106,7 @@ def resend_verification():
         if user and not user.is_email_verified:
             verification_token = generate_token(user.email, "email-verification")
             user.verification_token = verification_token
-            user.verification_token_expires = utcnow() + timedelta(hours=24)
+            user.verification_token_expires = utcnow() + timedelta(hours=24, seconds=1)
             db.session.commit()
             verification_url = build_absolute_url("auth.verify_email", token=verification_token)
             send_email(

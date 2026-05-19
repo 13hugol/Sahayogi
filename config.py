@@ -2,17 +2,29 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
 
+from dotenv import load_dotenv
+
+load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent
+MYSQL_SCHEMES = {"mysql", "mysql+pymysql"}
+
+
+def validate_mysql_database_url(database_url: str | None, variable_name: str) -> None:
+    if not database_url:
+        raise RuntimeError(f"{variable_name} environment variable is required. Set it in .env file.")
+
+    scheme = urlsplit(database_url).scheme
+    if scheme not in MYSQL_SCHEMES:
+        allowed = ", ".join(sorted(MYSQL_SCHEMES))
+        raise RuntimeError(f"{variable_name} must use MySQL. Allowed URL schemes: {allowed}.")
 
 
 class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-me")
-    SQLALCHEMY_DATABASE_URI = os.getenv(
-        "DATABASE_URL",
-        f"sqlite:///{(BASE_DIR / 'instance' / 'sahayogi.db').as_posix()}",
-    )
+    SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     WTF_CSRF_TIME_LIMIT = None
     MAX_CONTENT_LENGTH = 10 * 1024 * 1024
@@ -36,10 +48,18 @@ class Config:
     DEFAULT_ADMIN_NAME = os.getenv("DEFAULT_ADMIN_NAME", "Sahayogi Admin")
     BRAND_NAME = "Sahayogi"
 
+    @classmethod
+    def validate(cls) -> None:
+        validate_mysql_database_url(cls.SQLALCHEMY_DATABASE_URI, "DATABASE_URL")
+
 
 class TestConfig(Config):
     TESTING = True
     WTF_CSRF_ENABLED = False
-    SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+    SQLALCHEMY_DATABASE_URI = os.getenv("TEST_DATABASE_URL")
     MAIL_SERVER = None
     MAIL_LOG_FILE = BASE_DIR / "instance" / "test-mail.log"
+
+    @classmethod
+    def validate(cls) -> None:
+        validate_mysql_database_url(cls.SQLALCHEMY_DATABASE_URI, "TEST_DATABASE_URL")
