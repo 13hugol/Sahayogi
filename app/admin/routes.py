@@ -7,7 +7,7 @@ from flask_login import current_user
 
 from ..decorators import admin_required
 from ..extensions import db
-from ..forms import CategoryForm, SkillForm, SuspensionForm
+from ..forms import CategoryForm, RoleUpdateForm, SkillForm, SuspensionForm
 from ..models import Category, Certificate, Exchange, Listing, Report, Review, Role, Skill, User, utcnow
 from ..services import audit, create_notification, recalculate_reputation
 from . import admin_bp
@@ -180,7 +180,38 @@ def users():
             db.session.commit()
             flash("User status updated.", "success")
             return redirect(url_for("admin.users"))
-    return render_template("admin/users.html", users=users, form=form, target_user=target_user)
+    role_form = RoleUpdateForm(prefix="role")
+    return render_template("admin/users.html", users=users, form=form, target_user=target_user, role_form=role_form)
+
+
+@admin_bp.route("/users/<int:user_id>/role", methods=["POST"])
+@admin_required
+def update_user_role(user_id: int):
+    target_user = User.query.get_or_404(user_id)
+    if target_user.id == current_user.id:
+        flash("You cannot change your own role.", "danger")
+        return redirect(url_for("admin.users", user_id=target_user.id))
+    role_form = RoleUpdateForm(prefix="role")
+    if role_form.validate_on_submit():
+        new_role_name = role_form.role.data
+        new_role = Role.query.filter_by(name=new_role_name).first()
+        if not new_role:
+            new_role = Role(name=new_role_name, description="Platform administrator" if new_role_name == "admin" else "Platform member")
+            db.session.add(new_role)
+            db.session.flush()
+        old_role_name = target_user.role.name if target_user.role else "unknown"
+        target_user.role = new_role
+        audit(
+            "update_user_role",
+            "User",
+            target_user.id,
+            f"Role changed from '{old_role_name}' to '{new_role_name}' by admin {current_user.email}",
+        )
+        db.session.commit()
+        flash(f"{target_user.full_name}'s role updated to '{new_role_name}'.", "success")
+    else:
+        flash("Invalid role update request.", "danger")
+    return redirect(url_for("admin.users", user_id=target_user.id))
 
 
 @admin_bp.route("/categories", methods=["GET", "POST"])

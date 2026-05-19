@@ -231,3 +231,36 @@ def test_admin_review_moderation(app, client, login, user_factory):
         assert audit_log.target_id == review_id
         assert "Rejected review" in audit_log.detail
         assert audit_log.created_at is not None
+
+
+def test_admin_update_user_role(app, client, login, user_factory):
+    with app.app_context():
+        admin = user_factory(email="admin_role@example.com", role_name="admin")
+        member = user_factory(email="member_role@example.com")
+        member_id = member.id
+    
+    # Non-admin user cannot elevate role
+    login("member_role@example.com")
+    response = client.post(f"/admin/users/{member_id}/role", data={"role-role": "admin"})
+    assert response.status_code == 403
+
+    client.get("/auth/logout", follow_redirects=True)
+
+    # Admin can update role
+    login("admin_role@example.com")
+    response = client.post(
+        f"/admin/users/{member_id}/role", 
+        data={"role-role": "admin"}, 
+        follow_redirects=True
+    )
+    assert response.status_code == 200
+    assert "role updated to &#39;admin&#39;" in response.data.decode("utf-8") or "role updated to 'admin'" in response.data.decode("utf-8")
+
+    with app.app_context():
+        updated_user = db.session.get(User, member_id)
+        assert updated_user.role.name == "admin"
+        
+        # Verify audit log
+        audit_log = AdminAuditLog.query.filter_by(action="update_user_role").first()
+        assert audit_log is not None
+        assert "Role changed" in audit_log.detail

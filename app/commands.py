@@ -40,6 +40,24 @@ def register_commands(app):
         db.session.commit()
         click.echo(f"Maintenance complete. Purged accounts: {purged}")
 
+    @app.cli.command("elevate-user")
+    @click.argument("email")
+    def elevate_user(email):
+        """Elevate a user to admin by their email address."""
+        user = User.query.filter_by(email=email.lower().strip()).first()
+        if not user:
+            click.echo(f"Error: No user found with email '{email}'")
+            return
+            
+        admin_role = Role.query.filter_by(name="admin").first()
+        if not admin_role:
+            click.echo("Error: Admin role does not exist in the database.")
+            return
+            
+        user.role = admin_role
+        db.session.commit()
+        click.echo(f"Success: {user.full_name} ({user.email}) is now an admin!")
+
 
 def seed_roles() -> None:
     for name, description in [("admin", "Administrator"), ("user", "Platform member")]:

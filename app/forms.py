@@ -157,3 +157,12 @@ class SuspensionForm(FlaskForm):
     days = IntegerField("Suspension days", validators=[Optional(), NumberRange(min=1, max=30)])
     reason = TextAreaField("Reason", validators=[Optional(), Length(max=500)])
     submit = SubmitField("Update user")
+
+
+class RoleUpdateForm(FlaskForm):
+    role = SelectField(
+        "Role",
+        choices=[("user", "User"), ("admin", "Admin")],
+        validators=[InputRequired()],
+    )
+    submit = SubmitField("Update role")
