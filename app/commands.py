@@ -5,7 +5,7 @@ from flask import current_app
 
 from .extensions import db
 from .models import Category, Exchange, ExchangeCompletion, ExchangeRequest, Listing, ListingAvailability, Profile, Review, Role, Skill, User, UserSkillOffer, UserSkillWant, refresh_profile_metrics, utcnow
-from .services import append_ledger_entry, purge_due_accounts, unique_username
+from .services import append_ledger_entry, purge_due_accounts, send_email, unique_username
 
 
 REFERENCE_DATA = {
@@ -161,6 +161,20 @@ def register_commands(app):
         user.role = admin_role
         db.session.commit()
         click.echo(f"Success: {user.full_name} ({user.email}) is now an admin!")
+
+    @app.cli.command("test-email")
+    @click.argument("recipient")
+    def test_email(recipient):
+        """Send a test email or capture it in the local mail log."""
+        sent = send_email(
+            "Sahayogi email test",
+            recipient,
+            "This is a test email from your Sahayogi configuration.",
+        )
+        if sent:
+            click.echo(f"Email sent to {recipient}.")
+        else:
+            click.echo(f"Email was captured in {current_app.config['MAIL_LOG_FILE']}.")
 
 
 def seed_roles() -> None:

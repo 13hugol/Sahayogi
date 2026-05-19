@@ -23,9 +23,18 @@ This will:
 4. Set up a Python virtual environment
 5. Install all dependencies
 6. Generate `.env` with your database credentials
-7. Run database migrations
-8. Seed reference data (skills, categories, roles)
-9. Seed demo users, listings, and exchanges
+7. Ask whether to configure Gmail SMTP, or log emails locally
+8. Run database migrations
+9. Seed reference data (skills, categories, roles)
+10. Seed demo users, listings, and exchanges
+
+Password typing in setup is hidden. Type the password and press Enter even if no characters appear. If your terminal cannot use the password prompt, run:
+
+```powershell
+$env:MYSQL_ROOT_PASSWORD="your-mysql-root-password"
+py setup.py
+Remove-Item Env:\MYSQL_ROOT_PASSWORD
+```
 
 After setup, start the server:
 
@@ -67,12 +76,12 @@ Create a `.env` file in the project root:
 SECRET_KEY=change-me
 DATABASE_URL=mysql+pymysql://root:your-password@localhost:3306/sahayogi
 TEST_DATABASE_URL=mysql+pymysql://root:your-password@localhost:3306/sahayogi_test
-MAIL_SERVER=smtp.gmail.com
+MAIL_SERVER=
 MAIL_PORT=587
 MAIL_USE_TLS=true
-MAIL_USERNAME=your-email@gmail.com
-MAIL_PASSWORD=your-app-password
-MAIL_DEFAULT_SENDER=your-email@gmail.com
+MAIL_USERNAME=
+MAIL_PASSWORD=
+MAIL_DEFAULT_SENDER=noreply@sahayogi.local
 DEFAULT_ADMIN_EMAIL=admin@example.com
 DEFAULT_ADMIN_PASSWORD=Admin123!
 DEFAULT_ADMIN_NAME=Sahayogi Admin
@@ -90,20 +99,20 @@ CREATE DATABASE sahayogi_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 ### 6. Run migrations
 
-```bash
-flask db upgrade
+```powershell
+.\venv\Scripts\python.exe -m flask --app run db upgrade
 ```
 
 ### 7. Seed reference data
 
-```bash
-flask seed-reference-data
+```powershell
+.\venv\Scripts\python.exe -m flask --app run seed-reference-data
 ```
 
 ### 8. Seed demo data (optional)
 
-```bash
-flask seed-demo-data
+```powershell
+.\venv\Scripts\python.exe -m flask --app run seed-demo-data
 ```
 
 ### 9. Start the server
@@ -114,7 +123,7 @@ py run.py
 
 ## Demo Users
 
-After running `flask seed-demo-data`, these accounts are available:
+After running `seed-demo-data`, these accounts are available:
 
 | User | Email | Password | Offers | Wants |
 |------|-------|----------|--------|-------|
@@ -127,28 +136,64 @@ After running `flask seed-demo-data`, these accounts are available:
 
 ## Email Configuration
 
-The platform sends verification emails on registration. To use Gmail:
+The platform logs verification emails to `instance/mail.log` by default. To use Gmail SMTP:
 
 1. Enable [2-Step Verification](https://myaccount.google.com/security) on your Google account
 2. Generate an [App Password](https://myaccount.google.com/apppasswords)
-3. Update `MAIL_USERNAME` and `MAIL_PASSWORD` in `.env`
+3. Update `MAIL_SERVER`, `MAIL_USERNAME`, `MAIL_PASSWORD`, and `MAIL_DEFAULT_SENDER` in `.env`
+4. Use the 16-character Gmail App Password, not your normal Gmail password
 
-Without email configuration, verification emails are logged to `instance/mail.log`.
+If SMTP delivery fails, the email is still captured in `instance/mail.log` so registration does not crash.
 
 ## Available Commands
 
+Use these commands from the project root. The long Flask form works even when the virtual environment is not activated.
+
+### Setup And Startup
+
 | Command | Description |
 |---------|-------------|
-| `flask init-db` | Create database tables |
-| `flask seed-reference-data` | Seed roles, categories, skills, and admin |
-| `flask seed-demo-data` | Seed demo users, listings, and exchanges |
-| `flask run-maintenance` | Run scheduled maintenance tasks |
-| `flask elevate-user <email>` | Promote a user to admin |
+| `py setup.py` | Full first-time setup: MySQL database, venv, dependencies, `.env`, migrations, seed data |
+| `$env:MYSQL_ROOT_PASSWORD="your-password"; py setup.py` | Run setup without typing the hidden MySQL password prompt |
+| `Remove-Item Env:\MYSQL_ROOT_PASSWORD` | Clear the temporary MySQL password environment variable |
+| `py run.py` | Start the web app; auto-switches to `.\venv\Scripts\python.exe` when the venv exists |
+| `.\venv\Scripts\python.exe run.py` | Start the app directly with the project venv Python |
+| `venv\Scripts\activate` | Activate the virtual environment for manual commands |
+| `deactivate` | Leave the virtual environment |
+
+### Database And Data
+
+| Command | Description |
+|---------|-------------|
+| `.\venv\Scripts\python.exe -m flask --app run db upgrade` | Apply migrations |
+| `.\venv\Scripts\python.exe -m flask --app run db migrate -m "message"` | Generate a new migration after model changes |
+| `.\venv\Scripts\python.exe -m flask --app run db downgrade` | Roll back one migration |
+| `.\venv\Scripts\python.exe -m flask --app run init-db` | Create database tables from models |
+| `.\venv\Scripts\python.exe -m flask --app run seed-reference-data` | Seed roles, categories, skills, and admin |
+| `.\venv\Scripts\python.exe -m flask --app run seed-demo-data` | Seed demo users, listings, and exchanges |
+| `.\venv\Scripts\python.exe -m flask --app run run-maintenance` | Run scheduled maintenance tasks |
+| `.\venv\Scripts\python.exe -m flask --app run elevate-user <email>` | Promote a user to admin |
+
+### Email
+
+| Command | Description |
+|---------|-------------|
+| `.\venv\Scripts\python.exe -m flask --app run test-email your-email@gmail.com` | Send a test email if SMTP is configured; otherwise write it to `instance/mail.log` |
+| `Get-Content -Tail 40 instance\mail.log` | Show the most recent locally captured emails |
+
+### Testing
+
+| Command | Description |
+|---------|-------------|
+| `.\venv\Scripts\python.exe -m pytest tests/ -v` | Run the full test suite |
+| `.\venv\Scripts\python.exe -m pytest tests/test_email.py -v` | Run only email tests |
+
+If you have activated the venv, you can shorten Flask commands to `flask --app run <command>`.
 
 ## Testing
 
-```bash
-python -m pytest tests/ -v
+```powershell
+.\venv\Scripts\python.exe -m pytest tests/ -v
 ```
 
 Tests require `TEST_DATABASE_URL` and use the separate MySQL database configured there.

@@ -108,7 +108,7 @@ def test_resend_verification_success(app, client):
         follow_redirects=True,
     )
     assert response.status_code == 200
-    assert b"A new verification email has been sent" in response.data
+    assert b"new verification link was saved" in response.data
 
     with app.app_context():
         user = User.query.filter_by(email="charlie@example.com").first()

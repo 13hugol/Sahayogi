@@ -55,7 +55,7 @@ def register():
             user.verification_token_expires = utcnow() + timedelta(hours=24)
             db.session.commit()
             verification_url = build_absolute_url("auth.verify_email", token=verification_token)
-            send_email(
+            email_sent = send_email(
                 "Verify your Sahayogi email",
                 user.email,
                 (
@@ -64,10 +64,16 @@ def register():
                     "This link expires in 24 hours."
                 ),
             )
-            flash(
-                "Account created. A verification email has been sent. Please check your inbox.",
-                "info",
-            )
+            if email_sent:
+                flash(
+                    "Account created. A verification email has been sent. Please check your inbox.",
+                    "info",
+                )
+            else:
+                flash(
+                    f"Account created. Email delivery is not configured, so the verification link was saved in {current_app.config['MAIL_LOG_FILE']}.",
+                    "warning",
+                )
             return render_template("auth/verify_email_pending.html", email=user.email)
     return render_template("auth/register.html", form=form)
 
@@ -109,7 +115,7 @@ def resend_verification():
             user.verification_token_expires = utcnow() + timedelta(hours=24, seconds=1)
             db.session.commit()
             verification_url = build_absolute_url("auth.verify_email", token=verification_token)
-            send_email(
+            email_sent = send_email(
                 "Verify your Sahayogi email",
                 user.email,
                 (
@@ -118,7 +124,13 @@ def resend_verification():
                     "This link expires in 24 hours."
                 ),
             )
-            flash("A new verification email has been sent.", "info")
+            if email_sent:
+                flash("A new verification email has been sent.", "info")
+            else:
+                flash(
+                    f"Email delivery is not configured, so the new verification link was saved in {current_app.config['MAIL_LOG_FILE']}.",
+                    "warning",
+                )
             return render_template("auth/verify_email_pending.html", email=user.email)
         flash("If that email exists and is unverified, a new link has been sent.", "info")
     return render_template("auth/resend_verification.html")
@@ -175,7 +187,7 @@ def forgot_password():
         if user:
             token = generate_token(user.email, "password-reset")
             reset_url = build_absolute_url("auth.reset_password", token=token)
-            send_email(
+            email_sent = send_email(
                 "Reset your Sahayogi password",
                 user.email,
                 (
@@ -183,6 +195,8 @@ def forgot_password():
                     "This link expires in 30 minutes."
                 ),
             )
+            if not email_sent:
+                current_app.logger.info("Password reset link for %s captured in mail log.", user.email)
         flash("If that email exists, a reset link has been sent.", "info")
         return redirect(url_for("auth.login"))
     return render_template("auth/forgot_password.html", form=form)

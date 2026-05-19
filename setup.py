@@ -9,6 +9,7 @@ Usage:
 from __future__ import annotations
 
 import os
+import getpass
 import shutil
 import subprocess
 import sys
@@ -96,13 +97,65 @@ def check_mysql() -> str:
 
 def get_root_password() -> str:
     """Prompt for MySQL root password."""
-    import getpass
+
+    password = os.getenv("MYSQL_ROOT_PASSWORD")
+    if password:
+        return password
+
     print("\nEnter your MySQL root password:")
-    password = getpass.getpass("  Password: ")
+    print("  Note: typed characters are hidden. Type the password and press Enter.")
+    try:
+        password = getpass.getpass("  Password: ")
+    except (EOFError, getpass.GetPassWarning):
+        print("  Hidden password input is not available in this terminal.")
+        password = input("  Password (visible): ")
+
     if not password:
         print_error("Password cannot be empty. Exiting.")
+        print("  You can also run: $env:MYSQL_ROOT_PASSWORD='your-password'; py setup.py")
         sys.exit(1)
     return password
+
+
+def prompt_hidden(label: str) -> str:
+    import getpass
+
+    try:
+        return getpass.getpass(label)
+    except (EOFError, getpass.GetPassWarning):
+        print("  Hidden input is not available in this terminal.")
+        return input(label.replace("(hidden)", "(visible)"))
+
+
+def get_mail_settings() -> dict[str, str]:
+    print("\nEmail setup:")
+    print("  Press Enter to skip SMTP and log emails to instance/mail.log.")
+    configure = input("  Configure Gmail SMTP now? [y/N]: ").strip().lower()
+    if configure not in {"y", "yes"}:
+        return {
+            "MAIL_SERVER": "",
+            "MAIL_USERNAME": "",
+            "MAIL_PASSWORD": "",
+            "MAIL_DEFAULT_SENDER": "noreply@sahayogi.local",
+        }
+
+    email = input("  Gmail address: ").strip()
+    password = prompt_hidden("  Gmail App Password (hidden): ").replace(" ", "")
+    if not email or not password:
+        print("  Gmail settings incomplete. Emails will be logged locally.")
+        return {
+            "MAIL_SERVER": "",
+            "MAIL_USERNAME": "",
+            "MAIL_PASSWORD": "",
+            "MAIL_DEFAULT_SENDER": "noreply@sahayogi.local",
+        }
+
+    return {
+        "MAIL_SERVER": "smtp.gmail.com",
+        "MAIL_USERNAME": email,
+        "MAIL_PASSWORD": password,
+        "MAIL_DEFAULT_SENDER": email,
+    }
 
 
 def test_mysql_connection(mysql_client: str, password: str) -> bool:
@@ -161,18 +214,24 @@ def install_dependencies() -> bool:
     return True
 
 
-def generate_env(password: str) -> None:
+def generate_env(password: str, mail_settings: dict[str, str] | None = None) -> None:
     """Generate .env file with MySQL and mail settings."""
     encoded_password = quote_plus(password)
+    mail_settings = mail_settings or {
+        "MAIL_SERVER": "",
+        "MAIL_USERNAME": "",
+        "MAIL_PASSWORD": "",
+        "MAIL_DEFAULT_SENDER": "noreply@sahayogi.local",
+    }
     env_content = f"""SECRET_KEY=change-me
 DATABASE_URL=mysql+pymysql://root:{encoded_password}@localhost:3306/sahayogi
 TEST_DATABASE_URL=mysql+pymysql://root:{encoded_password}@localhost:3306/sahayogi_test
-MAIL_SERVER=smtp.gmail.com
+MAIL_SERVER={mail_settings['MAIL_SERVER']}
 MAIL_PORT=587
 MAIL_USE_TLS=true
-MAIL_USERNAME=your-email@gmail.com
-MAIL_PASSWORD=your-app-password
-MAIL_DEFAULT_SENDER=your-email@gmail.com
+MAIL_USERNAME={mail_settings['MAIL_USERNAME']}
+MAIL_PASSWORD={mail_settings['MAIL_PASSWORD']}
+MAIL_DEFAULT_SENDER={mail_settings['MAIL_DEFAULT_SENDER']}
 DEFAULT_ADMIN_EMAIL=admin@example.com
 DEFAULT_ADMIN_PASSWORD=Admin123!
 DEFAULT_ADMIN_NAME=Sahayogi Admin
@@ -181,7 +240,10 @@ INITIAL_CREDITS=10
     env_path = BASE_DIR / ".env"
     env_path.write_text(env_content, encoding="utf-8")
     print_success(".env file generated")
-    print("  Note: Update MAIL_USERNAME and MAIL_PASSWORD with your Gmail App Password")
+    if mail_settings["MAIL_SERVER"]:
+        print("  Gmail SMTP configured. Run: flask test-email your-email@gmail.com")
+    else:
+        print("  Note: Emails are logged to instance/mail.log until Gmail SMTP is configured.")
 
 
 def run_migrations() -> bool:
@@ -261,7 +323,8 @@ def main() -> None:
     if not install_dependencies():
         sys.exit(1)
 
-    generate_env(password)
+    mail_settings = get_mail_settings()
+    generate_env(password, mail_settings)
 
     if not run_migrations():
         sys.exit(1)

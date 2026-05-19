@@ -54,16 +54,12 @@ def validate_token(token: str, purpose: str, max_age: int) -> str | None:
     return payload.get("email")
 
 
-def send_email(subject: str, recipient: str, body: str) -> None:
+def send_email(subject: str, recipient: str, body: str) -> bool:
     mail_server = current_app.config.get("MAIL_SERVER")
     sender = current_app.config["MAIL_DEFAULT_SENDER"]
     if not mail_server:
-        log_file = Path(current_app.config["MAIL_LOG_FILE"])
-        log_file.parent.mkdir(parents=True, exist_ok=True)
-        with log_file.open("a", encoding="utf-8") as handle:
-            handle.write(f"TO: {recipient}\nSUBJECT: {subject}\n{body}\n{'-' * 60}\n")
-        current_app.logger.info("Email captured in %s for %s", log_file, recipient)
-        return
+        log_email(subject, recipient, body)
+        return False
 
     message = EmailMessage()
     message["Subject"] = subject
@@ -71,23 +67,37 @@ def send_email(subject: str, recipient: str, body: str) -> None:
     message["To"] = recipient
     message.set_content(body)
     port = current_app.config["MAIL_PORT"]
-    if current_app.config["MAIL_USE_TLS"]:
-        with smtplib.SMTP(mail_server, port) as client:
-            client.starttls()
-            if current_app.config["MAIL_USERNAME"]:
-                client.login(
-                    current_app.config["MAIL_USERNAME"],
-                    current_app.config["MAIL_PASSWORD"],
+    try:
+        if current_app.config["MAIL_USE_TLS"]:
+            with smtplib.SMTP(mail_server, port) as client:
+                client.starttls()
+                if current_app.config["MAIL_USERNAME"]:
+                    client.login(
+                        current_app.config["MAIL_USERNAME"],
+                        current_app.config["MAIL_PASSWORD"],
+                    )
+                client.send_message(message)
+        else:
+            with smtplib.SMTP(mail_server, port) as client:
+                if current_app.config["MAIL_USERNAME"]:
+                    client.login(
+                        current_app.config["MAIL_USERNAME"],
+                        current_app.config["MAIL_PASSWORD"],
                 )
-            client.send_message(message)
-    else:
-        with smtplib.SMTP(mail_server, port) as client:
-            if current_app.config["MAIL_USERNAME"]:
-                client.login(
-                    current_app.config["MAIL_USERNAME"],
-                    current_app.config["MAIL_PASSWORD"],
-                )
-            client.send_message(message)
+                client.send_message(message)
+        return True
+    except (OSError, smtplib.SMTPException) as exc:
+        current_app.logger.warning("Email delivery failed for %s: %s", recipient, exc)
+        log_email(subject, recipient, body)
+        return False
+
+
+def log_email(subject: str, recipient: str, body: str) -> None:
+    log_file = Path(current_app.config["MAIL_LOG_FILE"])
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+    with log_file.open("a", encoding="utf-8") as handle:
+        handle.write(f"TO: {recipient}\nSUBJECT: {subject}\n{body}\n{'-' * 60}\n")
+    current_app.logger.info("Email captured in %s for %s", log_file, recipient)
 
 
 def build_absolute_url(endpoint: str, **values) -> str:
