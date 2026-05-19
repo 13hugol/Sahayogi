@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+
 from flask import current_app, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
@@ -48,14 +50,78 @@ def register():
             db.session.add(user)
             db.session.flush()
             seed_initial_credits(user)
-            user.is_email_verified = True
+            verification_token = generate_token(user.email, "email-verification")
+            user.verification_token = verification_token
+            user.verification_token_expires = utcnow() + timedelta(hours=24)
             db.session.commit()
-            flash(
-                "Account created successfully. You can now log in.",
-                "success",
+            verification_url = build_absolute_url("auth.verify_email", token=verification_token)
+            send_email(
+                "Verify your Sahayogi email",
+                user.email,
+                (
+                    f"Welcome {user.full_name}! Please verify your email by visiting:\n"
+                    f"{verification_url}\n\n"
+                    "This link expires in 24 hours."
+                ),
             )
-            return redirect(url_for("auth.login"))
+            flash(
+                "Account created. A verification email has been sent. Please check your inbox.",
+                "info",
+            )
+            return render_template("auth/verify_email_pending.html", email=user.email)
     return render_template("auth/register.html", form=form)
+
+
+@auth_bp.route("/verify-email/<token>", methods=["GET"])
+def verify_email(token: str):
+    email = validate_token(token, "email-verification", 86400)
+    if not email:
+        flash("The verification link is invalid or has expired.", "danger")
+        return redirect(url_for("auth.register"))
+    user = User.query.filter_by(email=email).first_or_404()
+    if user.is_email_verified:
+        flash("Your email is already verified.", "info")
+    else:
+        user.is_email_verified = True
+        user.verification_token = None
+        user.verification_token_expires = None
+        db.session.commit()
+        flash("Email verified successfully! Welcome to Sahayogi.", "success")
+    return redirect(url_for("auth.profile_setup"))
+
+
+@auth_bp.route("/profile-setup", methods=["GET", "POST"])
+def profile_setup():
+    if current_user.is_authenticated:
+        return redirect(url_for("main.dashboard"))
+    flash("Please log in to complete your profile setup.", "info")
+    return redirect(url_for("auth.login"))
+
+
+@auth_bp.route("/resend-verification", methods=["GET", "POST"])
+def resend_verification():
+    if request.method == "POST":
+        email = request.form.get("email", "").lower().strip()
+        user = User.query.filter_by(email=email).first()
+        if user and not user.is_email_verified:
+            verification_token = generate_token(user.email, "email-verification")
+            user.verification_token = verification_token
+            user.verification_token_expires = utcnow() + timedelta(hours=24)
+            db.session.commit()
+            verification_url = build_absolute_url("auth.verify_email", token=verification_token)
+            send_email(
+                "Verify your Sahayogi email",
+                user.email,
+                (
+                    f"Welcome {user.full_name}! Please verify your email by visiting:\n"
+                    f"{verification_url}\n\n"
+                    "This link expires in 24 hours."
+                ),
+            )
+            flash("A new verification email has been sent.", "info")
+            return render_template("auth/verify_email_pending.html", email=user.email)
+        flash("If that email exists and is unverified, a new link has been sent.", "info")
+    return render_template("auth/resend_verification.html")
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
