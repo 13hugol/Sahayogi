@@ -1,0 +1,18 @@
+{% set layout_variant = 'transactional' %}
+{% extends "base.html" %}
+{% block title %}Complete your profile | Sahayogi{% endblock %}
+{% block content %}
+  <article class="auth-panel">
+    <span class="eyebrow">Welcome!</span>
+    <h1 class="h2 mb-3">Complete your profile</h1>
+    <p class="text-muted mb-4">Your email has been verified. Log in to set up your profile, add your skills, and start exchanging.</p>
+
+    <div class="stepper" aria-label="Registration progress">
+      <div class="stepper-item completed"><span class="stepper-dot">&#10003;</span>Account</div>
+      <div class="stepper-item active"><span class="stepper-dot">2</span>Profile</div>
+      <div class="stepper-item"><span class="stepper-dot">3</span>Exchange</div>
+    </div>
+
+    <a href="{{ url_for('auth.login') }}" class="btn btn-accent w-100 mt-4">Log in to continue</a>
+  </article>
+{% endblock %}
