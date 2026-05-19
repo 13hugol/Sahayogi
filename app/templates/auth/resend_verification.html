@@ -1,0 +1,20 @@
+{% set layout_variant = 'transactional' %}
+{% extends "base.html" %}
+{% block title %}Resend verification | Sahayogi{% endblock %}
+{% block content %}
+  <article class="auth-panel">
+    <span class="eyebrow">Resend verification</span>
+    <h1 class="h2 mb-3">Resend verification email</h1>
+    <p class="text-muted mb-4">Enter your email address and we'll send you a new verification link.</p>
+
+    <form method="post" novalidate>
+      <div class="mb-3">
+        <label for="email" class="form-label">Email</label>
+        <input type="email" name="email" id="email" class="form-control" placeholder="you@example.com" required>
+      </div>
+      <button type="submit" class="btn btn-accent w-100">Send verification email</button>
+    </form>
+
+    <p class="small text-muted mt-4 mb-0"><a href="{{ url_for('auth.login') }}">Back to login</a></p>
+  </article>
+{% endblock %}

@@ -1,0 +1,21 @@
+{% set layout_variant = 'transactional' %}
+{% extends "base.html" %}
+{% block title %}Verify your email | Sahayogi{% endblock %}
+{% block content %}
+  <article class="auth-panel">
+    <span class="eyebrow">Check your inbox</span>
+    <h1 class="h2 mb-3">Verify your email</h1>
+    <p class="mb-4">We sent a verification link to <strong>{{ email }}</strong>. Please click the link in the email to activate your account.</p>
+
+    <div class="alert alert-info">
+      <p class="mb-0">Didn't receive the email?</p>
+      <ul class="mb-0 mt-2 small">
+        <li>Check your spam or junk folder</li>
+        <li>Make sure the email address is correct</li>
+        <li><a href="{{ url_for('auth.resend_verification') }}">Resend verification email</a></li>
+      </ul>
+    </div>
+
+    <a href="{{ url_for('auth.login') }}" class="btn btn-outline-secondary w-100 mt-3">Back to login</a>
+  </article>
+{% endblock %}
