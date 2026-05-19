@@ -13,7 +13,7 @@
       <div class="stepper-item"><span class="stepper-dot">3</span>Exchange</div>
     </div>
 
-    <form method="post" novalidate>
+    <form id="registerForm" method="post" novalidate>
       {{ form.hidden_tag() }}
       <div class="mb-3">
         {{ form.full_name.label(class="form-label") }}
@@ -22,7 +22,8 @@
       </div>
       <div class="mb-3">
         {{ form.email.label(class="form-label") }}
-        {{ form.email(class="form-control", placeholder="you@example.com") }}
+        {{ form.email(id="emailField", class="form-control", placeholder="you@example.com") }}
+        <div id="emailError" class="text-danger small" style="display:none;"></div>
         {% for error in form.email.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
       </div>
       <div class="mb-3">
@@ -44,6 +45,49 @@
       </div>
       {{ form.submit(class="btn btn-accent w-100 mt-4") }}
     </form>
-    <p class="small text-muted mt-4 mb-0">Your account is active immediately after registration.</p>
+    <p class="small text-muted mt-4 mb-0">After registration, you'll receive a verification email to activate your account.</p>
   </article>
+
+  <script>
+    (function() {
+      const emailField = document.getElementById('emailField');
+      const emailError = document.getElementById('emailError');
+      const registerForm = document.getElementById('registerForm');
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+      emailField.addEventListener('blur', function() {
+        const value = emailField.value.trim();
+        if (value && !emailRegex.test(value)) {
+          emailError.textContent = 'Please enter a valid email address.';
+          emailError.style.display = 'block';
+          emailField.classList.add('is-invalid');
+        } else {
+          emailError.style.display = 'none';
+          emailField.classList.remove('is-invalid');
+        }
+      });
+
+      emailField.addEventListener('input', function() {
+        if (emailField.classList.contains('is-invalid')) {
+          const value = emailField.value.trim();
+          if (emailRegex.test(value)) {
+            emailError.style.display = 'none';
+            emailField.classList.remove('is-invalid');
+          }
+        }
+      });
+
+      registerForm.addEventListener('submit', function(e) {
+        const value = emailField.value.trim();
+        if (!emailRegex.test(value)) {
+          e.preventDefault();
+          emailError.textContent = 'Please enter a valid email address.';
+          emailError.style.display = 'block';
+          emailField.classList.add('is-invalid');
+          emailField.focus();
+        }
+      });
+    })();
+  </script>
 {% endblock %}
