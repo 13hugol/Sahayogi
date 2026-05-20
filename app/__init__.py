@@ -2,105 +2,96 @@ from __future__ import annotations
 
 import os
 
-from dotenv import load_dotenv
-from flask import Flask, flash, redirect, url_for
-from flask_login import current_user
+from flask import Flask, abort, render_template, request, session
+from flask_login import LoginManager
 
 from config import Config
 
 from .commands import register_commands
-from .extensions import bcrypt, db, login_manager, migrate
-from .models import Role, unread_message_count
-from .services import normalize_account_status, unread_counts_for
+from .database import Database
+from .models import User
+
+login_manager = LoginManager()
 
 
 def create_app(config_object: type[Config] = Config) -> Flask:
-    load_dotenv()
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_object(config_object)
     config_object.validate()
-    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
-    os.makedirs(app.instance_path, exist_ok=True)
+    app.secret_key = app.config["SECRET_KEY"]
 
-    db.init_app(app)
-    migrate.init_app(app, db)
+    os.makedirs(app.instance_path, exist_ok=True)
+    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+
     login_manager.init_app(app)
-    bcrypt.init_app(app)
     login_manager.login_view = "auth.login"
     login_manager.login_message_category = "warning"
 
+    with app.app_context():
+        Database.create_tables()
+
+    register_csrf(app)
     register_blueprints(app)
     register_commands(app)
-    register_context(app)
-    register_hooks(app)
+    register_template_context(app)
+    register_error_handlers(app)
 
     return app
 
 
-def register_blueprints(app: Flask) -> None:
-    from .admin import admin_bp
-    from .auth import auth_bp
-    from .credits import credits_bp
-    from .exchanges import exchanges_bp
-    from .listings import listings_bp
-    from .main import main_bp
-    from .matches import matches_bp
-    from .messages import messages_bp
-    from .notifications import notifications_bp
-    from .profile import profile_bp
-    from .requests_bp import requests_bp
-    from .reviews import reviews_bp
+@login_manager.user_loader
+def load_user(user_id: str) -> User | None:
+    if not user_id.isdigit():
+        return None
+    return User.find_by_id(int(user_id))
 
-    for blueprint in [
-        main_bp,
-        auth_bp,
-        profile_bp,
-        listings_bp,
-        matches_bp,
-        requests_bp,
-        exchanges_bp,
-        messages_bp,
-        notifications_bp,
-        reviews_bp,
-        credits_bp,
-        admin_bp,
-    ]:
+
+def register_blueprints(app: Flask) -> None:
+    from .routes.admin_routes import AdminRoutes
+    from .routes.auth_routes import AuthRoutes
+    from .routes.frontend_routes import FrontendRoutes
+    from .routes.main_routes import MainRoutes
+
+    app.register_blueprint(MainRoutes().register())
+    app.register_blueprint(AuthRoutes().register())
+    app.register_blueprint(AdminRoutes().register())
+    for blueprint in FrontendRoutes().register():
         app.register_blueprint(blueprint)
 
 
-def register_context(app: Flask) -> None:
-    @app.context_processor
-    def inject_navigation_state():
-        counts = {"notifications": 0, "messages": 0}
-        available_credits = None
-        if current_user.is_authenticated:
-            counts = unread_counts_for(current_user)
-            available_credits = current_user.available_credit_balance
-        return {
-            "nav_counts": counts,
-            "available_credits": available_credits,
-        }
-
-
-def register_hooks(app: Flask) -> None:
+def register_csrf(app: Flask) -> None:
     @app.before_request
-    def protect_account_state():
-        if current_user.is_authenticated:
-            normalize_account_status(current_user)
-            if current_user.deleted_at:
-                flash("Your account is scheduled for deletion and cannot be used right now.", "warning")
-                return redirect(url_for("auth.logout"))
-            if current_user.status == "banned":
-                flash("Your account has been banned.", "danger")
-                return redirect(url_for("auth.logout"))
-            if current_user.status == "suspended" and not current_user.is_active:
-                flash("Your account is suspended.", "warning")
-                return redirect(url_for("auth.logout"))
+    def csrf_protect():
+        if "csrf_token" not in session:
+            session["csrf_token"] = os.urandom(16).hex()
+        if not app.config.get("WTF_CSRF_ENABLED", True):
+            return None
+        if request.method == "POST":
+            token = request.form.get("csrf_token")
+            if not token or token != session.get("csrf_token"):
+                abort(403)
+        return None
 
-    @app.shell_context_processor
-    def shell_context():
+
+def register_template_context(app: Flask) -> None:
+    @app.context_processor
+    def inject_template_state():
         return {
-            "db": db,
-            "Role": Role,
-            "unread_message_count": unread_message_count,
+            "available_credits": 0,
+            "nav_counts": {"messages": 0, "notifications": 0},
+            "csrf_token": lambda: session.get("csrf_token", ""),
         }
+
+
+def register_error_handlers(app: Flask) -> None:
+    @app.errorhandler(403)
+    def forbidden(_error):
+        return render_template("errors/403.html"), 403
+
+    @app.errorhandler(404)
+    def not_found(_error):
+        return render_template("errors/404.html"), 404
+
+    @app.errorhandler(500)
+    def server_error(_error):
+        return render_template("errors/500.html"), 500

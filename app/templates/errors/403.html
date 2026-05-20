@@ -1,0 +1,11 @@
+{% set layout_variant = 'transactional' %}
+{% extends "base.html" %}
+{% block title %}Forbidden | Sahayogi{% endblock %}
+{% block content %}
+  <article class="auth-panel">
+    <span class="eyebrow">Access control</span>
+    <h1 class="h2 mb-2">Forbidden</h1>
+    <p class="text-muted mb-4">You do not have permission to open this page.</p>
+    <a class="btn btn-accent w-100" href="{{ url_for('main.home') }}">Go home</a>
+  </article>
+{% endblock %}

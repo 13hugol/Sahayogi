@@ -1,241 +1,133 @@
-# Sahayogi - Skill Exchange Platform
+# Sahayogi
 
-A Flask-based skill exchange platform where users can teach and learn skills from each other.
+Sahayogi is a Flask, Jinja, and MySQL student project for a skill exchange product.
+
+The implementation is intentionally scoped:
+
+- Active backend: registration, login/logout needed for access, role access, and admin dashboard/user role management.
+- Frontend-only surfaces: listings, profile editing, credits, matches, requests, exchanges, messages, notifications, reviews, reports, certificates, categories, and skills.
+
+The frontend-only pages keep the existing templates and navigation, but they do not create, update, delete, or settle backend records.
 
 ## Prerequisites
 
-- **Python 3.10+**
-- **MySQL Server** (9.x or 8.x) - must be installed and running
-- **Git**
+- Python 3.10+
+- MySQL Server 8.x or 9.x
+- MySQL Workbench
+- Visual Studio Code
 
-## Quick Setup (Recommended)
+## Quick Setup
 
-Run the automated setup script on a fresh machine:
-
-```bash
-py setup.py
-```
-
-This will:
-1. Detect your MySQL installation
-2. Prompt for your MySQL root password
-3. Create the `sahayogi` database
-4. Set up a Python virtual environment
-5. Install all dependencies
-6. Generate `.env` with your database credentials
-7. Ask whether to configure Gmail SMTP, or log emails locally
-8. Run database migrations
-9. Seed reference data (skills, categories, roles)
-10. Seed demo users, listings, and exchanges
-
-Password typing in setup is hidden. Type the password and press Enter even if no characters appear. If your terminal cannot use the password prompt, run:
+Run from the project root:
 
 ```powershell
-$env:MYSQL_ROOT_PASSWORD="your-mysql-root-password"
 py setup.py
-Remove-Item Env:\MYSQL_ROOT_PASSWORD
 ```
 
-After setup, start the server:
+The setup script will:
 
-```bash
+1. Find MySQL.
+2. Prompt for the MySQL root password.
+3. Create `sahayogi` and `sahayogi_test`.
+4. Create `venv`.
+5. Install Python dependencies.
+6. Generate `.env`.
+7. Ask whether to configure Gmail SMTP or log email locally.
+8. Create the guide-defined MySQL tables.
+9. Seed roles and the default admin account.
+
+Start the app:
+
+```powershell
 py run.py
 ```
 
-Visit `http://localhost:5000` in your browser.
+Open `http://localhost:5000`.
+
+## Default Admin
+
+| Role | Email | Password |
+| --- | --- | --- |
+| Admin | `admin@example.com` | `Admin123!` |
 
 ## Manual Setup
 
-If you prefer to set up manually:
-
-### 1. Clone the repository
-
-```bash
-git clone <repository-url>
-cd Sahayogi
-```
-
-### 2. Create and activate a virtual environment
-
-```bash
+```powershell
 py -m venv venv
-venv\Scripts\activate
-```
-
-### 3. Install dependencies
-
-```bash
+.\venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 4. Configure the database
-
-Create a `.env` file in the project root:
-
-```env
-SECRET_KEY=change-me
-DATABASE_URL=mysql+pymysql://root:your-password@localhost:3306/sahayogi
-TEST_DATABASE_URL=mysql+pymysql://root:your-password@localhost:3306/sahayogi_test
-MAIL_SERVER=
-MAIL_PORT=587
-MAIL_USE_TLS=true
-MAIL_USERNAME=
-MAIL_PASSWORD=
-MAIL_DEFAULT_SENDER=noreply@sahayogi.local
-DEFAULT_ADMIN_EMAIL=admin@example.com
-DEFAULT_ADMIN_PASSWORD=Admin123!
-DEFAULT_ADMIN_NAME=Sahayogi Admin
-INITIAL_CREDITS=10
-```
-
-### 5. Create the MySQL database
-
-Open MySQL Workbench or use the command line:
+Create `.env` from `.env.example`, then create the databases:
 
 ```sql
 CREATE DATABASE sahayogi CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE DATABASE sahayogi_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-### 6. Run migrations
+Create tables and seed active backend reference data:
 
 ```powershell
-.\venv\Scripts\python.exe -m flask --app run db upgrade
-```
-
-### 7. Seed reference data
-
-```powershell
+.\venv\Scripts\python.exe -m flask --app run init-db
 .\venv\Scripts\python.exe -m flask --app run seed-reference-data
 ```
 
-### 8. Seed demo data (optional)
-
-```powershell
-.\venv\Scripts\python.exe -m flask --app run seed-demo-data
-```
-
-### 9. Start the server
-
-```bash
-py run.py
-```
-
-## Demo Users
-
-After running `seed-demo-data`, these accounts are available:
-
-| User | Email | Password | Offers | Wants |
-|------|-------|----------|--------|-------|
-| Anisha Sharma | anisha@demo.local | Demo1234! | Python, Flask, SQL | Graphic Design, Photography |
-| Rajesh Tamang | rajesh@demo.local | Demo1234! | Graphic Design, Photography | Python, JavaScript |
-| Sunita Gurung | sunita@demo.local | Demo1234! | Marketing, Public Speaking | English, Video Editing |
-| Bikash Rai | bikash@demo.local | Demo1234! | English, Nepali Basics | Photography, Writing |
-
-**Admin:** `admin@example.com` / `Admin123!`
-
-## Email Configuration
-
-The platform logs verification emails to `instance/mail.log` by default. To use Gmail SMTP:
-
-1. Enable [2-Step Verification](https://myaccount.google.com/security) on your Google account
-2. Generate an [App Password](https://myaccount.google.com/apppasswords)
-3. Update `MAIL_SERVER`, `MAIL_USERNAME`, `MAIL_PASSWORD`, and `MAIL_DEFAULT_SENDER` in `.env`
-4. Use the 16-character Gmail App Password, not your normal Gmail password
-
-If SMTP delivery fails, the email is still captured in `instance/mail.log` so registration does not crash.
-
-## Available Commands
-
-Use these commands from the project root. The long Flask form works even when the virtual environment is not activated.
-
-### Setup And Startup
+## Commands
 
 | Command | Description |
-|---------|-------------|
-| `py setup.py` | Full first-time setup: MySQL database, venv, dependencies, `.env`, migrations, seed data |
-| `$env:MYSQL_ROOT_PASSWORD="your-password"; py setup.py` | Run setup without typing the hidden MySQL password prompt |
-| `Remove-Item Env:\MYSQL_ROOT_PASSWORD` | Clear the temporary MySQL password environment variable |
-| `py run.py` | Start the web app; auto-switches to `.\venv\Scripts\python.exe` when the venv exists |
-| `.\venv\Scripts\python.exe run.py` | Start the app directly with the project venv Python |
-| `venv\Scripts\activate` | Activate the virtual environment for manual commands |
-| `deactivate` | Leave the virtual environment |
-
-### Database And Data
-
-| Command | Description |
-|---------|-------------|
-| `.\venv\Scripts\python.exe -m flask --app run db upgrade` | Apply migrations |
-| `.\venv\Scripts\python.exe -m flask --app run db migrate -m "message"` | Generate a new migration after model changes |
-| `.\venv\Scripts\python.exe -m flask --app run db downgrade` | Roll back one migration |
-| `.\venv\Scripts\python.exe -m flask --app run init-db` | Create database tables from models |
-| `.\venv\Scripts\python.exe -m flask --app run seed-reference-data` | Seed roles, categories, skills, and admin |
-| `.\venv\Scripts\python.exe -m flask --app run seed-demo-data` | Seed demo users, listings, and exchanges |
-| `.\venv\Scripts\python.exe -m flask --app run run-maintenance` | Run scheduled maintenance tasks |
-| `.\venv\Scripts\python.exe -m flask --app run elevate-user <email>` | Promote a user to admin |
-
-### Email
-
-| Command | Description |
-|---------|-------------|
-| `.\venv\Scripts\python.exe -m flask --app run test-email your-email@gmail.com` | Send a test email if SMTP is configured; otherwise write it to `instance/mail.log` |
-| `Get-Content -Tail 40 instance\mail.log` | Show the most recent locally captured emails |
-
-### Testing
-
-| Command | Description |
-|---------|-------------|
-| `.\venv\Scripts\python.exe -m pytest tests/ -v` | Run the full test suite |
-| `.\venv\Scripts\python.exe -m pytest tests/test_email.py -v` | Run only email tests |
-
-If you have activated the venv, you can shorten Flask commands to `flask --app run <command>`.
-
-## Testing
-
-```powershell
-.\venv\Scripts\python.exe -m pytest tests/ -v
-```
-
-Tests require `TEST_DATABASE_URL` and use the separate MySQL database configured there.
-
-## Database Management
-
-Use **MySQL Workbench** to manage the database:
-
-1. Create a new connection: `localhost`, port `3306`, user `root`
-2. Select the `sahayogi` schema
-3. Browse tables, run queries, and manage data
+| --- | --- |
+| `py setup.py` | Full first-time setup |
+| `py run.py` | Start the app, auto-using `.\venv\Scripts\python.exe` when available |
+| `.\venv\Scripts\python.exe -m flask --app run init-db` | Create the guide-defined MySQL tables |
+| `.\venv\Scripts\python.exe -m flask --app run seed-reference-data` | Seed roles and default admin |
+| `.\venv\Scripts\python.exe -m flask --app run seed-demo-data` | No-op placeholder; demo listing/exchange backend is out of scope |
+| `.\venv\Scripts\python.exe -m flask --app run elevate-user <email>` | Promote a registered user to admin |
+| `.\venv\Scripts\python.exe -m flask --app run test-email you@example.com` | Send or locally log a test email |
+| `Get-Content -Tail 40 instance\mail.log` | Show locally captured emails |
+| `.\venv\Scripts\python.exe -m pytest tests/ -q` | Run the reduced backend test suite |
 
 ## Project Structure
 
-```
+```text
 Sahayogi/
-├── app/
-│   ├── admin/          # Admin dashboard
-│   ├── auth/           # Authentication (login, register, verification)
-│   ├── credits/        # Credit system
-│   ├── exchanges/      # Exchange management
-│   ├── listings/       # Skill listings
-│   ├── main/           # Home and dashboard
-│   ├── matches/        # Skill matching
-│   ├── messages/       # Messaging system
-│   ├── notifications/  # Notifications
-│   ├── profile/        # User profiles
-│   ├── requests_bp/    # Exchange requests
-│   ├── reviews/        # Reviews and ratings
-│   ├── static/         # CSS, JS, images
-│   ├── templates/      # HTML templates
-│   ├── __init__.py     # App factory
-│   ├── commands.py     # CLI commands
-│   ├── decorators.py   # Custom decorators
-│   ├── extensions.py   # Flask extensions
-│   ├── forms.py        # WTForms
-│   ├── models.py       # SQLAlchemy models
-│   └── services.py     # Business logic
-├── migrations/         # Alembic migrations
-├── tests/              # Test suite
-├── config.py           # Configuration
-├── requirements.txt    # Python dependencies
-├── run.py              # Entry point
-└── setup.py            # Automated setup script
+    run.py
+    config.py
+    requirements.txt
+    setup.py
+    guide.md
+    app/
+        __init__.py
+        auth.py
+        commands.py
+        database.py
+        models/
+            base_model.py
+            user.py
+            admin_audit.py
+        controllers/
+            base_controller.py
+            auth_controller.py
+            admin_controller.py
+            main_controller.py
+            frontend_controller.py
+        routes/
+            auth_routes.py
+            admin_routes.py
+            main_routes.py
+            frontend_routes.py
+        templates/
+        static/
+        utils/
+            email.py
+            tokens.py
+    tests/
+    Documents/
 ```
+
+## Active Backend Rules
+
+Registration validates required fields, hashes passwords, assigns the `user` role, creates a profile shell, and sends or logs email verification.
+
+Role access uses `admin_required` on admin routes. Admins can promote or demote users between `user` and `admin`, and role changes are audit logged.
+
+The admin dashboard reads only active backend tables: users, roles, profiles, and admin audit logs.

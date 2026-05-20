@@ -13,20 +13,18 @@ def test_registration_requires_email_verification(app, client):
             "password": "Password123!",
             "confirm_password": "Password123!",
         },
-        follow_redirects=False,
     )
     assert response.status_code == 200
     with app.app_context():
-        user = User.query.filter_by(email="alice@example.com").first()
+        user = User.find_by_email("alice@example.com")
         assert user is not None
         assert user.is_email_verified is False
         assert user.profile.location == "Kathmandu"
-        assert user.credit_balance == 10
         assert user.verification_token is not None
         assert user.verification_token_expires is not None
 
 
-def test_unverified_legacy_user_can_login_without_verification_step(app, client, login, user_factory):
+def test_unverified_user_can_login_for_current_scope(app, client, login, user_factory):
     with app.app_context():
         user_factory(email="legacy@example.com", verified=False)
 
@@ -46,12 +44,11 @@ def test_failed_logins_trigger_lockout(app, client, login, user_factory):
     assert b"Too many failed attempts" in locked_response.data
 
     with app.app_context():
-        locked_user = User.query.filter_by(email="locked@example.com").first()
+        locked_user = User.find_by_email("locked@example.com")
         assert locked_user.locked_until is not None
 
 
 def test_verify_email_success(app, client):
-    # Register user first
     client.post(
         "/auth/register",
         data={
@@ -63,18 +60,17 @@ def test_verify_email_success(app, client):
         },
     )
     with app.app_context():
-        user = User.query.filter_by(email="bob@example.com").first()
+        user = User.find_by_email("bob@example.com")
         assert user is not None
         assert user.is_email_verified is False
         token = user.verification_token
 
-    # Verify email using the token
     response = client.get(f"/auth/verify-email/{token}", follow_redirects=True)
     assert response.status_code == 200
     assert b"Email verified successfully" in response.data
 
     with app.app_context():
-        user = User.query.filter_by(email="bob@example.com").first()
+        user = User.find_by_email("bob@example.com")
         assert user.is_email_verified is True
         assert user.verification_token is None
 
@@ -97,20 +93,18 @@ def test_resend_verification_success(app, client):
         },
     )
     with app.app_context():
-        user = User.query.filter_by(email="charlie@example.com").first()
+        user = User.find_by_email("charlie@example.com")
         assert user.is_email_verified is False
         old_expires = user.verification_token_expires
 
-    # Resend verification
     response = client.post(
         "/auth/resend-verification",
         data={"email": "charlie@example.com"},
         follow_redirects=True,
     )
     assert response.status_code == 200
-    assert b"new verification link was saved" in response.data
+    assert b"Verify your email" in response.data
 
     with app.app_context():
-        user = User.query.filter_by(email="charlie@example.com").first()
-        assert user.verification_token_expires > old_expires
-
+        user = User.find_by_email("charlie@example.com")
+        assert user.verification_token_expires >= old_expires

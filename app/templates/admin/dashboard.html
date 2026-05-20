@@ -14,10 +14,10 @@
   <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-5 g-3 mb-4">
     {% for label, value, endpoint in [
       ('Total users', stats.total_users, 'admin.users'),
-      ('Active listings', stats.active_listings, 'admin.listings'),
-      ('Pending approvals', stats.pending_approvals, 'admin.listings'),
-      ('Open reports', stats.open_reports, 'admin.reports'),
-      ('Daily exchanges', stats.daily_exchanges, 'admin.dashboard')
+      ('Admin users', stats.admin_users, 'admin.users'),
+      ('Regular users', stats.regular_users, 'admin.users'),
+      ('Verified users', stats.verified_users, 'admin.users'),
+      ('Audit logs', stats.audit_logs, 'admin.dashboard')
     ] %}
       <div class="col">
         <a class="metric-card text-decoration-none h-100 d-flex flex-column justify-content-between" href="{{ url_for(endpoint) }}">

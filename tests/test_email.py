@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import smtplib
 
-from app.services import send_email
+from app.utils.email import send_email
 
 
 class RejectingSMTP:

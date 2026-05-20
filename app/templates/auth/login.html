@@ -7,10 +7,16 @@
     <h1 class="h2 mb-2">Log in</h1>
     <p class="text-muted mb-4">Continue to your skill exchange workspace.</p>
     <form method="post" novalidate>
-      {{ form.hidden_tag() }}
-      <div class="mb-3">{{ form.email.label(class="form-label") }}{{ form.email(class="form-control", placeholder="you@example.com") }}</div>
-      <div class="mb-4">{{ form.password.label(class="form-label") }}{{ form.password(class="form-control", placeholder="Your password") }}</div>
-      {{ form.submit(class="btn btn-accent w-100") }}
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="mb-3">
+        <label class="form-label" for="email">Email</label>
+        <input class="form-control" id="email" name="email" type="email" value="{{ email|default('') }}" placeholder="you@example.com" required>
+      </div>
+      <div class="mb-4">
+        <label class="form-label" for="password">Password</label>
+        <input class="form-control" id="password" name="password" type="password" placeholder="Your password" required>
+      </div>
+      <button class="btn btn-accent w-100" type="submit">Log in</button>
     </form>
     <div class="mt-4 d-flex justify-content-between gap-3 small fw-semibold">
       <a href="{{ url_for('auth.forgot_password') }}">Forgot password?</a>

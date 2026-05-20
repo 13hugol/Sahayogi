@@ -20,7 +20,6 @@ from urllib.parse import quote_plus
 BASE_DIR = Path(__file__).resolve().parent
 VENV_DIR = BASE_DIR / "venv"
 PYTHON = str(VENV_DIR / "Scripts" / "python.exe")
-FLASK = str(VENV_DIR / "Scripts" / "flask.exe")
 MYSQL_CLIENT_PATHS = [
     r"C:\Program Files\MySQL\MySQL Server 9.6\bin\mysql.exe",
     r"C:\Program Files\MySQL\MySQL Server 9.5\bin\mysql.exe",
@@ -217,6 +216,7 @@ def install_dependencies() -> bool:
 def generate_env(password: str, mail_settings: dict[str, str] | None = None) -> None:
     """Generate .env file with MySQL and mail settings."""
     encoded_password = quote_plus(password)
+    escaped_password = password.replace("\\", "\\\\").replace('"', '\\"')
     mail_settings = mail_settings or {
         "MAIL_SERVER": "",
         "MAIL_USERNAME": "",
@@ -226,6 +226,12 @@ def generate_env(password: str, mail_settings: dict[str, str] | None = None) -> 
     env_content = f"""SECRET_KEY=change-me
 DATABASE_URL=mysql+pymysql://root:{encoded_password}@localhost:3306/sahayogi
 TEST_DATABASE_URL=mysql+pymysql://root:{encoded_password}@localhost:3306/sahayogi_test
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_USER=root
+MYSQL_PASSWORD="{escaped_password}"
+MYSQL_DATABASE=sahayogi
+TEST_MYSQL_DATABASE=sahayogi_test
 MAIL_SERVER={mail_settings['MAIL_SERVER']}
 MAIL_PORT=587
 MAIL_USE_TLS=true
@@ -235,7 +241,6 @@ MAIL_DEFAULT_SENDER={mail_settings['MAIL_DEFAULT_SENDER']}
 DEFAULT_ADMIN_EMAIL=admin@example.com
 DEFAULT_ADMIN_PASSWORD=Admin123!
 DEFAULT_ADMIN_NAME=Sahayogi Admin
-INITIAL_CREDITS=10
 """
     env_path = BASE_DIR / ".env"
     env_path.write_text(env_content, encoding="utf-8")
@@ -246,22 +251,22 @@ INITIAL_CREDITS=10
         print("  Note: Emails are logged to instance/mail.log until Gmail SMTP is configured.")
 
 
-def run_migrations() -> bool:
-    """Run Flask database migrations."""
-    print("  Running database migrations...")
+def init_database() -> bool:
+    """Create guide-defined tables."""
+    print("  Creating database tables...")
     env = os.environ.copy()
     env["FLASK_APP"] = "run.py"
-    result = run_cmd([PYTHON, "-m", "flask", "db", "upgrade"], cwd=str(BASE_DIR), env=env)
+    result = run_cmd([PYTHON, "-m", "flask", "--app", "run", "init-db"], cwd=str(BASE_DIR), env=env)
     if result.returncode != 0:
-        print_error("Failed to run migrations")
+        print_error("Failed to create tables")
         print(f"  Error: {result.stderr.strip()}")
         return False
-    print_success("Database migrations applied")
+    print_success("Database tables created")
     return True
 
 
 def seed_reference_data() -> bool:
-    """Seed reference data (roles, categories, skills, admin)."""
+    """Seed reference data (roles and admin)."""
     print("  Seeding reference data...")
     env = os.environ.copy()
     env["FLASK_APP"] = "run.py"
@@ -274,29 +279,9 @@ def seed_reference_data() -> bool:
     return True
 
 
-def seed_demo_data() -> bool:
-    """Seed demo users, listings, and exchanges."""
-    print("  Seeding demo data...")
-    env = os.environ.copy()
-    env["FLASK_APP"] = "run.py"
-    result = run_cmd([PYTHON, "-m", "flask", "seed-demo-data"], cwd=str(BASE_DIR), env=env)
-    if result.returncode != 0:
-        print_error("Failed to seed demo data")
-        print(f"  Error: {result.stderr.strip()}")
-        return False
-    print_success("Demo data seeded")
-    return True
-
-
 def print_demo_credentials() -> None:
-    """Print demo user credentials."""
+    """Print admin credentials."""
     print_header("Setup Complete!")
-    print("Demo Users (password: Demo1234!):")
-    print("  anisha@demo.local  - Python, Flask, SQL")
-    print("  rajesh@demo.local  - Graphic Design, Photography")
-    print("  sunita@demo.local  - Marketing, Public Speaking")
-    print("  bikash@demo.local  - English, Nepali Basics")
-    print()
     print("Admin:")
     print("  admin@example.com  - Admin123!")
     print()
@@ -326,13 +311,10 @@ def main() -> None:
     mail_settings = get_mail_settings()
     generate_env(password, mail_settings)
 
-    if not run_migrations():
+    if not init_database():
         sys.exit(1)
 
     if not seed_reference_data():
-        sys.exit(1)
-
-    if not seed_demo_data():
         sys.exit(1)
 
     print_demo_credentials()

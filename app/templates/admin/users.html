@@ -7,29 +7,19 @@
   {% if target_user %}
     <div class="card card-shell mb-4">
       <div class="card-body">
-        <h2 class="h5 mb-3">Update {{ target_user.full_name }}</h2>
-        <form method="post" action="{{ url_for('admin.users', user_id=target_user.id) }}">
-          {{ form.hidden_tag() }}
-          <div class="row g-3">
-            <div class="col-md-4">{{ form.action.label(class="form-label") }}{{ form.action(class="form-select") }}</div>
-            <div class="col-md-4">{{ form.days.label(class="form-label") }}{{ form.days(class="form-control") }}</div>
-            <div class="col-md-4">{{ form.reason.label(class="form-label") }}{{ form.reason(class="form-control", rows="1") }}</div>
-          </div>
-          <div class="mt-3">{{ form.submit(class="btn btn-accent") }}</div>
-        </form>
-        
-        <hr class="my-4">
-        
         <h2 class="h5 mb-3">Role Management</h2>
         <form method="post" action="{{ url_for('admin.update_user_role', user_id=target_user.id) }}">
-          {{ role_form.hidden_tag() }}
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="row g-3 align-items-end">
             <div class="col-md-8">
-              {{ role_form.role.label(class="form-label") }}
-              {{ role_form.role(class="form-select", id="roleSelect") }}
+              <label class="form-label" for="roleSelect">Role</label>
+              <select class="form-select" id="roleSelect" name="role">
+                <option value="user" {% if target_user.role and target_user.role.name == 'user' %}selected{% endif %}>User</option>
+                <option value="admin" {% if target_user.role and target_user.role.name == 'admin' %}selected{% endif %}>Admin</option>
+              </select>
             </div>
             <div class="col-md-4">
-              {{ role_form.submit(class="btn btn-primary w-100") }}
+              <button class="btn btn-primary w-100" type="submit">Update role</button>
             </div>
           </div>
           <p class="text-muted small mt-2">Current Role: <strong>{{ target_user.role.name|capitalize if target_user.role else 'Unknown' }}</strong></p>
