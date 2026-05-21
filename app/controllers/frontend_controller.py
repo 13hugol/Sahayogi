@@ -2,16 +2,20 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from flask import abort, flash, jsonify, redirect, render_template, request, session, url_for
+from flask import abort, flash, jsonify, redirect, request, session, url_for
 from flask_login import current_user, login_required
 from markupsafe import Markup, escape
 
-from app.models import ProfileCertificate, ProfileReview, User
+from app.exceptions import ProfileNotFoundError
+from app.services import ProfileService
 
 from .base_controller import BaseController
 
 
 class FrontendController(BaseController):
+    def __init__(self, profile_service: ProfileService):
+        self._profile_service = profile_service
+
     def _categories(self):
         return [
             SimpleNamespace(id=1, name="Tech"),
@@ -21,7 +25,7 @@ class FrontendController(BaseController):
         ]
 
     def marketplace(self):
-        return render_template(
+        return self.render(
             "listings/index.html",
             listings=[],
             categories=self._categories(),
@@ -32,11 +36,11 @@ class FrontendController(BaseController):
 
     @login_required
     def post_listing(self):
-        return render_template("listings/form.html", form=ListingShellForm(), title="Create listing")
+        return self.render("listings/form.html", form=ListingShellForm(), title="Create listing")
 
     @login_required
     def my_listings(self):
-        return render_template("listings/mine.html", listings=[])
+        return self.render("listings/mine.html", listings=[])
 
     def listing_detail(self, listing_id: int):
         listing = SimpleNamespace(
@@ -60,31 +64,31 @@ class FrontendController(BaseController):
             skill_id=1,
             user_id=0,
         )
-        return render_template("listings/detail.html", listing=listing, request_form=RequestShellForm())
+        return self.render("listings/detail.html", listing=listing, request_form=RequestShellForm())
 
     def api_search(self):
-        html = render_template("partials/listing_cards.html", listings=[])
+        html = self.render("partials/listing_cards.html", listings=[])
         return jsonify({"count": 0, "html": html})
 
     @login_required
     def wallet(self):
-        return render_template("credits/ledger.html", entries=[], holds=[])
+        return self.render("credits/ledger.html", entries=[], holds=[])
 
     @login_required
     def matches(self):
-        return render_template("matches/index.html", matches=[])
+        return self.render("matches/index.html", matches=[])
 
     @login_required
     def requests(self):
-        return render_template("requests/inbox.html", requests=[])
+        return self.render("requests/inbox.html", requests=[])
 
     @login_required
     def sent_requests(self):
-        return render_template("requests/sent.html", requests=[])
+        return self.render("requests/sent.html", requests=[])
 
     @login_required
     def exchanges(self):
-        return render_template("exchanges/index.html", exchanges=[])
+        return self.render("exchanges/index.html", exchanges=[])
 
     @login_required
     def exchange_detail(self, exchange_id: int):
@@ -102,7 +106,7 @@ class FrontendController(BaseController):
             conversation=None,
             completion_marks=[],
         )
-        return render_template(
+        return self.render(
             "exchanges/detail.html",
             exchange=exchange,
             can_mark_complete=False,
@@ -112,7 +116,7 @@ class FrontendController(BaseController):
 
     @login_required
     def messages(self):
-        return render_template("messages/index.html", conversations=[])
+        return self.render("messages/index.html", conversations=[])
 
     @login_required
     def conversation(self, conversation_id: int):
@@ -122,11 +126,11 @@ class FrontendController(BaseController):
             messages=[],
             other_participant=lambda _user_id: SimpleNamespace(full_name="Exchange partner"),
         )
-        return render_template("messages/detail.html", conversation=conversation, form=MessageShellForm())
+        return self.render("messages/detail.html", conversation=conversation, form=MessageShellForm())
 
     @login_required
     def notifications(self):
-        return render_template("notifications/index.html", notifications=[])
+        return self.render("notifications/index.html", notifications=[])
 
     @login_required
     def notification_counts(self):
@@ -138,22 +142,23 @@ class FrontendController(BaseController):
 
     @login_required
     def profile_edit(self):
-        return render_template("profile/edit.html", form=ProfileShellForm())
+        return self.render("profile/edit.html", form=ProfileShellForm())
 
     @login_required
     def certificates(self):
-        return render_template("profile/certificates.html", form=CertificateShellForm(), certificates=[])
+        return self.render("profile/certificates.html", form=CertificateShellForm(), certificates=[])
 
     def profile_view(self, user_id: int):
-        user = User.find_by_id(user_id)
-        if not user or not user.profile:
+        try:
+            page_data = self._profile_service.get_profile_page_data(user_id)
+        except ProfileNotFoundError:
             abort(404)
-        return render_template(
+        return self.render(
             "profile/view.html",
-            user=user,
-            approved_listings=[],
-            approved_certificates=ProfileCertificate.approved_for_user(user.id),
-            recent_reviews=ProfileReview.recent_for_user(user.id),
+            user=page_data.user,
+            approved_listings=page_data.approved_listings,
+            approved_certificates=page_data.approved_certificates,
+            recent_reviews=page_data.recent_reviews,
             report_form=ReportShellForm(),
         )
 
@@ -161,41 +166,24 @@ class FrontendController(BaseController):
         return self.profile_view(user_id)
 
     def top_rated(self):
-        return render_template("reviews/top_rated.html", profiles=[])
+        return self.render("reviews/top_rated.html", profiles=self._profile_service.get_top_rated_profiles())
 
     def user_reviews(self, user_id: int):
-        return render_template("reviews/user_reviews.html", review_user=shell_user(user_id), reviews=[])
+        try:
+            review_user, reviews = self._profile_service.get_review_history(user_id)
+        except ProfileNotFoundError:
+            abort(404)
+        return self.render("reviews/user_reviews.html", review_user=review_user, reviews=reviews)
 
     @login_required
     def review_form(self, exchange_id: int):
         exchange = SimpleNamespace(id=exchange_id, listing=SimpleNamespace(title="Exchange preview"))
         reviewee = SimpleNamespace(full_name="Exchange partner")
-        return render_template("reviews/form.html", form=ReviewShellForm(), exchange=exchange, reviewee=reviewee)
+        return self.render("reviews/form.html", form=ReviewShellForm(), exchange=exchange, reviewee=reviewee)
 
     def frontend_only_action(self, *args, **kwargs):
         flash("This action is frontend-only in the current project scope.", "info")
         return redirect(request.referrer or url_for("main.dashboard"))
-
-
-def shell_user(user_id: int):
-    return SimpleNamespace(
-        id=user_id,
-        full_name="Sahayogi Member",
-        email="member@example.com",
-        role=SimpleNamespace(name="user"),
-        offered_skills=[],
-        wanted_skills=[],
-        profile=SimpleNamespace(
-            avatar_path=None,
-            username=f"member{user_id}",
-            headline="Skill exchange member",
-            location="Kathmandu",
-            reputation_score=0,
-            completed_exchange_count=0,
-            bio="Frontend-only profile preview.",
-            contact_email=None,
-        ),
-    )
 
 
 class ShellForm:

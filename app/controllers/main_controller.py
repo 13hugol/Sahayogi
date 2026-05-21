@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from flask import current_app, render_template, send_from_directory
+from flask import current_app, send_from_directory
 from flask_login import login_required
 
 from .base_controller import BaseController
@@ -16,11 +16,11 @@ class MainController(BaseController):
             "reviews": 0,
             "members": 0,
         }
-        return render_template("main/home.html", stats=stats, recent_listings=[], top_profiles=[])
+        return self.render("main/home.html", stats=stats, recent_listings=[], top_profiles=[])
 
     @login_required
     def dashboard(self):
-        return render_template(
+        return self.render(
             "main/dashboard.html",
             my_listings=[],
             pending_requests=[],
