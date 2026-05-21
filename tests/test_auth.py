@@ -108,3 +108,151 @@ def test_resend_verification_success(app, client):
     with app.app_context():
         user = User.find_by_email("charlie@example.com")
         assert user.verification_token_expires >= old_expires
+
+
+# ── US-02: Login / Logout Tests ──────────────────────────────────────────────
+
+
+def test_login_success_redirects_to_dashboard(app, client, login, user_factory):
+    """AC-1: Login accepts valid email and password; redirects to dashboard."""
+    with app.app_context():
+        user_factory(email="success@example.com")
+
+    response = login("success@example.com", "Password123!")
+    assert response.status_code == 200
+    assert b"Dashboard" in response.data
+    assert b"Welcome back" in response.data
+
+
+def test_login_invalid_password_shows_inline_error(app, client, login, user_factory):
+    """AC-1: Incorrect credentials display a clear error message."""
+    with app.app_context():
+        user_factory(email="wrong@example.com")
+
+    response = login("wrong@example.com", "WrongPassword!")
+    assert response.status_code == 200
+    assert b"Invalid email or password" in response.data
+
+
+def test_login_nonexistent_email_shows_error(app, client, login):
+    """AC-1: Nonexistent email shows error message."""
+    response = login("nobody@example.com", "Password123!")
+    assert response.status_code == 200
+    assert b"Invalid email or password" in response.data
+
+
+def test_login_empty_fields_show_errors(app, client):
+    """AC-1: Empty fields show inline validation errors."""
+    response = client.post(
+        "/auth/login",
+        data={"email": "", "password": ""},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert b"Email is required" in response.data
+    assert b"Password is required" in response.data
+
+
+def test_session_persists_across_pages(app, client, login, user_factory):
+    """AC-2: Session is maintained across pages after login."""
+    with app.app_context():
+        user_factory(email="persist@example.com")
+
+    login("persist@example.com", "Password123!")
+
+    # Access protected page without re-logging in
+    response = client.get("/dashboard", follow_redirects=True)
+    assert response.status_code == 200
+    assert b"Dashboard" in response.data
+
+
+def test_logout_clears_session(app, client, login, user_factory):
+    """AC-3: Logout immediately invalidates the session."""
+    with app.app_context():
+        user_factory(email="logout@example.com")
+
+    login("logout@example.com", "Password123!")
+
+    # Verify logged in
+    response = client.get("/dashboard")
+    assert response.status_code == 200
+
+    # Logout via POST
+    response = client.post("/auth/logout", follow_redirects=True)
+    assert response.status_code == 200
+    assert b"You have been logged out" in response.data
+
+    # After logout, accessing dashboard should redirect to login
+    response = client.get("/dashboard", follow_redirects=True)
+    assert b"Log in" in response.data
+
+
+def test_logout_via_get_also_works(app, client, login, user_factory):
+    """AC-3: Logout via GET still works for backward compatibility."""
+    with app.app_context():
+        user_factory(email="getlogout@example.com")
+
+    login("getlogout@example.com", "Password123!")
+    response = client.get("/auth/logout", follow_redirects=True)
+    assert response.status_code == 200
+    assert b"You have been logged out" in response.data
+
+
+def test_failed_count_increments_correctly(app, client, login, user_factory):
+    """AC-4: Failed login count increments correctly to threshold."""
+    with app.app_context():
+        user_factory(email="counting@example.com")
+
+    # First failed attempt
+    login("counting@example.com", "wrong1")
+    with app.app_context():
+        user = User.find_by_email("counting@example.com")
+        assert user.failed_login_count == 1
+
+    # Second failed attempt
+    login("counting@example.com", "wrong2")
+    with app.app_context():
+        user = User.find_by_email("counting@example.com")
+        assert user.failed_login_count == 2
+
+    # Third failed attempt triggers lockout
+    login("counting@example.com", "wrong3")
+    with app.app_context():
+        user = User.find_by_email("counting@example.com")
+        assert user.failed_login_count == 3
+        assert user.locked_until is not None
+
+
+def test_lockout_shows_minutes_remaining(app, client, login, user_factory):
+    """AC-4: Lockout message shows time remaining."""
+    with app.app_context():
+        user_factory(email="timed@example.com")
+
+    # Trigger lockout
+    for _ in range(app.config["LOCKOUT_THRESHOLD"]):
+        login("timed@example.com", "wrong-password")
+
+    # Next attempt should show minutes remaining
+    response = login("timed@example.com", "Password123!")
+    assert response.status_code == 200
+    assert b"Too many failed attempts" in response.data
+    assert b"minute" in response.data
+
+
+def test_successful_login_clears_failed_count(app, client, login, user_factory):
+    """AC-4: Successful login resets the failed login counter."""
+    with app.app_context():
+        user_factory(email="reset@example.com")
+
+    # One failed attempt
+    login("reset@example.com", "wrong")
+    with app.app_context():
+        user = User.find_by_email("reset@example.com")
+        assert user.failed_login_count == 1
+
+    # Successful login should reset count
+    login("reset@example.com", "Password123!")
+    with app.app_context():
+        user = User.find_by_email("reset@example.com")
+        assert user.failed_login_count == 0
+        assert user.locked_until is None
