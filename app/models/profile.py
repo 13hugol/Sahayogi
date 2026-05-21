@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from types import SimpleNamespace
 
+from app.enums import CertificateStatus, SkillType
+
 from .base_model import BaseModel
 
 
@@ -34,46 +36,22 @@ class ProfileSkill(BaseModel):
         )
 
     @classmethod
-    def find_for_user(cls, user_id: int, skill_type: str) -> list["ProfileSkill"]:
-        db = cls.db()
-        try:
-            rows = db.fetch_all(
-                """
-                SELECT
-                    profile_skills.*,
-                    EXISTS (
-                        SELECT 1
-                        FROM profile_certificates
-                        WHERE profile_certificates.profile_skill_id = profile_skills.id
-                          AND profile_certificates.status = 'approved'
-                    ) AS has_verified_certificate
-                FROM profile_skills
-                WHERE user_id = %s AND skill_type = %s
-                ORDER BY sort_order ASC, skill_name ASC
-                """,
-                (user_id, skill_type),
-            )
-            return [skill for row in rows if (skill := cls.from_row(row))]
-        finally:
-            db.close()
+    def find_for_user(cls, user_id: int, skill_type: str | SkillType) -> list["ProfileSkill"]:
+        from app.repositories import ProfileSkillRepository
+
+        return ProfileSkillRepository().find_for_user(user_id, skill_type)
 
     @classmethod
-    def create(cls, user_id: int, skill_name: str, skill_type: str, sort_order: int = 0) -> "ProfileSkill":
-        if skill_type not in {"offered", "wanted"}:
-            raise ValueError("Profile skill type must be 'offered' or 'wanted'.")
-        db = cls.db()
-        try:
-            skill_id = db.execute(
-                """
-                INSERT INTO profile_skills (user_id, skill_name, skill_type, sort_order)
-                VALUES (%s, %s, %s, %s)
-                """,
-                (user_id, skill_name.strip(), skill_type, sort_order),
-            )
-            row = db.fetch_one("SELECT * FROM profile_skills WHERE id = %s", (skill_id,))
-            return cls.from_row(row)
-        finally:
-            db.close()
+    def create(
+        cls,
+        user_id: int,
+        skill_name: str,
+        skill_type: str | SkillType,
+        sort_order: int = 0,
+    ) -> "ProfileSkill":
+        from app.repositories import ProfileSkillRepository
+
+        return ProfileSkillRepository().create(user_id, skill_name, skill_type, sort_order)
 
 
 @dataclass
@@ -108,20 +86,9 @@ class ProfileCertificate(BaseModel):
 
     @classmethod
     def approved_for_user(cls, user_id: int) -> list["ProfileCertificate"]:
-        db = cls.db()
-        try:
-            rows = db.fetch_all(
-                """
-                SELECT *
-                FROM profile_certificates
-                WHERE user_id = %s AND status = 'approved'
-                ORDER BY created_at DESC, skill_name ASC
-                """,
-                (user_id,),
-            )
-            return [certificate for row in rows if (certificate := cls.from_row(row))]
-        finally:
-            db.close()
+        from app.repositories import ProfileCertificateRepository
+
+        return ProfileCertificateRepository().approved_for_user(user_id)
 
     @classmethod
     def create(
@@ -130,24 +97,20 @@ class ProfileCertificate(BaseModel):
         user_id: int,
         skill_name: str,
         profile_skill_id: int | None = None,
-        status: str = "pending",
+        status: str = CertificateStatus.PENDING.value,
         file_path: str | None = None,
         review_notes: str | None = None,
     ) -> "ProfileCertificate":
-        db = cls.db()
-        try:
-            certificate_id = db.execute(
-                """
-                INSERT INTO profile_certificates
-                    (user_id, profile_skill_id, skill_name, status, file_path, review_notes)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                """,
-                (user_id, profile_skill_id, skill_name.strip(), status, file_path, review_notes),
-            )
-            row = db.fetch_one("SELECT * FROM profile_certificates WHERE id = %s", (certificate_id,))
-            return cls.from_row(row)
-        finally:
-            db.close()
+        from app.repositories import ProfileCertificateRepository
+
+        return ProfileCertificateRepository().create(
+            user_id=user_id,
+            skill_name=skill_name,
+            profile_skill_id=profile_skill_id,
+            status=status,
+            file_path=file_path,
+            review_notes=review_notes,
+        )
 
 
 @dataclass
@@ -180,21 +143,15 @@ class ProfileReview(BaseModel):
 
     @classmethod
     def recent_for_user(cls, user_id: int, limit: int = 3) -> list["ProfileReview"]:
-        db = cls.db()
-        try:
-            rows = db.fetch_all(
-                """
-                SELECT *
-                FROM profile_reviews
-                WHERE reviewee_user_id = %s
-                ORDER BY created_at DESC, id DESC
-                LIMIT %s
-                """,
-                (user_id, limit),
-            )
-            return [review for row in rows if (review := cls.from_row(row))]
-        finally:
-            db.close()
+        from app.repositories import ProfileReviewRepository
+
+        return ProfileReviewRepository().recent_for_user(user_id, limit)
+
+    @classmethod
+    def for_user(cls, user_id: int) -> list["ProfileReview"]:
+        from app.repositories import ProfileReviewRepository
+
+        return ProfileReviewRepository().for_user(user_id)
 
     @classmethod
     def create(
@@ -206,17 +163,12 @@ class ProfileReview(BaseModel):
         reviewer_id: int | None = None,
         comment: str | None = None,
     ) -> "ProfileReview":
-        db = cls.db()
-        try:
-            review_id = db.execute(
-                """
-                INSERT INTO profile_reviews
-                    (reviewee_user_id, reviewer_id, reviewer_name, rating, comment)
-                VALUES (%s, %s, %s, %s, %s)
-                """,
-                (reviewee_user_id, reviewer_id, reviewer_name.strip(), rating, comment),
-            )
-            row = db.fetch_one("SELECT * FROM profile_reviews WHERE id = %s", (review_id,))
-            return cls.from_row(row)
-        finally:
-            db.close()
+        from app.repositories import ProfileReviewRepository
+
+        return ProfileReviewRepository().create(
+            reviewee_user_id=reviewee_user_id,
+            reviewer_name=reviewer_name,
+            rating=rating,
+            reviewer_id=reviewer_id,
+            comment=comment,
+        )
