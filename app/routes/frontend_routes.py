@@ -3,11 +3,32 @@ from __future__ import annotations
 from flask import Blueprint
 
 from ..controllers.frontend_controller import FrontendController
+from ..repositories import (
+    ProfileCertificateRepository,
+    ProfileRepository,
+    ProfileReviewRepository,
+    RoleRepository,
+    UserRepository,
+)
+from ..services import ProfileService
 
 
 class FrontendRoutes:
     def __init__(self):
-        self.controller = FrontendController()
+        profile_repository = ProfileRepository()
+        role_repository = RoleRepository()
+        user_repository = UserRepository(
+            role_repository=role_repository,
+            profile_repository=profile_repository,
+        )
+        self.controller = FrontendController(
+            ProfileService(
+                user_repository,
+                profile_repository,
+                ProfileCertificateRepository(),
+                ProfileReviewRepository(),
+            )
+        )
 
     def register(self):
         listings = Blueprint("listings", __name__, url_prefix="/listings")

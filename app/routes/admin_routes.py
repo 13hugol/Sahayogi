@@ -3,12 +3,24 @@ from __future__ import annotations
 from flask import Blueprint
 
 from ..controllers.admin_controller import AdminController
+from ..repositories import AdminAuditRepository, ProfileRepository, RoleRepository, UserRepository
+from ..services import AdminService
+from ..validators import RoleAssignmentValidator
 
 
 class AdminRoutes:
     def __init__(self):
         self.bp = Blueprint("admin", __name__, url_prefix="/admin")
-        self.controller = AdminController()
+        role_repository = RoleRepository()
+        profile_repository = ProfileRepository()
+        user_repository = UserRepository(
+            role_repository=role_repository,
+            profile_repository=profile_repository,
+        )
+        self.controller = AdminController(
+            AdminService(user_repository, role_repository, AdminAuditRepository()),
+            RoleAssignmentValidator(),
+        )
 
     def register(self):
         self.bp.route("/")(self.controller.dashboard)
