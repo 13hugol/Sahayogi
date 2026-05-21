@@ -291,7 +291,7 @@ class User(UserMixin, BaseModel):
             db.close()
 
     def register_failed_login(self, locked_until: datetime | None = None) -> None:
-        self.failed_login_count = 0 if locked_until else self.failed_login_count + 1
+        self.failed_login_count += 1
         self.locked_until = locked_until
         db = Database()
         try:
