@@ -61,6 +61,16 @@ class InvalidVerificationTokenError(SahayogiException):
         super().__init__("The verification link is invalid or has expired.")
 
 
+class InvalidPasswordResetTokenError(SahayogiException):
+    def __init__(self):
+        super().__init__("The password reset link is invalid, expired, or has already been used.")
+
+
+class InvalidCurrentPasswordError(SahayogiException):
+    def __init__(self):
+        super().__init__("Current password is incorrect.")
+
+
 class InvalidRoleError(SahayogiException):
     def __init__(self, role_name: str):
         super().__init__(f"Invalid role '{role_name}'.")
