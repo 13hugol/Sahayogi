@@ -80,6 +80,8 @@ class Profile(BaseModel):
     location: str | None = None
     contact_email: str | None = None
     avatar_path: str | None = None
+    headline: str | None = None
+    bio: str | None = None
     reputation_score: float = 0.0
     review_count: int = 0
     completed_exchange_count: int = 0
@@ -94,6 +96,8 @@ class Profile(BaseModel):
             location=row.get("location"),
             contact_email=row.get("contact_email"),
             avatar_path=row.get("avatar_path"),
+            headline=row.get("headline"),
+            bio=row.get("bio"),
             reputation_score=float(row.get("reputation_score") or 0),
             review_count=int(row.get("review_count") or 0),
             completed_exchange_count=int(row.get("completed_exchange_count") or 0),
@@ -333,11 +337,15 @@ class User(UserMixin, BaseModel):
 
     @property
     def offered_skills(self) -> list:
-        return []
+        from .profile import ProfileSkill
+
+        return ProfileSkill.find_for_user(self.id, "offered")
 
     @property
     def wanted_skills(self) -> list:
-        return []
+        from .profile import ProfileSkill
+
+        return ProfileSkill.find_for_user(self.id, "wanted")
 
     def has_verified_skill(self, _skill_id: int) -> bool:
         return False
