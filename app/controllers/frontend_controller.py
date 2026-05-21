@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from flask import flash, jsonify, redirect, render_template, request, session, url_for
+from flask import abort, flash, jsonify, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required
 from markupsafe import Markup, escape
+
+from app.models import ProfileCertificate, ProfileReview, User
 
 from .base_controller import BaseController
 
@@ -143,13 +145,15 @@ class FrontendController(BaseController):
         return render_template("profile/certificates.html", form=CertificateShellForm(), certificates=[])
 
     def profile_view(self, user_id: int):
-        user = current_user if current_user.is_authenticated and current_user.id == user_id else shell_user(user_id)
+        user = User.find_by_id(user_id)
+        if not user or not user.profile:
+            abort(404)
         return render_template(
             "profile/view.html",
             user=user,
             approved_listings=[],
-            approved_certificates=[],
-            recent_reviews=[],
+            approved_certificates=ProfileCertificate.approved_for_user(user.id),
+            recent_reviews=ProfileReview.recent_for_user(user.id),
             report_form=ReportShellForm(),
         )
 
