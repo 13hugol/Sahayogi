@@ -32,6 +32,32 @@
               {{ form.submit(class="btn btn-accent") }}
             </div>
           </form>
+          <div class="border rounded-3 mt-4 p-3">
+            <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-3">
+              <div>
+                <h2 class="h5 mb-1">Password and security</h2>
+                <p class="text-muted mb-0">Change your password after confirming the current one.</p>
+              </div>
+            </div>
+            <form method="post" action="{{ url_for('auth.change_password') }}" class="row g-3 mb-4">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <div class="col-md-4">
+                <label class="form-label" for="current_password">Current password</label>
+                <input class="form-control" type="password" id="current_password" name="current_password" required>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="password">New password</label>
+                <input class="form-control" type="password" id="password" name="password" minlength="8" required>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="confirm_password">Confirm new password</label>
+                <input class="form-control" type="password" id="confirm_password" name="confirm_password" minlength="8" required>
+              </div>
+              <div class="col-md-4">
+                <button class="btn btn-accent w-100" type="submit">Change password</button>
+              </div>
+            </form>
+          </div>
           <div class="danger-zone mt-4">
             <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-3">
               <div>
