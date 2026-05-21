@@ -20,6 +20,15 @@
             <div>Completed exchanges: {{ user.profile.completed_exchange_count }}</div>
           </div>
           <p>{{ user.profile.bio or "No bio yet." }}</p>
+          {% if not current_user.is_authenticated %}
+            <div class="alert alert-info small mb-3">
+              Create an account or log in to request skills, save listings, and contact this member.
+              <div class="d-flex gap-2 mt-2">
+                <a class="btn btn-accent btn-sm" href="{{ url_for('auth.register') }}">Join Sahayogi</a>
+                <a class="btn btn-outline-primary btn-sm" href="{{ url_for('auth.login') }}">Log in</a>
+              </div>
+            </div>
+          {% endif %}
           {% if current_user.is_authenticated and current_user.id == user.id %}
             <div class="d-grid gap-2">
               <a class="btn btn-accent" href="{{ url_for('profile.edit') }}">Edit profile</a>
@@ -45,7 +54,12 @@
               <h3 class="h6">Offers</h3>
               <ul class="list-unstyled">
                 {% for item in user.offered_skills %}
-                  <li class="mb-2"><span class="badge text-bg-light">{{ item.skill.name }}</span></li>
+                  <li class="mb-2">
+                    <span class="badge text-bg-light">{{ item.skill.name }}</span>
+                    {% if item.has_verified_certificate %}
+                      <span class="badge text-bg-info">Verified certificate</span>
+                    {% endif %}
+                  </li>
                 {% else %}
                   <li class="text-muted">No offered skills listed.</li>
                 {% endfor %}
@@ -67,7 +81,7 @@
 
       <section class="card card-shell mb-4">
         <div class="card-body">
-          <div class="section-head mb-3"><h2 class="h5 mb-0">Verified certificates</h2><a href="{{ url_for('reviews.user_reviews', user_id=user.id) }}">View all reviews</a></div>
+          <div class="section-head mb-3"><h2 class="h5 mb-0">Verified certificates</h2></div>
           <div class="d-flex flex-wrap gap-2">
             {% for certificate in approved_certificates %}
               <span class="badge text-bg-info">{{ certificate.skill.name }} verified</span>
@@ -98,13 +112,16 @@
 
       <section class="card card-shell">
         <div class="card-body">
-          <div class="section-head mb-3"><h2 class="h5 mb-0">Recent reviews</h2></div>
+          <div class="section-head mb-3"><h2 class="h5 mb-0">Recent reviews</h2><a href="{{ url_for('reviews.user_reviews', user_id=user.id) }}">View all reviews</a></div>
           {% for review in recent_reviews %}
             <article class="border-bottom pb-3 mb-3">
               <div class="d-flex justify-content-between">
                 <strong>{{ review.reviewer.full_name }}</strong>
                 <span>{{ review.rating }}/5</span>
               </div>
+              {% if review.created_at %}
+                <div class="small text-muted">Submitted {{ review.created_at.strftime('%Y-%m-%d') }}</div>
+              {% endif %}
               <p class="mb-0">{{ review.comment or "No written comment." }}</p>
             </article>
           {% else %}
