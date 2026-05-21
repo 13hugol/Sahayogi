@@ -5,9 +5,8 @@ from datetime import datetime
 import math
 
 from flask_login import UserMixin
-from werkzeug.security import check_password_hash, generate_password_hash
-
 from app.enums import SkillType, UserRole
+from app.utils.passwords import hash_password, verify_password
 
 from .base_model import BaseModel
 
@@ -244,14 +243,14 @@ class User(UserMixin, BaseModel):
     def set_password(self, password: str) -> None:
         from app.repositories import UserRepository
 
-        self._set_password_hash(generate_password_hash(password))
+        self._set_password_hash(hash_password(password))
         UserRepository().update_password(self)
 
     def check_password(self, password: str) -> bool:
         return self._check_password(password)
 
     def _check_password(self, password: str) -> bool:
-        return check_password_hash(self._password_hash, password)
+        return verify_password(self._password_hash, password)
 
     def save_verification_token(self, token: str, expires_at: datetime) -> None:
         from app.repositories import UserRepository

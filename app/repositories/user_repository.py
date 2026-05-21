@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from werkzeug.security import generate_password_hash
-
 from app.models.user import Role, User, unique_username
+from app.utils.passwords import hash_password
 
 from .base_repository import BaseRepository
 from .profile_repository import ProfileRepository
@@ -52,7 +51,7 @@ class UserRepository(BaseRepository):
     def create_registered(self, full_name: str, email: str, password: str, location: str, role: Role) -> User:
         normalized_email = self._normalize_email(email)
         username = unique_username(normalized_email.split("@")[0], self._profile_repository)
-        password_hash = generate_password_hash(password)
+        password_hash = hash_password(password)
         with self._db() as db:
             with db.transaction():
                 user_id = db.execute(
@@ -73,8 +72,87 @@ class UserRepository(BaseRepository):
         return self._hydrate(row)
 
     def update_password(self, user: User) -> None:
+        user._reset_login_security()
         with self._db() as db:
-            db.execute("UPDATE users SET password_hash = %s WHERE id = %s", (user.password_hash, user.id))
+            db.execute(
+                """
+                UPDATE users
+                SET password_hash = %s,
+                    failed_login_count = 0,
+                    locked_until = NULL
+                WHERE id = %s
+                """,
+                (user.password_hash, user.id),
+            )
+
+    def create_password_reset_token(self, user: User, token_hash: str, expires_at: datetime) -> None:
+        now = datetime.utcnow()
+        with self._db() as db:
+            with db.transaction():
+                db.execute(
+                    """
+                    UPDATE password_reset_tokens
+                    SET used_at = %s
+                    WHERE user_id = %s AND used_at IS NULL
+                    """,
+                    (now, user.id),
+                )
+                db.execute(
+                    """
+                    INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+                    VALUES (%s, %s, %s)
+                    """,
+                    (user.id, token_hash, expires_at),
+                )
+
+    def has_valid_password_reset_token(self, token_hash: str) -> bool:
+        with self._db() as db:
+            row = db.fetch_one(
+                """
+                SELECT id
+                FROM password_reset_tokens
+                WHERE token_hash = %s
+                  AND used_at IS NULL
+                  AND expires_at > %s
+                """,
+                (token_hash, datetime.utcnow()),
+            )
+        return row is not None
+
+    def consume_password_reset_token(self, token_hash: str, password_hash: str) -> bool:
+        now = datetime.utcnow()
+        with self._db() as db:
+            with db.transaction():
+                row = db.fetch_one(
+                    """
+                    SELECT id, user_id, expires_at, used_at
+                    FROM password_reset_tokens
+                    WHERE token_hash = %s
+                    """,
+                    (token_hash,),
+                )
+                if (
+                    not row
+                    or row.get("used_at") is not None
+                    or row.get("expires_at") is None
+                    or row["expires_at"] <= now
+                ):
+                    return False
+                db.execute(
+                    """
+                    UPDATE users
+                    SET password_hash = %s,
+                        failed_login_count = 0,
+                        locked_until = NULL
+                    WHERE id = %s
+                    """,
+                    (password_hash, row["user_id"]),
+                )
+                db.execute(
+                    "UPDATE password_reset_tokens SET used_at = %s WHERE id = %s",
+                    (now, row["id"]),
+                )
+        return True
 
     def save_verification_token(self, user: User, token: str, expires_at: datetime) -> None:
         user._assign_verification_token(token, expires_at)
