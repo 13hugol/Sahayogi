@@ -29,6 +29,24 @@ class LoginData:
 
 
 @dataclass(frozen=True)
+class PasswordResetRequestData:
+    email: str
+
+
+@dataclass(frozen=True)
+class PasswordResetData:
+    password: str
+    confirm_password: str
+
+
+@dataclass(frozen=True)
+class PasswordChangeData:
+    current_password: str
+    password: str
+    confirm_password: str
+
+
+@dataclass(frozen=True)
 class DashboardStats:
     total_users: int
     admin_users: int
