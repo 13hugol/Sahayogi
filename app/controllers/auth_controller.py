@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import math
 from datetime import datetime, timedelta
 
-from flask import current_app, flash, redirect, render_template, request, url_for
+from flask import current_app, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
 from app.models import Role, User
@@ -89,37 +90,77 @@ class AuthController(BaseController):
         if current_user.is_authenticated:
             return redirect(url_for("main.dashboard"))
 
+        errors: dict[str, str] = {}
+        email = ""
+
         if request.method == "POST":
             email = request.form.get("email", "").lower().strip()
             password = request.form.get("password", "")
-            user = User.find_by_email(email)
-            if not user:
-                flash("Invalid email or password.", "danger")
-                return render_template("auth/login.html", email=email)
-            if user.locked_until and user.locked_until > datetime.utcnow():
-                flash("Too many failed attempts. Try again after the lockout period.", "danger")
-                return render_template("auth/login.html", email=email)
-            if not user.check_password(password):
-                locked_until = None
-                if user.failed_login_count + 1 >= current_app.config["LOCKOUT_THRESHOLD"]:
-                    locked_until = datetime.utcnow() + timedelta(
-                        minutes=current_app.config["LOCKOUT_DURATION_MINUTES"]
+
+            # ── field-level validation ──
+            if not email:
+                errors["email"] = "Email is required."
+            if not password:
+                errors["password"] = "Password is required."
+
+            if not errors:
+                user = User.find_by_email(email)
+
+                if not user:
+                    errors["email"] = "Invalid email or password."
+                    return render_template("auth/login.html", email=email, errors=errors)
+
+                # ── account lockout check ──
+                if user.locked_until and user.locked_until > datetime.utcnow():
+                    remaining = user.locked_until - datetime.utcnow()
+                    mins_left = max(1, math.ceil(remaining.total_seconds() / 60))
+                    errors["locked"] = (
+                        f"Too many failed attempts. Try again in {mins_left} minute{'s' if mins_left != 1 else ''}."
                     )
-                user.register_failed_login(locked_until)
-                flash("Invalid email or password.", "danger")
-                return render_template("auth/login.html", email=email)
-            if user.status != "active":
-                flash("This account is not active.", "danger")
-                return render_template("auth/login.html", email=email)
-            user.clear_failed_login()
-            login_user(user)
-            flash("Welcome back.", "success")
-            return redirect(request.args.get("next") or url_for("main.dashboard"))
-        return render_template("auth/login.html")
+                    return render_template("auth/login.html", email=email, errors=errors)
+
+                # ── if lockout has expired, reset the counter ──
+                if user.locked_until and user.locked_until <= datetime.utcnow():
+                    user.clear_failed_login()
+
+                # ── password verification ──
+                if not user.check_password(password):
+                    locked_until = None
+                    if user.failed_login_count + 1 >= current_app.config["LOCKOUT_THRESHOLD"]:
+                        locked_until = datetime.utcnow() + timedelta(
+                            minutes=current_app.config["LOCKOUT_DURATION_MINUTES"]
+                        )
+                    user.register_failed_login(locked_until)
+
+                    if locked_until:
+                        errors["locked"] = (
+                            f"Too many failed attempts. Account locked for "
+                            f"{current_app.config['LOCKOUT_DURATION_MINUTES']} minutes."
+                        )
+                    else:
+                        errors["password"] = "Invalid email or password."
+                    return render_template("auth/login.html", email=email, errors=errors)
+
+                # ── account status check ──
+                if user.status != "active":
+                    errors["email"] = "This account is not active."
+                    return render_template("auth/login.html", email=email, errors=errors)
+
+                # ── successful login ──
+                user.clear_failed_login()
+                login_user(user, remember=True)
+                session.permanent = True
+                flash("Welcome back.", "success")
+                return redirect(request.args.get("next") or url_for("main.dashboard"))
+
+        return render_template("auth/login.html", email=email, errors=errors)
 
     @login_required
     def logout(self):
         logout_user()
+        # Remove app-specific session data; logout_user() already
+        # handles _user_id and the remember-me cookie signal.
+        session.pop("csrf_token", None)
         flash("You have been logged out.", "info")
         return redirect(url_for("main.home"))
 
@@ -145,3 +186,4 @@ class AuthController(BaseController):
             flash("Password reset is outside the current backend scope.", "info")
             return redirect(url_for("auth.login"))
         return render_template("auth/forgot_password.html")
+
