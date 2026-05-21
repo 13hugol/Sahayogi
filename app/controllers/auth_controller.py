@@ -8,13 +8,21 @@ from app.exceptions import (
     AccountLockedError,
     DuplicateEmailError,
     InactiveAccountError,
+    InvalidCurrentPasswordError,
     InvalidCredentialsError,
+    InvalidPasswordResetTokenError,
     InvalidVerificationTokenError,
     UserNotFoundError,
 )
 from app.services import AuthService
 from app.utils.email import send_email
-from app.validators import LoginValidator, RegistrationValidator
+from app.validators import (
+    LoginValidator,
+    PasswordChangeValidator,
+    PasswordResetRequestValidator,
+    PasswordResetValidator,
+    RegistrationValidator,
+)
 
 from .base_controller import BaseController
 
@@ -25,10 +33,16 @@ class AuthController(BaseController):
         auth_service: AuthService,
         registration_validator: RegistrationValidator,
         login_validator: LoginValidator,
+        password_reset_request_validator: PasswordResetRequestValidator,
+        password_reset_validator: PasswordResetValidator,
+        password_change_validator: PasswordChangeValidator,
     ):
         self._auth_service = auth_service
         self._registration_validator = registration_validator
         self._login_validator = login_validator
+        self._password_reset_request_validator = password_reset_request_validator
+        self._password_reset_validator = password_reset_validator
+        self._password_change_validator = password_change_validator
 
     def register(self):
         if current_user.is_authenticated:
@@ -152,7 +166,82 @@ class AuthController(BaseController):
         return self.render("auth/resend_verification.html")
 
     def forgot_password(self):
+        errors: dict[str, str] = {}
+        reset_request = self._password_reset_request_validator.build_data(request.form)
+
         if request.method == "POST":
-            flash("Password reset is outside the current backend scope.", "info")
-            return redirect(url_for("auth.login"))
-        return self.render("auth/forgot_password.html")
+            errors = self._password_reset_request_validator.validate(reset_request)
+            if not errors:
+                user, token = self._auth_service.request_password_reset(
+                    reset_request.email,
+                    expiry_seconds=current_app.config["PASSWORD_RESET_EXPIRY_SECONDS"],
+                )
+                if user and token:
+                    reset_url = url_for("auth.reset_password", token=token, _external=True)
+                    send_email(
+                        "Reset your Sahayogi password",
+                        user.email,
+                        (
+                            f"Hello {user.full_name},\n\n"
+                            f"Reset your Sahayogi password using this one-time link:\n"
+                            f"{reset_url}\n\n"
+                            "This link expires in 30 minutes. If you did not request it, you can ignore this email."
+                        ),
+                    )
+                flash(
+                    "If that email belongs to an account, a 30-minute password reset link has been sent.",
+                    "info",
+                )
+                if not current_app.config.get("MAIL_SERVER"):
+                    flash(
+                        f"Development email links are written to {current_app.config['MAIL_LOG_FILE']}.",
+                        "warning",
+                    )
+                return redirect(url_for("auth.login"))
+        return self.render("auth/forgot_password.html", email=reset_request.email, errors=errors)
+
+    def reset_password(self, token: str):
+        errors: dict[str, str] = {}
+        token_is_valid = self._auth_service.password_reset_token_is_valid(token)
+        reset_data = self._password_reset_validator.build_data(request.form)
+
+        if request.method == "POST":
+            errors = self._password_reset_validator.validate(reset_data)
+            if not errors:
+                try:
+                    self._auth_service.reset_password(token, reset_data.password)
+                except InvalidPasswordResetTokenError as exc:
+                    errors["token"] = str(exc)
+                else:
+                    flash("Your password has been reset. Please log in with the new password.", "success")
+                    return redirect(url_for("auth.login"))
+
+        return self.render(
+            "auth/reset_password.html",
+            errors=errors,
+            token_is_valid=token_is_valid,
+        )
+
+    @login_required
+    def change_password(self):
+        password_data = self._password_change_validator.build_data(request.form)
+        errors = self._password_change_validator.validate(password_data)
+
+        if not errors:
+            try:
+                self._auth_service.change_password(
+                    current_user.id,
+                    password_data.current_password,
+                    password_data.password,
+                )
+            except InvalidCurrentPasswordError as exc:
+                errors["current_password"] = str(exc)
+            except UserNotFoundError as exc:
+                errors["current_password"] = str(exc)
+            else:
+                flash("Your password has been changed securely.", "success")
+                return redirect(url_for("profile.edit"))
+
+        for message in errors.values():
+            flash(message, "danger")
+        return redirect(url_for("profile.edit"))
