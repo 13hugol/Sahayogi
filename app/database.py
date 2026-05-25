@@ -226,6 +226,16 @@ class Database:
                 CONSTRAINT fk_skills_profile_skill FOREIGN KEY (skill_id) REFERENCES profile_skills(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """,
+            """
+            CREATE TABLE IF NOT EXISTS notifications (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                message TEXT NOT NULL,
+                is_read BOOLEAN NOT NULL DEFAULT FALSE,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT fk_notifications_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """,
         ]
         try:
             for statement in statements:

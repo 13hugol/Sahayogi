@@ -3,6 +3,7 @@ from .base_model import BaseModel
 from .profile import ProfileCertificate, ProfileReview, ProfileSkill
 from .user import Profile, Role, User
 from .skill import Category, Skill
+from .notification import Notification
 
 __all__ = [
     "AdminAuditLog",
@@ -15,4 +16,5 @@ __all__ = [
     "User",
     "Category",
     "Skill",
+    "Notification",
 ]

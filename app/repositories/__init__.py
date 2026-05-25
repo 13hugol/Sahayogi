@@ -9,6 +9,7 @@ from .profile_repository import (
 from .role_repository import RoleRepository
 from .user_repository import UserRepository
 from .skill_repository import CategoryRepository, SkillRepository
+from .notification_repository import NotificationRepository
 
 __all__ = [
     "AdminAuditRepository",
@@ -21,4 +22,5 @@ __all__ = [
     "UserRepository",
     "CategoryRepository",
     "SkillRepository",
+    "NotificationRepository",
 ]
