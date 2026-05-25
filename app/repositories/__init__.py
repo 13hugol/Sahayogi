@@ -8,6 +8,7 @@ from .profile_repository import (
 )
 from .role_repository import RoleRepository
 from .user_repository import UserRepository
+from .skill_repository import CategoryRepository, SkillRepository
 
 __all__ = [
     "AdminAuditRepository",
@@ -18,5 +19,6 @@ __all__ = [
     "ProfileSkillRepository",
     "RoleRepository",
     "UserRepository",
+    "CategoryRepository",
+    "SkillRepository",
 ]
-
