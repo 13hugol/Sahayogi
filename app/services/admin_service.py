@@ -12,10 +12,13 @@ class AdminService:
         user_repository: UserRepository,
         role_repository: RoleRepository,
         audit_repository: AdminAuditRepository,
+        skill_repository=None,
     ):
         self._user_repository = user_repository
         self._role_repository = role_repository
         self._audit_repository = audit_repository
+        from app.repositories import SkillRepository
+        self._skill_repository = skill_repository or SkillRepository()
 
     def dashboard_stats(self) -> DashboardStats:
         return DashboardStats(
@@ -56,4 +59,67 @@ class AdminService:
             detail=f"Role changed from '{old_role_name}' to '{normalized_role}' by admin {admin_user.email}",
         )
         return target_user
+
+    def get_pending_listings(
+        self,
+        category_id: int | None = None,
+        username: str | None = None,
+        sort_order: str = "desc",
+    ):
+        from app.models.skill import Skill
+        sql = """
+            SELECT s.* FROM skills s
+            JOIN profiles p ON s.user_id = p.user_id
+            WHERE s.status = 'pending'
+        """
+        params = []
+        if category_id is not None:
+            sql += " AND s.category_id = %s"
+            params.append(category_id)
+        if username:
+            sql += " AND p.username = %s"
+            params.append(username)
+        
+        if sort_order.lower() == "asc":
+            sql += " ORDER BY s.created_at ASC"
+        else:
+            sql += " ORDER BY s.created_at DESC"
+
+        with self._skill_repository._db() as db:
+            rows = db.fetch_all(sql, params)
+        return [Skill.from_row(row) for row in rows if row]
+
+    def approve_listing(self, admin_user, listing_id: int):
+        listing = self._skill_repository.find_by_id(listing_id)
+        if not listing:
+            return None
+        listing.status = "approved"
+        listing.rejection_reason = None
+        self._skill_repository.update(listing)
+        
+        self._audit_repository.create(
+            admin_id=admin_user.id,
+            action="approve_listing",
+            target_type="Skill",
+            target_id=listing.id,
+            detail=f"Listing '{listing.title}' approved by admin {admin_user.email}",
+        )
+        return listing
+
+    def reject_listing(self, admin_user, listing_id: int, reason: str):
+        listing = self._skill_repository.find_by_id(listing_id)
+        if not listing:
+            return None
+        listing.status = "rejected"
+        listing.rejection_reason = reason
+        self._skill_repository.update(listing)
+        
+        self._audit_repository.create(
+            admin_id=admin_user.id,
+            action="reject_listing",
+            target_type="Skill",
+            target_id=listing.id,
+            detail=f"Listing '{listing.title}' rejected by admin {admin_user.email} (Reason: {reason})",
+        )
+        return listing
 
