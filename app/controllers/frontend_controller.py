@@ -23,7 +23,18 @@ class FrontendController(BaseController):
         
         listings = self._skill_service.search_listings(query=q if q else None, status="approved")
         
-        category_ids = [int(cid) for cid in request.args.getlist("category") if cid.isdigit()]
+        category_ids = []
+        raw_cats = request.args.getlist("category") + request.args.getlist("category[]")
+        for cid in raw_cats:
+            if "," in cid:
+                for part in cid.split(","):
+                    part = part.strip()
+                    if part.isdigit():
+                        category_ids.append(int(part))
+            else:
+                cid = cid.strip()
+                if cid.isdigit():
+                    category_ids.append(int(cid))
         if category_ids:
             listings = [l for l in listings if l.category_id in category_ids]
             
@@ -210,7 +221,18 @@ class FrontendController(BaseController):
     def api_search(self):
         q = request.args.get("q", "").strip()
         listings = self._skill_service.search_listings(query=q if q else None, status="approved")
-        category_ids = [int(cid) for cid in request.args.getlist("category") if cid.isdigit()]
+        category_ids = []
+        raw_cats = request.args.getlist("category") + request.args.getlist("category[]")
+        for cid in raw_cats:
+            if "," in cid:
+                for part in cid.split(","):
+                    part = part.strip()
+                    if part.isdigit():
+                        category_ids.append(int(part))
+            else:
+                cid = cid.strip()
+                if cid.isdigit():
+                    category_ids.append(int(cid))
         if category_ids:
             listings = [l for l in listings if l.category_id in category_ids]
             
