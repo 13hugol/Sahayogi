@@ -379,7 +379,9 @@ class FrontendController(BaseController):
 
     @login_required
     def notification_counts(self):
-        return jsonify({"messages": 0, "notifications": 0})
+        from app.models.notification import Notification
+        unread = Notification.get_unread_count(current_user.id)
+        return jsonify({"messages": 0, "notifications": unread})
 
     @login_required
     def profile_me(self):

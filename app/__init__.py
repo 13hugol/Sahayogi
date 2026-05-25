@@ -78,9 +78,19 @@ def register_csrf(app: Flask) -> None:
 def register_template_context(app: Flask) -> None:
     @app.context_processor
     def inject_template_state():
+        from flask_login import current_user
+        from app.models.notification import Notification
+
+        unread_notifications = 0
+        if current_user and current_user.is_authenticated:
+            try:
+                unread_notifications = Notification.get_unread_count(current_user.id)
+            except Exception:
+                pass
+
         return {
             "available_credits": 0,
-            "nav_counts": {"messages": 0, "notifications": 0},
+            "nav_counts": {"messages": 0, "notifications": unread_notifications},
             "csrf_token": lambda: session.get("csrf_token", ""),
         }
 
