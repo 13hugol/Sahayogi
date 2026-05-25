@@ -9,8 +9,10 @@ from ..repositories import (
     ProfileReviewRepository,
     RoleRepository,
     UserRepository,
+    CategoryRepository,
+    SkillRepository,
 )
-from ..services import ProfileService
+from ..services import ProfileService, SkillService
 
 
 class FrontendRoutes:
@@ -22,12 +24,16 @@ class FrontendRoutes:
             profile_repository=profile_repository,
         )
         self.controller = FrontendController(
-            ProfileService(
+            profile_service=ProfileService(
                 user_repository,
                 profile_repository,
                 ProfileCertificateRepository(),
                 ProfileReviewRepository(),
-            )
+            ),
+            skill_service=SkillService(
+                SkillRepository(),
+                CategoryRepository(),
+            ),
         )
 
     def register(self):
@@ -38,7 +44,7 @@ class FrontendRoutes:
         listings.route("/mine", endpoint="mine")(self.controller.my_listings)
         listings.route("/<int:listing_id>", endpoint="detail")(self.controller.listing_detail)
         listings.route("/<int:listing_id>/edit", methods=["GET", "POST"], endpoint="edit")(self.controller.post_listing)
-        listings.route("/<int:listing_id>/delete", methods=["POST"], endpoint="delete")(self.controller.frontend_only_action)
+        listings.route("/<int:listing_id>/delete", methods=["POST"], endpoint="delete")(self.controller.delete_listing)
 
         credits = Blueprint("credits", __name__, url_prefix="/credits")
         credits.route("/ledger", endpoint="ledger")(self.controller.wallet)

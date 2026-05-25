@@ -107,6 +107,10 @@ class Skill(BaseModel):
         return res
 
     @property
+    def min_credits(self) -> int:
+        return self.credit_cost
+
+    @property
     def skill(self):
         from app.database import Database
 

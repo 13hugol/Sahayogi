@@ -7,68 +7,233 @@ from flask_login import current_user, login_required
 from markupsafe import Markup, escape
 
 from app.exceptions import ProfileNotFoundError
-from app.services import ProfileService
+from app.services import ProfileService, SkillService
 
 from .base_controller import BaseController
 
 
 class FrontendController(BaseController):
-    def __init__(self, profile_service: ProfileService):
+    def __init__(self, profile_service: ProfileService, skill_service: SkillService):
         self._profile_service = profile_service
-
-    def _categories(self):
-        return [
-            SimpleNamespace(id=1, name="Tech"),
-            SimpleNamespace(id=2, name="Music"),
-            SimpleNamespace(id=3, name="Language"),
-            SimpleNamespace(id=4, name="Kitchen"),
-        ]
+        self._skill_service = skill_service
 
     def marketplace(self):
+        q = request.args.get("q", "").strip()
+        categories = self._skill_service.get_all_categories()
+        
+        listings = self._skill_service.search_listings(query=q if q else None, status="approved")
+        
+        category_ids = [int(cid) for cid in request.args.getlist("category") if cid.isdigit()]
+        if category_ids:
+            listings = [l for l in listings if l.category_id in category_ids]
+            
+        page = request.args.get("page", 1, type=int)
+        per_page = 6
+        total_results = len(listings)
+        total_pages = max(1, (total_results + per_page - 1) // per_page)
+        
+        start = (page - 1) * per_page
+        end = start + per_page
+        paginated_listings = listings[start:end]
+        
         return self.render(
             "listings/index.html",
-            listings=[],
-            categories=self._categories(),
-            page=1,
-            total_pages=1,
-            total_results=0,
+            listings=paginated_listings,
+            categories=categories,
+            page=page,
+            total_pages=total_pages,
+            total_results=total_results,
         )
 
     @login_required
-    def post_listing(self):
-        return self.render("listings/form.html", form=ListingShellForm(), title="Create listing")
+    def post_listing(self, listing_id: int = None):
+        is_edit = listing_id is not None
+        title_text = "Edit listing" if is_edit else "Create listing"
+        
+        listing = None
+        if is_edit:
+            listing = self._skill_service.get_listing_by_id(listing_id)
+            if not listing:
+                abort(404)
+            if listing.user_id != current_user.id:
+                abort(403)
+                
+        skill_choices = [(ps.id, ps.skill_name) for ps in current_user.offered_skills]
+        categories = self._skill_service.get_all_categories()
+        category_choices = [(c.id, c.name) for c in categories]
+        
+        if request.method == "POST":
+            title = request.form.get("title", "").strip()
+            exchange_type = request.form.get("exchange_type", "").strip()
+            skill_id_str = request.form.get("skill_id", "").strip()
+            category_id_str = request.form.get("category_id", "").strip()
+            description = request.form.get("description", "").strip()
+            min_credits_str = request.form.get("min_credits", "10").strip()
+            location_text = request.form.get("location_text", "").strip()
+            contact_method = request.form.get("contact_method", "").strip()
+            availability_labels = request.form.get("availability_labels", "").strip()
+            
+            form = ListingShellForm(
+                data={
+                    "title": title,
+                    "description": description,
+                    "exchange_type": exchange_type,
+                    "skill_id": skill_id_str,
+                    "category_id": category_id_str,
+                    "min_credits": min_credits_str,
+                    "location_text": location_text,
+                    "contact_method": contact_method,
+                    "availability_labels": availability_labels,
+                }
+            )
+            form.skill_id.choices = skill_choices
+            form.category_id.choices = category_choices
+            
+            if not title or len(title) < 5 or len(title) > 120:
+                form.title.errors.append("Title must be between 5 and 120 characters.")
+            if not description or len(description) < 10:
+                form.description.errors.append("Description must be at least 10 characters.")
+            
+            skill_id = None
+            try:
+                skill_id = int(skill_id_str)
+                if skill_id not in [ps.id for ps in current_user.offered_skills]:
+                    form.skill_id.errors.append("Please select a valid skill from your profile.")
+            except ValueError:
+                form.skill_id.errors.append("Please select a valid skill.")
+                
+            category_id = None
+            try:
+                category_id = int(category_id_str)
+                if not self._skill_service.get_category_by_id(category_id):
+                    form.category_id.errors.append("Please select a valid category.")
+            except ValueError:
+                form.category_id.errors.append("Please select a valid category.")
+                
+            if exchange_type not in ["credit", "teach"]:
+                form.exchange_type.errors.append("Please select a valid exchange type.")
+                
+            credit_cost = 10
+            if exchange_type == "credit":
+                try:
+                    credit_cost = int(min_credits_str)
+                    if credit_cost < 0:
+                        form.min_credits.errors.append("Credits cannot be negative.")
+                except ValueError:
+                    form.min_credits.errors.append("Please enter a valid number of credits.")
+            else:
+                credit_cost = 0
+            
+            if not availability_labels:
+                form.availability_labels.errors.append("Please provide availability details.")
+                
+            has_errors = False
+            all_fields = set(form.fields.keys()) | set(form._fields_cache.keys())
+            for field_name in all_fields:
+                field = getattr(form, field_name)
+                if field.errors:
+                    has_errors = True
+                    for err in field.errors:
+                        flash(err, "danger")
+                
+            if not has_errors:
+                if is_edit:
+                    self._skill_service.edit_listing(
+                        listing_id=listing_id,
+                        category_id=category_id,
+                        skill_id=skill_id,
+                        title=title,
+                        description=description,
+                        exchange_type=exchange_type,
+                        credit_cost=credit_cost,
+                        availability=availability_labels,
+                        location_text=location_text,
+                        contact_method=contact_method,
+                        status="pending"
+                    )
+                    flash("Listing updated successfully and is pending admin review.", "success")
+                else:
+                    self._skill_service.create_listing(
+                        user_id=current_user.id,
+                        category_id=category_id,
+                        skill_id=skill_id,
+                        title=title,
+                        description=description,
+                        exchange_type=exchange_type,
+                        credit_cost=credit_cost,
+                        availability=availability_labels,
+                        location_text=location_text,
+                        contact_method=contact_method,
+                        status="pending"
+                    )
+                    flash("Listing submitted successfully and is pending admin review.", "success")
+                return redirect(url_for("listings.mine"))
+        else:
+            if is_edit:
+                availability_str = "\n".join([item.label for item in listing.availability])
+                form = ListingShellForm(
+                    data={
+                        "title": listing.title,
+                        "description": listing.description,
+                        "exchange_type": listing.exchange_type,
+                        "skill_id": listing.skill_id,
+                        "category_id": listing.category_id,
+                        "min_credits": listing.credit_cost,
+                        "location_text": listing.location_text,
+                        "contact_method": listing.contact_method,
+                        "availability_labels": availability_str,
+                    }
+                )
+            else:
+                form = ListingShellForm(
+                    data={
+                        "exchange_type": "credit",
+                        "min_credits": 10,
+                    }
+                )
+            form.skill_id.choices = skill_choices
+            form.category_id.choices = category_choices
+            
+        return self.render("listings/form.html", form=form, title=title_text)
 
     @login_required
     def my_listings(self):
-        return self.render("listings/mine.html", listings=[])
+        listings = self._skill_service.get_listings_by_user(current_user.id)
+        return self.render("listings/mine.html", listings=listings)
 
     def listing_detail(self, listing_id: int):
-        listing = SimpleNamespace(
-            id=listing_id,
-            title="Skill listing preview",
-            description="This frontend page is available, but listing persistence is not active in the backend scope.",
-            exchange_type="credit",
-            min_credits=10,
-            location_text="Kathmandu or remote",
-            contact_method="Platform messaging",
-            status="frontend-only",
-            availability=[],
-            skill=SimpleNamespace(name="Python"),
-            category=SimpleNamespace(name="Tech"),
-            user=SimpleNamespace(
-                id=0,
-                full_name="Sahayogi Member",
-                profile=SimpleNamespace(location="Kathmandu", reputation_score=0, contact_email=None),
-                has_verified_skill=lambda _skill_id: False,
-            ),
-            skill_id=1,
-            user_id=0,
-        )
+        listing = self._skill_service.get_listing_by_id(listing_id)
+        if not listing:
+            abort(404)
         return self.render("listings/detail.html", listing=listing, request_form=RequestShellForm())
 
     def api_search(self):
-        html = self.render("partials/listing_cards.html", listings=[])
-        return jsonify({"count": 0, "html": html})
+        q = request.args.get("q", "").strip()
+        listings = self._skill_service.search_listings(query=q if q else None, status="approved")
+        category_ids = [int(cid) for cid in request.args.getlist("category") if cid.isdigit()]
+        if category_ids:
+            listings = [l for l in listings if l.category_id in category_ids]
+            
+        page = request.args.get("page", 1, type=int)
+        per_page = 6
+        total_results = len(listings)
+        start = (page - 1) * per_page
+        end = start + per_page
+        paginated_listings = listings[start:end]
+        
+        html = self.render("partials/listing_cards.html", listings=paginated_listings)
+        return jsonify({"count": total_results, "html": html})
+
+    @login_required
+    def delete_listing(self, listing_id: int):
+        listing = self._skill_service.get_listing_by_id(listing_id)
+        if not listing:
+            abort(404)
+        if listing.user_id != current_user.id:
+            abort(403)
+        self._skill_service.delete_listing(listing_id)
+        flash("Listing deleted successfully.", "success")
+        return redirect(url_for("listings.mine"))
 
     @login_required
     def wallet(self):
@@ -189,13 +354,35 @@ class FrontendController(BaseController):
 class ShellForm:
     fields: dict[str, str] = {}
 
+    def __init__(self, data=None, **kwargs):
+        self._fields_cache = {}
+        self.data_dict = {}
+        if data:
+            if isinstance(data, dict):
+                self.data_dict.update(data)
+            else:
+                for k in self.fields:
+                    if hasattr(data, k):
+                        self.data_dict[k] = getattr(data, k)
+                for k in ["title", "min_credits", "location_text", "contact_method"]:
+                    if hasattr(data, k):
+                        self.data_dict[k] = getattr(data, k)
+        for k, v in kwargs.items():
+            self.data_dict[k] = v
+
     def hidden_tag(self):
         token = session.get("csrf_token", "")
         return Markup(f'<input type="hidden" name="csrf_token" value="{escape(token)}">')
 
     def __getattr__(self, name: str):
+        if name in self._fields_cache:
+            return self._fields_cache[name]
         field_type = self.fields.get(name, "text")
-        return ShellField(name, field_type)
+        field = ShellField(name, field_type)
+        if name in self.data_dict:
+            field.data = self.data_dict[name]
+        self._fields_cache[name] = field
+        return field
 
 
 class ShellField:
@@ -204,31 +391,45 @@ class ShellField:
         self.field_type = field_type
         self.errors = []
         self.label = ShellLabel(name)
+        self.choices = []
+        self.data = None
 
     def __call__(self, *args, **kwargs):
+        if self.data is not None and "value" not in kwargs and self.field_type not in ["select", "textarea", "submit"]:
+            kwargs["value"] = self.data
         attrs = html_attrs(kwargs)
         if self.field_type == "textarea":
-            return Markup(f'<textarea name="{self.name}" {attrs}></textarea>')
+            val = escape(str(self.data)) if self.data is not None else ""
+            return Markup(f'<textarea name="{self.name}" {attrs}>{val}</textarea>')
         if self.field_type == "select":
-            return Markup(f'<select name="{self.name}" {attrs}></select>')
+            options = []
+            for val, lbl in self.choices:
+                selected = ' selected' if self.data is not None and str(val) == str(self.data) else ''
+                options.append(f'<option value="{escape(str(val))}"{selected}>{escape(str(lbl))}</option>')
+            return Markup(f'<select name="{self.name}" {attrs}>{"".join(options)}</select>')
         if self.field_type == "submit":
             return Markup(f'<button type="submit" {attrs}>Save</button>')
         return Markup(f'<input type="{self.field_type}" name="{self.name}" {attrs}>')
 
     def __iter__(self):
         if self.name == "exchange_type":
-            yield ShellRadioField(self.name, "credit", "Credit")
-            yield ShellRadioField(self.name, "teach", "Teach")
+            checked_credit = (self.data == "credit") or (self.data is None)
+            checked_teach = (self.data == "teach")
+            yield ShellRadioField(self.name, "credit", "Credit", checked=checked_credit)
+            yield ShellRadioField(self.name, "teach", "Teach", checked=checked_teach)
         return
 
 
 class ShellRadioField:
-    def __init__(self, name: str, value: str, label: str):
+    def __init__(self, name: str, value: str, label: str, checked: bool = False):
         self.name = name
         self.value = value
         self.label = ShellTextLabel(label)
+        self.checked = checked
 
     def __call__(self, *args, **kwargs):
+        if self.checked:
+            kwargs["checked"] = True
         attrs = html_attrs(kwargs)
         return Markup(f'<input type="radio" name="{self.name}" value="{self.value}" {attrs}>')
 
@@ -251,11 +452,15 @@ class ShellTextLabel:
 
 class ListingShellForm(ShellForm):
     fields = {
+        "title": "text",
         "description": "textarea",
         "availability_labels": "textarea",
         "exchange_type": "select",
         "skill_id": "select",
         "category_id": "select",
+        "min_credits": "text",
+        "location_text": "text",
+        "contact_method": "text",
         "submit": "submit",
     }
 
