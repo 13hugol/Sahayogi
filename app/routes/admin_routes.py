@@ -27,6 +27,8 @@ class AdminRoutes:
         self.bp.route("/users")(self.controller.users)
         self.bp.route("/users/<int:user_id>/role", methods=["POST"])(self.controller.update_user_role)
         self.bp.route("/listings")(self.controller.listings)
+        self.bp.route("/listings/<int:listing_id>/approve", methods=["POST"])(self.controller.approve_listing)
+        self.bp.route("/listings/<int:listing_id>/reject", methods=["POST"])(self.controller.reject_listing)
         self.bp.route("/certificates")(self.controller.certificates)
         self.bp.route("/reports")(self.controller.reports)
         self.bp.route("/reviews")(self.controller.reviews)

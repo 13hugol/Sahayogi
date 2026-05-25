@@ -60,6 +60,36 @@ class AdminController(BaseController):
         return self.render("admin/listings.html", listings=[])
 
     @admin_required
+    def approve_listing(self, listing_id: int):
+        listing = self._admin_service.approve_listing(current_user, listing_id)
+        if not listing:
+            flash("Listing not found.", "danger")
+            return redirect(url_for("admin.listings"))
+        flash(f"Listing '{listing.title}' approved successfully.", "success")
+        return redirect(url_for("admin.listings"))
+
+    @admin_required
+    def reject_listing(self, listing_id: int):
+        reason = request.form.get("reason", "").strip()
+        if not reason:
+            flash("Rejection reason is required.", "danger")
+            return redirect(url_for("admin.listings"))
+            
+        listing = self._admin_service.reject_listing(current_user, listing_id, reason)
+        if not listing:
+            flash("Listing not found.", "danger")
+            return redirect(url_for("admin.listings"))
+        
+        from app.models.notification import Notification
+        Notification.create(
+            user_id=listing.user_id,
+            message=f"Your skill listing '{listing.title}' was rejected. Reason: {reason}"
+        )
+        
+        flash(f"Listing '{listing.title}' rejected.", "success")
+        return redirect(url_for("admin.listings"))
+
+    @admin_required
     def certificates(self):
         return self.render("admin/certificates.html", certificates=[])
 
