@@ -57,7 +57,25 @@ class AdminController(BaseController):
 
     @admin_required
     def listings(self):
-        return self.render("admin/listings.html", listings=[])
+        from app.models.skill import Category
+        category_id = request.args.get("category_id", type=int)
+        username = request.args.get("username", "").strip() or None
+        sort_order = request.args.get("sort_order", "desc")
+        
+        listings = self._admin_service.get_pending_listings(
+            category_id=category_id,
+            username=username,
+            sort_order=sort_order
+        )
+        categories = Category.all()
+        return self.render(
+            "admin/listings.html",
+            listings=listings,
+            categories=categories,
+            category_id=category_id,
+            username=username,
+            sort_order=sort_order
+        )
 
     @admin_required
     def approve_listing(self, listing_id: int):

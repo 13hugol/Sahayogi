@@ -4,6 +4,37 @@
 {% block content %}
   {% include "admin/_nav.html" %}
   <div class="section-head mb-4"><div><span class="eyebrow">Queue</span><h1 class="h2 mb-0">Pending listings</h1></div></div>
+  
+  <div class="card card-shell mb-4">
+    <div class="card-body">
+      <form method="get" action="{{ url_for('admin.listings') }}" class="row g-3">
+        <div class="col-md-4">
+          <label for="category_id" class="form-label small text-muted">Category</label>
+          <select name="category_id" id="category_id" class="form-select form-select-sm">
+            <option value="">All Categories</option>
+            {% for cat in categories %}
+              <option value="{{ cat.id }}" {% if category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label for="username" class="form-label small text-muted">Poster Username</label>
+          <input type="text" name="username" id="username" class="form-control form-control-sm" placeholder="e.g. johndoe" value="{{ username or '' }}">
+        </div>
+        <div class="col-md-3">
+          <label for="sort_order" class="form-label small text-muted">Date Submitted</label>
+          <select name="sort_order" id="sort_order" class="form-select form-select-sm">
+            <option value="desc" {% if sort_order == 'desc' %}selected{% endif %}>Newest First</option>
+            <option value="asc" {% if sort_order == 'asc' %}selected{% endif %}>Oldest First</option>
+          </select>
+        </div>
+        <div class="col-md-1 d-flex align-items-end">
+          <button type="submit" class="btn btn-primary btn-sm w-100">Filter</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   {% for listing in listings %}
     <div class="card card-shell mb-4">
       <div class="card-body">
@@ -16,8 +47,12 @@
         </div>
         <p>{{ listing.description }}</p>
         <div class="d-flex flex-wrap gap-2">
-          <form method="post" action="{{ url_for('admin.approve_listing', listing_id=listing.id) }}"><button class="btn btn-accent btn-sm">Approve</button></form>
+          <form method="post" action="{{ url_for('admin.approve_listing', listing_id=listing.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-accent btn-sm">Approve</button>
+          </form>
           <form method="post" action="{{ url_for('admin.reject_listing', listing_id=listing.id) }}" class="d-flex gap-2">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input class="form-control form-control-sm" name="reason" placeholder="Rejection reason">
             <button class="btn btn-outline-danger btn-sm">Reject</button>
           </form>
