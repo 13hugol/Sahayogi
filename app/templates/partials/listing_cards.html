@@ -19,7 +19,7 @@
             <p class="text-muted small mb-2">{{ listing.skill.name }} by {{ listing.user.full_name }}</p>
             <p class="flex-grow-1">{{ listing.description[:160] }}{% if listing.description|length > 160 %}...{% endif %}</p>
             <div class="listing-meta mb-3">
-              <div>Location: {{ listing.location_text or listing.user.profile.location or "Flexible" }}</div>
+              <div>Location: {{ listing.location_text or listing.user.profile.location or "Flexible" }}{% if listing.distance is not none %} ({{ listing.distance|round(1) }} km away){% endif %}</div>
               <div>Reputation: {{ listing.user.profile.reputation_score }} / 5</div>
               {% if listing.exchange_type == "credit" %}
                 <div>Credits: {{ listing.min_credits }}</div>
