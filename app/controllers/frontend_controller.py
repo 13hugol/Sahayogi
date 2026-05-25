@@ -22,6 +22,8 @@ class FrontendController(BaseController):
         categories = self._skill_service.get_all_categories()
         
         listings = self._skill_service.search_listings(query=q if q else None, status="approved")
+        for l in listings:
+            l.distance = None
         
         category_ids = []
         raw_cats = request.args.getlist("category") + request.args.getlist("category[]")
@@ -38,6 +40,33 @@ class FrontendController(BaseController):
         if category_ids:
             listings = [l for l in listings if l.category_id in category_ids]
             
+        location_query = request.args.get("location", "").strip()
+        radius_query = request.args.get("radius", "").strip()
+        if location_query:
+            from app.utils.distance import parse_coordinates, haversine_distance
+            search_coords = parse_coordinates(location_query)
+            radius_km = None
+            if radius_query:
+                try:
+                    radius_km = float(radius_query)
+                except ValueError:
+                    pass
+            filtered_listings = []
+            for l in listings:
+                l_loc_str = l.location_text.strip() if l.location_text else None
+                if not l_loc_str and l.user and l.user.profile and l.user.profile.location:
+                    l_loc_str = l.user.profile.location.strip()
+                l_coords = parse_coordinates(l_loc_str) if l_loc_str else None
+                if search_coords and l_coords:
+                    dist = haversine_distance(search_coords, l_coords)
+                    l.distance = dist
+                    if radius_km is None or dist <= radius_km:
+                        filtered_listings.append(l)
+                elif not search_coords and l_loc_str and location_query.lower() in l_loc_str.lower():
+                    l.distance = None
+                    filtered_listings.append(l)
+            listings = filtered_listings
+
         page = request.args.get("page", 1, type=int)
         per_page = 6
         total_results = len(listings)
@@ -221,6 +250,8 @@ class FrontendController(BaseController):
     def api_search(self):
         q = request.args.get("q", "").strip()
         listings = self._skill_service.search_listings(query=q if q else None, status="approved")
+        for l in listings:
+            l.distance = None
         category_ids = []
         raw_cats = request.args.getlist("category") + request.args.getlist("category[]")
         for cid in raw_cats:
@@ -236,6 +267,33 @@ class FrontendController(BaseController):
         if category_ids:
             listings = [l for l in listings if l.category_id in category_ids]
             
+        location_query = request.args.get("location", "").strip()
+        radius_query = request.args.get("radius", "").strip()
+        if location_query:
+            from app.utils.distance import parse_coordinates, haversine_distance
+            search_coords = parse_coordinates(location_query)
+            radius_km = None
+            if radius_query:
+                try:
+                    radius_km = float(radius_query)
+                except ValueError:
+                    pass
+            filtered_listings = []
+            for l in listings:
+                l_loc_str = l.location_text.strip() if l.location_text else None
+                if not l_loc_str and l.user and l.user.profile and l.user.profile.location:
+                    l_loc_str = l.user.profile.location.strip()
+                l_coords = parse_coordinates(l_loc_str) if l_loc_str else None
+                if search_coords and l_coords:
+                    dist = haversine_distance(search_coords, l_coords)
+                    l.distance = dist
+                    if radius_km is None or dist <= radius_km:
+                        filtered_listings.append(l)
+                elif not search_coords and l_loc_str and location_query.lower() in l_loc_str.lower():
+                    l.distance = None
+                    filtered_listings.append(l)
+            listings = filtered_listings
+
         page = request.args.get("page", 1, type=int)
         per_page = 6
         total_results = len(listings)
