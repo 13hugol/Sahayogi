@@ -195,6 +195,37 @@ class Database:
                 CONSTRAINT fk_audit_admin FOREIGN KEY (admin_id) REFERENCES users(id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """,
+            """
+            CREATE TABLE IF NOT EXISTS categories (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(80) NOT NULL UNIQUE,
+                description VARCHAR(255)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS skills (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                category_id INT NOT NULL,
+                skill_id INT NOT NULL,
+                title VARCHAR(120) NOT NULL,
+                description TEXT NOT NULL,
+                exchange_type VARCHAR(32) NOT NULL DEFAULT 'credit',
+                credit_cost INT NOT NULL DEFAULT 10,
+                availability VARCHAR(255) NOT NULL,
+                location_text VARCHAR(160),
+                contact_method VARCHAR(255),
+                status VARCHAR(32) NOT NULL DEFAULT 'pending',
+                rejection_reason TEXT,
+                certificate_path VARCHAR(255),
+                certificate_status VARCHAR(32) NOT NULL DEFAULT 'none',
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                CONSTRAINT fk_skills_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                CONSTRAINT fk_skills_category FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE,
+                CONSTRAINT fk_skills_profile_skill FOREIGN KEY (skill_id) REFERENCES profile_skills(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """,
         ]
         try:
             for statement in statements:

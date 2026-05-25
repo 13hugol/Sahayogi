@@ -20,6 +20,7 @@ def register_commands(app):
     def seed_reference_data_command():
         seed_roles()
         seed_admin()
+        seed_categories()
         click.echo("Reference data seeded: roles and admin account.")
 
     @app.cli.command("seed-demo-data")
@@ -80,3 +81,21 @@ def seed_admin() -> None:
         target_id=admin.id,
         detail="Default administrator account created.",
     )
+
+
+def seed_categories() -> None:
+    categories = [
+        ("Tech", "Technical skills and programming"),
+        ("Music", "Instrument learning and music theory"),
+        ("Language", "Foreign languages and linguistics"),
+        ("Kitchen", "Cooking, baking, and culinary arts"),
+    ]
+    db = Database()
+    try:
+        for name, desc in categories:
+            row = db.fetch_one("SELECT id FROM categories WHERE name = %s", (name,))
+            if not row:
+                db.execute("INSERT INTO categories (name, description) VALUES (%s, %s)", (name, desc))
+    finally:
+        db.close()
+
