@@ -7,6 +7,7 @@ from .profile_repository import (
     ProfileSkillRepository,
 )
 from .role_repository import RoleRepository
+from .skill_search_repository import SkillSearchRepository
 from .user_repository import UserRepository
 
 __all__ = [
@@ -17,6 +18,7 @@ __all__ = [
     "ProfileReviewRepository",
     "ProfileSkillRepository",
     "RoleRepository",
+    "SkillSearchRepository",
     "UserRepository",
 ]
 
