@@ -170,6 +170,28 @@ class Database:
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """,
             """
+            CREATE TABLE IF NOT EXISTS skill_search_listings (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                title VARCHAR(160) NOT NULL,
+                skill_name VARCHAR(120) NOT NULL,
+                category_id INT,
+                category_name VARCHAR(80) NOT NULL,
+                provider_name VARCHAR(120) NOT NULL,
+                provider_location VARCHAR(160),
+                description TEXT NOT NULL,
+                exchange_type VARCHAR(16) NOT NULL DEFAULT 'credit',
+                min_credits INT NOT NULL DEFAULT 10,
+                location_text VARCHAR(160),
+                contact_method VARCHAR(120),
+                reputation_score FLOAT NOT NULL DEFAULT 0,
+                status VARCHAR(32) NOT NULL DEFAULT 'approved',
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                INDEX ix_skill_search_status_created (status, created_at),
+                INDEX ix_skill_search_title (title),
+                FULLTEXT KEY ft_skill_search_title_description (title, description)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """,
+            """
             CREATE TABLE IF NOT EXISTS profile_reviews (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 reviewee_user_id INT NOT NULL,
@@ -199,6 +221,7 @@ class Database:
         try:
             for statement in statements:
                 db.execute(statement)
+            Database.seed_search_listing_examples(db)
             for statement in (
                 "ALTER TABLE profiles ADD COLUMN headline VARCHAR(160)",
                 "ALTER TABLE profiles ADD COLUMN bio TEXT",
@@ -211,3 +234,86 @@ class Database:
                     raise
         finally:
             db.close()
+
+    @staticmethod
+    def seed_search_listing_examples(db: "Database") -> None:
+        row = db.fetch_one("SELECT COUNT(*) AS count FROM skill_search_listings")
+        if int((row or {}).get("count") or 0) > 0:
+            return
+        db.execute_many(
+            """
+            INSERT INTO skill_search_listings (
+                title,
+                skill_name,
+                category_id,
+                category_name,
+                provider_name,
+                provider_location,
+                description,
+                exchange_type,
+                min_credits,
+                location_text,
+                contact_method,
+                reputation_score
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                (
+                    "Guitar lessons for beginners",
+                    "Guitar",
+                    2,
+                    "Music",
+                    "Aarav Shrestha",
+                    "Kathmandu",
+                    "Friendly acoustic guitar lessons covering chords, rhythm, and first songs.",
+                    "credit",
+                    10,
+                    "Kathmandu or remote",
+                    "In-app messaging",
+                    4.7,
+                ),
+                (
+                    "Guitarist jam and stage confidence",
+                    "Guitar performance",
+                    2,
+                    "Music",
+                    "Mina Rai",
+                    "Lalitpur",
+                    "Practice with a guitarist to improve timing, improvisation, and performance confidence.",
+                    "teach",
+                    0,
+                    "Lalitpur",
+                    "In-app messaging",
+                    4.9,
+                ),
+                (
+                    "Python web basics",
+                    "Python",
+                    1,
+                    "Tech",
+                    "Sanjay Thapa",
+                    "Bhaktapur",
+                    "Learn Python functions, Flask routes, templates, and simple database-backed pages.",
+                    "credit",
+                    12,
+                    "Remote",
+                    "In-app messaging",
+                    4.5,
+                ),
+                (
+                    "Momo cooking kitchen skills",
+                    "Cooking",
+                    4,
+                    "Kitchen",
+                    "Pema Lama",
+                    "Kathmandu",
+                    "Hands-on momo wrapping, filling preparation, steaming, and achar basics.",
+                    "credit",
+                    8,
+                    "Kathmandu",
+                    "In-app messaging",
+                    4.6,
+                ),
+            ),
+        )
