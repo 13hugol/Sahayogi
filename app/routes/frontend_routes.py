@@ -8,9 +8,10 @@ from ..repositories import (
     ProfileRepository,
     ProfileReviewRepository,
     RoleRepository,
+    SkillSearchRepository,
     UserRepository,
 )
-from ..services import ProfileService
+from ..services import ProfileService, SkillSearchService
 
 
 class FrontendRoutes:
@@ -27,7 +28,8 @@ class FrontendRoutes:
                 profile_repository,
                 ProfileCertificateRepository(),
                 ProfileReviewRepository(),
-            )
+            ),
+            SkillSearchService(SkillSearchRepository()),
         )
 
     def register(self):

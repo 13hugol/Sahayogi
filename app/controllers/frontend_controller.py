@@ -7,14 +7,15 @@ from flask_login import current_user, login_required
 from markupsafe import Markup, escape
 
 from app.exceptions import ProfileNotFoundError
-from app.services import ProfileService
+from app.services import ProfileService, SkillSearchService
 
 from .base_controller import BaseController
 
 
 class FrontendController(BaseController):
-    def __init__(self, profile_service: ProfileService):
+    def __init__(self, profile_service: ProfileService, skill_search_service: SkillSearchService):
         self._profile_service = profile_service
+        self._skill_search_service = skill_search_service
 
     def _categories(self):
         return [
@@ -25,13 +26,19 @@ class FrontendController(BaseController):
         ]
 
     def marketplace(self):
+        page = request.args.get("page", "1")
+        page = int(page) if page.isdigit() else 1
+        search_results = self._skill_search_service.search(
+            request.args.get("q", ""),
+            page=page,
+        )
         return self.render(
             "listings/index.html",
-            listings=[],
+            listings=search_results["listings"],
             categories=self._categories(),
-            page=1,
-            total_pages=1,
-            total_results=0,
+            page=search_results["page"],
+            total_pages=search_results["total_pages"],
+            total_results=search_results["total_results"],
         )
 
     @login_required
@@ -43,32 +50,35 @@ class FrontendController(BaseController):
         return self.render("listings/mine.html", listings=[])
 
     def listing_detail(self, listing_id: int):
-        listing = SimpleNamespace(
-            id=listing_id,
-            title="Skill listing preview",
-            description="This frontend page is available, but listing persistence is not active in the backend scope.",
-            exchange_type="credit",
-            min_credits=10,
-            location_text="Kathmandu or remote",
-            contact_method="Platform messaging",
-            status="frontend-only",
-            availability=[],
-            skill=SimpleNamespace(name="Python"),
-            category=SimpleNamespace(name="Tech"),
-            user=SimpleNamespace(
-                id=0,
-                full_name="Sahayogi Member",
-                profile=SimpleNamespace(location="Kathmandu", reputation_score=0, contact_email=None),
-                has_verified_skill=lambda _skill_id: False,
-            ),
-            skill_id=1,
-            user_id=0,
-        )
+        listing = self._skill_search_service.find_listing(listing_id)
+        if not listing:
+            listing = SimpleNamespace(
+                id=listing_id,
+                title="Skill listing preview",
+                description="This frontend page is available, but listing persistence is not active in the backend scope.",
+                exchange_type="credit",
+                min_credits=10,
+                location_text="Kathmandu or remote",
+                contact_method="Platform messaging",
+                status="frontend-only",
+                availability=[],
+                skill=SimpleNamespace(name="Python"),
+                category=SimpleNamespace(name="Tech"),
+                user=SimpleNamespace(
+                    id=0,
+                    full_name="Sahayogi Member",
+                    profile=SimpleNamespace(location="Kathmandu", reputation_score=0, contact_email=None),
+                    has_verified_skill=lambda _skill_id: False,
+                ),
+                skill_id=1,
+                user_id=0,
+            )
         return self.render("listings/detail.html", listing=listing, request_form=RequestShellForm())
 
     def api_search(self):
-        html = self.render("partials/listing_cards.html", listings=[])
-        return jsonify({"count": 0, "html": html})
+        search_results = self._skill_search_service.search(request.args.get("q", ""))
+        html = self.render("partials/listing_cards.html", listings=search_results["listings"])
+        return jsonify({"count": search_results["total_results"], "html": html})
 
     @login_required
     def wallet(self):
