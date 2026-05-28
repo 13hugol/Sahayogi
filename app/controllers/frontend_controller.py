@@ -8,6 +8,13 @@ from markupsafe import Markup, escape
 
 from app.exceptions import ProfileNotFoundError
 from app.services import ProfileService
+from app.services.listing_catalog import (
+    all_listings,
+    categories,
+    filter_listings,
+    find_listing,
+    paginate_listings,
+)
 
 from .base_controller import BaseController
 
@@ -17,21 +24,20 @@ class FrontendController(BaseController):
         self._profile_service = profile_service
 
     def _categories(self):
-        return [
-            SimpleNamespace(id=1, name="Tech"),
-            SimpleNamespace(id=2, name="Music"),
-            SimpleNamespace(id=3, name="Language"),
-            SimpleNamespace(id=4, name="Kitchen"),
-        ]
+        return categories()
 
     def marketplace(self):
+        page_data = self._browse_page()
         return self.render(
             "listings/index.html",
-            listings=[],
+            listings=page_data.listings,
             categories=self._categories(),
-            page=1,
-            total_pages=1,
-            total_results=0,
+            page=page_data.page,
+            total_pages=page_data.total_pages,
+            total_results=page_data.total_results,
+            saved_listing_ids=self._saved_listing_ids(),
+            active_filters=self._active_filters(),
+            catalog_total=len(all_listings()),
         )
 
     @login_required
@@ -42,33 +48,51 @@ class FrontendController(BaseController):
     def my_listings(self):
         return self.render("listings/mine.html", listings=[])
 
-    def listing_detail(self, listing_id: int):
-        listing = SimpleNamespace(
-            id=listing_id,
-            title="Skill listing preview",
-            description="This frontend page is available, but listing persistence is not active in the backend scope.",
-            exchange_type="credit",
-            min_credits=10,
-            location_text="Kathmandu or remote",
-            contact_method="Platform messaging",
-            status="frontend-only",
-            availability=[],
-            skill=SimpleNamespace(name="Python"),
-            category=SimpleNamespace(name="Tech"),
-            user=SimpleNamespace(
-                id=0,
-                full_name="Sahayogi Member",
-                profile=SimpleNamespace(location="Kathmandu", reputation_score=0, contact_email=None),
-                has_verified_skill=lambda _skill_id: False,
-            ),
-            skill_id=1,
-            user_id=0,
+    def saved_listings(self):
+        saved_ids = self._saved_listing_ids()
+        listings = [listing for listing in all_listings() if listing.id in saved_ids]
+        return self.render(
+            "listings/saved.html",
+            listings=listings,
+            saved_listing_ids=saved_ids,
+            total_results=len(listings),
         )
-        return self.render("listings/detail.html", listing=listing, request_form=RequestShellForm())
+
+    def listing_detail(self, listing_id: int):
+        listing = find_listing(listing_id)
+        if listing is None:
+            abort(404)
+        return self.render(
+            "listings/detail.html",
+            listing=listing,
+            request_form=RequestShellForm(),
+            saved_listing_ids=self._saved_listing_ids(),
+        )
 
     def api_search(self):
-        html = self.render("partials/listing_cards.html", listings=[])
-        return jsonify({"count": 0, "html": html})
+        page_data = self._browse_page(page=1)
+        html = self.render(
+            "partials/listing_cards.html",
+            listings=page_data.listings,
+            saved_listing_ids=self._saved_listing_ids(),
+        )
+        return jsonify({"count": page_data.total_results, "html": html})
+
+    def save_listing(self, listing_id: int):
+        if find_listing(listing_id) is None:
+            abort(404)
+        saved_ids = self._saved_listing_ids()
+        saved_ids.add(listing_id)
+        self._store_saved_listing_ids(saved_ids)
+        flash("Listing saved to your browse list.", "success")
+        return redirect(request.referrer or url_for("listings.saved"))
+
+    def unsave_listing(self, listing_id: int):
+        saved_ids = self._saved_listing_ids()
+        saved_ids.discard(listing_id)
+        self._store_saved_listing_ids(saved_ids)
+        flash("Listing removed from your saved list.", "info")
+        return redirect(request.referrer or url_for("listings.saved"))
 
     @login_required
     def wallet(self):
@@ -184,6 +208,74 @@ class FrontendController(BaseController):
     def frontend_only_action(self, *args, **kwargs):
         flash("This action is frontend-only in the current project scope.", "info")
         return redirect(request.referrer or url_for("main.dashboard"))
+
+    def _browse_page(self, page: int | None = None):
+        selected_categories = self._selected_category_ids()
+        listings = filter_listings(
+            query=request.args.get("q", ""),
+            category_ids=selected_categories,
+            radius=request.args.get("radius", ""),
+        )
+        current_page = page if page is not None else request.args.get("page", 1, type=int) or 1
+        return paginate_listings(listings, current_page)
+
+    @staticmethod
+    def _selected_category_ids() -> set[int]:
+        selected_ids = set()
+        for raw_category_id in request.args.getlist("category"):
+            try:
+                selected_ids.add(int(raw_category_id))
+            except ValueError:
+                continue
+        return selected_ids
+
+    @staticmethod
+    def _saved_listing_ids() -> set[int]:
+        saved_ids = set()
+        for listing_id in session.get("saved_listing_ids", []):
+            try:
+                saved_ids.add(int(listing_id))
+            except (TypeError, ValueError):
+                continue
+        return saved_ids
+
+    @staticmethod
+    def _store_saved_listing_ids(saved_ids: set[int]) -> None:
+        session["saved_listing_ids"] = sorted(saved_ids)
+        session.modified = True
+
+    def _active_filters(self) -> list[dict[str, str]]:
+        filters = []
+        query = request.args.get("q", "").strip()
+        if query:
+            filters.append({"label": f"Keyword: {query}", "remove_url": self._filter_remove_url("q")})
+        category_lookup = {category.id: category.name for category in self._categories()}
+        for category_id in self._selected_category_ids():
+            if category_id in category_lookup:
+                filters.append(
+                    {
+                        "label": f"Category: {category_lookup[category_id]}",
+                        "remove_url": self._filter_remove_url("category", str(category_id)),
+                    }
+                )
+        radius = request.args.get("radius", "").strip()
+        if radius:
+            filters.append({"label": f"Radius: {radius} km", "remove_url": self._filter_remove_url("radius")})
+        return filters
+
+    @staticmethod
+    def _filter_remove_url(key: str, value: str | None = None) -> str:
+        params = request.args.to_dict(flat=False)
+        params.pop("page", None)
+        if value is None:
+            params.pop(key, None)
+        else:
+            remaining = [item for item in params.get(key, []) if item != value]
+            if remaining:
+                params[key] = remaining
+            else:
+                params.pop(key, None)
+        return url_for("listings.index", **params)
 
 
 class ShellForm:
