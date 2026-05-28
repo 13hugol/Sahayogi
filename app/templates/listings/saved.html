@@ -1,0 +1,17 @@
+{% set active_nav = 'listings' %}
+{% extends "base.html" %}
+{% block title %}Saved Listings | Sahayogi{% endblock %}
+{% block content %}
+  <header class="page-header">
+    <div>
+      <span class="eyebrow">Saved browse list</span>
+      <h1 class="h2 mb-0">Saved listings</h1>
+      <p class="page-subtitle">{{ total_results }} bookmarked skill offer(s) are ready for a closer look.</p>
+    </div>
+    <a class="btn btn-outline-primary" href="{{ url_for('listings.index') }}">Browse all</a>
+  </header>
+
+  <div id="listingResults">
+    {% include "partials/listing_cards.html" %}
+  </div>
+{% endblock %}

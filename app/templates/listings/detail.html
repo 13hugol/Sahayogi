@@ -12,11 +12,24 @@
               <span class="badge {% if listing.exchange_type == 'credit' %}text-bg-warning{% else %}text-bg-success{% endif %}">{{ listing.exchange_type|title }}</span>
               {% if listing.user.has_verified_skill(listing.skill_id) %}<span class="badge text-bg-info">Verified skill</span>{% endif %}
               <h1 class="h2 mt-3">{{ listing.title }}</h1>
-              <div class="text-muted">{{ listing.skill.name }} by <a href="{{ url_for('profile.view', user_id=listing.user_id) }}">{{ listing.user.full_name }}</a></div>
+              <div class="text-muted">{{ listing.skill.name }} by {{ listing.user.full_name }}</div>
             </div>
-            {% if current_user.is_authenticated and current_user.id == listing.user_id %}
-              <a class="btn btn-outline-primary" href="{{ url_for('listings.edit', listing_id=listing.id) }}">Edit listing</a>
-            {% endif %}
+            <div class="d-flex gap-2 flex-wrap justify-content-end">
+              {% if listing.id in saved_listing_ids %}
+                <form method="post" action="{{ url_for('listings.unsave', listing_id=listing.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-outline-secondary" type="submit">Saved</button>
+                </form>
+              {% else %}
+                <form method="post" action="{{ url_for('listings.save', listing_id=listing.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-outline-secondary" type="submit">Save</button>
+                </form>
+              {% endif %}
+              {% if current_user.is_authenticated and current_user.id == listing.user_id %}
+                <a class="btn btn-outline-primary" href="{{ url_for('listings.edit', listing_id=listing.id) }}">Edit listing</a>
+              {% endif %}
+            </div>
           </div>
           <p class="lead">{{ listing.description }}</p>
           <div class="row g-3 mb-4">
