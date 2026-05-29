@@ -8,6 +8,13 @@ from markupsafe import Markup, escape
 
 from app.exceptions import ProfileNotFoundError
 from app.services import ProfileService, SkillService
+from app.services.listing_catalog import (
+    all_listings,
+    categories,
+    filter_listings,
+    find_listing,
+    paginate_listings,
+)
 
 from .base_controller import BaseController
 
@@ -17,10 +24,8 @@ class FrontendController(BaseController):
         self._profile_service = profile_service
         self._skill_service = skill_service
 
-    def marketplace(self):
+    def _get_filtered_listings(self):
         q = request.args.get("q", "").strip()
-        categories = self._skill_service.get_all_categories()
-        
         listings = self._skill_service.search_listings(query=q if q else None, status="approved")
         for l in listings:
             l.distance = None
@@ -66,7 +71,15 @@ class FrontendController(BaseController):
                     l.distance = None
                     filtered_listings.append(l)
             listings = filtered_listings
+        return listings
 
+    def _categories(self):
+        return self._skill_service.get_all_categories()
+
+    def marketplace(self):
+        listings = self._get_filtered_listings()
+        categories = self._categories()
+        
         page = request.args.get("page", 1, type=int)
         per_page = 6
         total_results = len(listings)
@@ -76,6 +89,8 @@ class FrontendController(BaseController):
         end = start + per_page
         paginated_listings = listings[start:end]
         
+        catalog_total = len(self._skill_service.search_listings(status="approved"))
+        
         return self.render(
             "listings/index.html",
             listings=paginated_listings,
@@ -83,6 +98,9 @@ class FrontendController(BaseController):
             page=page,
             total_pages=total_pages,
             total_results=total_results,
+            saved_listing_ids=self._saved_listing_ids(),
+            active_filters=self._active_filters(),
+            catalog_total=catalog_total,
         )
 
     @login_required
@@ -241,59 +259,33 @@ class FrontendController(BaseController):
         listings = self._skill_service.get_listings_by_user(current_user.id)
         return self.render("listings/mine.html", listings=listings)
 
+    def saved_listings(self):
+        saved_ids = self._saved_listing_ids()
+        listings = []
+        for lid in saved_ids:
+            l = self._skill_service.get_listing_by_id(lid)
+            if l:
+                listings.append(l)
+        return self.render(
+            "listings/saved.html",
+            listings=listings,
+            saved_listing_ids=saved_ids,
+            total_results=len(listings),
+        )
+
     def listing_detail(self, listing_id: int):
         listing = self._skill_service.get_listing_by_id(listing_id)
         if not listing:
             abort(404)
-        return self.render("listings/detail.html", listing=listing, request_form=RequestShellForm())
+        return self.render(
+            "listings/detail.html",
+            listing=listing,
+            request_form=RequestShellForm(),
+            saved_listing_ids=self._saved_listing_ids(),
+        )
 
     def api_search(self):
-        q = request.args.get("q", "").strip()
-        listings = self._skill_service.search_listings(query=q if q else None, status="approved")
-        for l in listings:
-            l.distance = None
-        category_ids = []
-        raw_cats = request.args.getlist("category") + request.args.getlist("category[]")
-        for cid in raw_cats:
-            if "," in cid:
-                for part in cid.split(","):
-                    part = part.strip()
-                    if part.isdigit():
-                        category_ids.append(int(part))
-            else:
-                cid = cid.strip()
-                if cid.isdigit():
-                    category_ids.append(int(cid))
-        if category_ids:
-            listings = [l for l in listings if l.category_id in category_ids]
-            
-        location_query = request.args.get("location", "").strip()
-        radius_query = request.args.get("radius", "").strip()
-        if location_query:
-            from app.utils.distance import parse_coordinates, haversine_distance
-            search_coords = parse_coordinates(location_query)
-            radius_km = None
-            if radius_query:
-                try:
-                    radius_km = float(radius_query)
-                except ValueError:
-                    pass
-            filtered_listings = []
-            for l in listings:
-                l_loc_str = l.location_text.strip() if l.location_text else None
-                if not l_loc_str and l.user and l.user.profile and l.user.profile.location:
-                    l_loc_str = l.user.profile.location.strip()
-                l_coords = parse_coordinates(l_loc_str) if l_loc_str else None
-                if search_coords and l_coords:
-                    dist = haversine_distance(search_coords, l_coords)
-                    l.distance = dist
-                    if radius_km is None or dist <= radius_km:
-                        filtered_listings.append(l)
-                elif not search_coords and l_loc_str and location_query.lower() in l_loc_str.lower():
-                    l.distance = None
-                    filtered_listings.append(l)
-            listings = filtered_listings
-
+        listings = self._get_filtered_listings()
         page = request.args.get("page", 1, type=int)
         per_page = 6
         total_results = len(listings)
@@ -301,7 +293,11 @@ class FrontendController(BaseController):
         end = start + per_page
         paginated_listings = listings[start:end]
         
-        html = self.render("partials/listing_cards.html", listings=paginated_listings)
+        html = self.render(
+            "partials/listing_cards.html",
+            listings=paginated_listings,
+            saved_listing_ids=self._saved_listing_ids(),
+        )
         return jsonify({"count": total_results, "html": html})
 
     @login_required
@@ -314,6 +310,22 @@ class FrontendController(BaseController):
         self._skill_service.delete_listing(listing_id)
         flash("Listing deleted successfully.", "success")
         return redirect(url_for("listings.mine"))
+
+    def save_listing(self, listing_id: int):
+        if self._skill_service.get_listing_by_id(listing_id) is None:
+            abort(404)
+        saved_ids = self._saved_listing_ids()
+        saved_ids.add(listing_id)
+        self._store_saved_listing_ids(saved_ids)
+        flash("Listing saved to your browse list.", "success")
+        return redirect(request.referrer or url_for("listings.saved"))
+
+    def unsave_listing(self, listing_id: int):
+        saved_ids = self._saved_listing_ids()
+        saved_ids.discard(listing_id)
+        self._store_saved_listing_ids(saved_ids)
+        flash("Listing removed from your saved list.", "info")
+        return redirect(request.referrer or url_for("listings.saved"))
 
     @login_required
     def wallet(self):
@@ -431,6 +443,74 @@ class FrontendController(BaseController):
     def frontend_only_action(self, *args, **kwargs):
         flash("This action is frontend-only in the current project scope.", "info")
         return redirect(request.referrer or url_for("main.dashboard"))
+
+    def _browse_page(self, page: int | None = None):
+        selected_categories = self._selected_category_ids()
+        listings = filter_listings(
+            query=request.args.get("q", ""),
+            category_ids=selected_categories,
+            radius=request.args.get("radius", ""),
+        )
+        current_page = page if page is not None else request.args.get("page", 1, type=int) or 1
+        return paginate_listings(listings, current_page)
+
+    @staticmethod
+    def _selected_category_ids() -> set[int]:
+        selected_ids = set()
+        for raw_category_id in request.args.getlist("category"):
+            try:
+                selected_ids.add(int(raw_category_id))
+            except ValueError:
+                continue
+        return selected_ids
+
+    @staticmethod
+    def _saved_listing_ids() -> set[int]:
+        saved_ids = set()
+        for listing_id in session.get("saved_listing_ids", []):
+            try:
+                saved_ids.add(int(listing_id))
+            except (TypeError, ValueError):
+                continue
+        return saved_ids
+
+    @staticmethod
+    def _store_saved_listing_ids(saved_ids: set[int]) -> None:
+        session["saved_listing_ids"] = sorted(saved_ids)
+        session.modified = True
+
+    def _active_filters(self) -> list[dict[str, str]]:
+        filters = []
+        query = request.args.get("q", "").strip()
+        if query:
+            filters.append({"label": f"Keyword: {query}", "remove_url": self._filter_remove_url("q")})
+        category_lookup = {category.id: category.name for category in self._categories()}
+        for category_id in self._selected_category_ids():
+            if category_id in category_lookup:
+                filters.append(
+                    {
+                        "label": f"Category: {category_lookup[category_id]}",
+                        "remove_url": self._filter_remove_url("category", str(category_id)),
+                    }
+                )
+        radius = request.args.get("radius", "").strip()
+        if radius:
+            filters.append({"label": f"Radius: {radius} km", "remove_url": self._filter_remove_url("radius")})
+        return filters
+
+    @staticmethod
+    def _filter_remove_url(key: str, value: str | None = None) -> str:
+        params = request.args.to_dict(flat=False)
+        params.pop("page", None)
+        if value is None:
+            params.pop(key, None)
+        else:
+            remaining = [item for item in params.get(key, []) if item != value]
+            if remaining:
+                params[key] = remaining
+            else:
+                params.pop(key, None)
+        return url_for("listings.index", **params)
 
 
 class ShellForm:

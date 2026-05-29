@@ -913,6 +913,46 @@ h6,
   font-size: 13px;
 }
 
+.listing-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.listing-actions .btn {
+  min-width: 104px;
+}
+
+.filter-tags {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 18px;
+}
+
+.filter-tag,
+.filter-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.filter-tag {
+  border: 1px solid rgba(253, 118, 26, 0.22);
+  background: rgba(253, 118, 26, 0.08);
+  color: var(--orange-dark);
+}
+
+.filter-clear {
+  color: var(--text-muted);
+}
+
 .avatar-large {
   width: 108px;
   height: 108px;

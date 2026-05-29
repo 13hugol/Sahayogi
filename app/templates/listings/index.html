@@ -1,4 +1,4 @@
-﻿{% set active_nav = 'listings' %}
+{% set active_nav = 'listings' %}
 {% extends "base.html" %}
 {% block title %}Browse Listings | Sahayogi{% endblock %}
 {% block content %}
@@ -6,11 +6,14 @@
     <div>
       <span class="eyebrow">Discovery</span>
       <h1 class="h2 mb-0">Browse skill listings</h1>
-      <p class="page-subtitle">Find approved offers by keyword, category, and location radius.</p>
+      <p class="page-subtitle">Explore {{ catalog_total }} approved skill offers by keyword, category, and location radius.</p>
     </div>
-    {% if current_user.is_authenticated %}
-      <a class="btn btn-accent" href="{{ url_for('listings.create') }}">Post listing</a>
-    {% endif %}
+    <div class="d-flex gap-2 flex-wrap">
+      <a class="btn btn-outline-primary" href="{{ url_for('listings.saved') }}">Saved listings</a>
+      {% if current_user.is_authenticated %}
+        <a class="btn btn-accent" href="{{ url_for('listings.create') }}">Post listing</a>
+      {% endif %}
+    </div>
   </header>
 
   <section class="table-card mb-4">
@@ -19,7 +22,7 @@
       <span class="badge text-bg-light">Live refresh</span>
     </div>
     <div class="card-body">
-      <form id="searchForm" data-live-search="true" class="row g-3">
+      <form id="searchForm" data-live-search="true" class="row g-3" method="get" action="{{ url_for('listings.index') }}">
         <div class="col-lg-3">
           <label class="form-label" for="q">Keyword</label>
           <input class="form-control" id="q" name="q" value="{{ request.args.get('q', '') }}" placeholder="Search by skill, title, or topic">
@@ -52,6 +55,14 @@
           <button class="btn btn-accent w-100" type="submit">Search</button>
         </div>
       </form>
+      {% if active_filters %}
+        <div class="filter-tags" aria-label="Active filters">
+          {% for filter in active_filters %}
+            <a class="filter-tag" href="{{ filter.remove_url }}">{{ filter.label }} <span aria-hidden="true">&times;</span></a>
+          {% endfor %}
+          <a class="filter-clear" href="{{ url_for('listings.index') }}">Clear all</a>
+        </div>
+      {% endif %}
     </div>
   </section>
 
@@ -59,6 +70,7 @@
 
   <div class="d-flex justify-content-between align-items-center mb-3">
     <div class="text-muted"><span id="resultCount">{{ total_results }}</span> result(s)</div>
+    <div class="text-muted small">Newest approved listings first, 20 per page</div>
   </div>
   <div id="listingResults">
     {% include "partials/listing_cards.html" %}

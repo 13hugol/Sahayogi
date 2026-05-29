@@ -1,3 +1,4 @@
+{% set saved_listing_ids = saved_listing_ids|default([]) %}
 {% if listings %}
   <div class="row g-4">
     {% for listing in listings %}
@@ -21,11 +22,25 @@
             <div class="listing-meta mb-3">
               <div>Location: {{ listing.location_text or listing.user.profile.location or "Flexible" }}{% if listing.distance is not none %} ({{ listing.distance|round(1) }} km away){% endif %}</div>
               <div>Reputation: {{ listing.user.profile.reputation_score }} / 5</div>
+              <div>Status: {{ listing.status|title }}</div>
               {% if listing.exchange_type == "credit" %}
                 <div>Credits: {{ listing.min_credits }}</div>
               {% endif %}
             </div>
-            <a class="btn btn-outline-primary mt-auto" href="{{ url_for('listings.detail', listing_id=listing.id) }}">View listing</a>
+            <div class="listing-actions mt-auto">
+              <a class="btn btn-outline-primary" href="{{ url_for('listings.detail', listing_id=listing.id) }}">View listing</a>
+              {% if listing.id in saved_listing_ids %}
+                <form method="post" action="{{ url_for('listings.unsave', listing_id=listing.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-outline-secondary" type="submit">Saved</button>
+                </form>
+              {% else %}
+                <form method="post" action="{{ url_for('listings.save', listing_id=listing.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-outline-secondary" type="submit">Save</button>
+                </form>
+              {% endif %}
+            </div>
           </div>
         </article>
       </div>
