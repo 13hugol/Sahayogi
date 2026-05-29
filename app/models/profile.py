@@ -53,6 +53,62 @@ class ProfileSkill(BaseModel):
 
         return ProfileSkillRepository().create(user_id, skill_name, skill_type, sort_order)
 
+    @classmethod
+    def sync_for_user(cls, user_id: int, skill_type: str, skill_names: list[str]) -> list["ProfileSkill"]:
+        if skill_type not in {"offered", "wanted"}:
+            raise ValueError("Profile skill type must be 'offered' or 'wanted'.")
+
+        cleaned_names = cls.clean_skill_names(skill_names)
+        existing_skills = cls.find_for_user(user_id, skill_type)
+        existing_by_key = {skill.skill_name.casefold(): skill for skill in existing_skills}
+        desired_keys = {name.casefold() for name in cleaned_names}
+
+        db = cls.db()
+        try:
+            for skill in existing_skills:
+                if skill.skill_name.casefold() not in desired_keys:
+                    db.execute(
+                        "DELETE FROM profile_skills WHERE id = %s AND user_id = %s",
+                        (skill.id, user_id),
+                    )
+
+            for sort_order, skill_name in enumerate(cleaned_names):
+                existing = existing_by_key.get(skill_name.casefold())
+                if existing:
+                    db.execute(
+                        """
+                        UPDATE profile_skills
+                        SET skill_name = %s, sort_order = %s
+                        WHERE id = %s AND user_id = %s
+                        """,
+                        (skill_name, sort_order, existing.id, user_id),
+                    )
+                else:
+                    db.execute(
+                        """
+                        INSERT INTO profile_skills (user_id, skill_name, skill_type, sort_order)
+                        VALUES (%s, %s, %s, %s)
+                        """,
+                        (user_id, skill_name, skill_type, sort_order),
+                    )
+        finally:
+            db.close()
+
+        return cls.find_for_user(user_id, skill_type)
+
+    @staticmethod
+    def clean_skill_names(skill_names: list[str]) -> list[str]:
+        cleaned = []
+        seen = set()
+        for raw_name in skill_names:
+            name = " ".join((raw_name or "").split())
+            key = name.casefold()
+            if not name or key in seen:
+                continue
+            cleaned.append(name)
+            seen.add(key)
+        return cleaned
+
 
 @dataclass
 class ProfileCertificate(BaseModel):
