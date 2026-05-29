@@ -112,6 +112,8 @@ class Profile(BaseModel):
             params.append(avatar_path)
         params.append(user_id)
 
+        from app.database import Database
+
         db = Database()
         try:
             db.execute(
@@ -199,6 +201,8 @@ class User(UserMixin, BaseModel):
 
     @classmethod
     def update_full_name(cls, user_id: int, full_name: str) -> None:
+        from app.database import Database
+
         db = Database()
         try:
             db.execute("UPDATE users SET full_name = %s WHERE id = %s", (full_name.strip(), user_id))
