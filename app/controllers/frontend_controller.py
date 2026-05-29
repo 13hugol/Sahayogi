@@ -1,14 +1,22 @@
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from types import SimpleNamespace
+from uuid import uuid4
 
-from flask import abort, flash, jsonify, redirect, render_template, request, session, url_for
+from flask import abort, current_app, flash, jsonify, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required
 from markupsafe import Markup, escape
+from werkzeug.utils import secure_filename
 
-from app.models import ProfileCertificate, ProfileReview, User
+from app.models import Profile, ProfileCertificate, ProfileReview, ProfileSkill, User
 
 from .base_controller import BaseController
+
+MAX_AVATAR_BYTES = 5 * 1024 * 1024
+ALLOWED_AVATAR_EXTENSIONS = {".jpg", ".jpeg", ".png"}
+ALLOWED_AVATAR_MIMETYPES = {"image/jpeg", "image/png"}
 
 
 class FrontendController(BaseController):
@@ -138,7 +146,123 @@ class FrontendController(BaseController):
 
     @login_required
     def profile_edit(self):
-        return render_template("profile/edit.html", form=ProfileShellForm())
+        user = User.find_by_id(current_user.id)
+        if not user or not user.profile:
+            abort(404)
+
+        errors: dict[str, str] = {}
+        values = self._profile_edit_values(user)
+
+        if request.method == "POST":
+            values = self._submitted_profile_values()
+            errors = self._validate_profile_edit(values)
+            avatar = request.files.get("avatar")
+            avatar_extension = None
+
+            if avatar and avatar.filename:
+                avatar_extension, avatar_error = self._validate_avatar_upload(avatar)
+                if avatar_error:
+                    errors["avatar"] = avatar_error
+
+            if not errors:
+                avatar_path = None
+                if avatar and avatar.filename and avatar_extension:
+                    avatar_path = self._save_avatar_upload(avatar, avatar_extension)
+
+                User.update_full_name(user.id, values["full_name"])
+                Profile.update_details(
+                    user.id,
+                    location=values["location"],
+                    bio=values["bio"],
+                    avatar_path=avatar_path,
+                )
+                ProfileSkill.sync_for_user(user.id, "offered", values["offered_skills"])
+                ProfileSkill.sync_for_user(user.id, "wanted", values["wanted_skills"])
+                flash("Profile updated successfully.", "success")
+                return redirect(url_for("profile.edit"))
+
+        return render_template(
+            "profile/edit.html",
+            errors=errors,
+            max_avatar_mb=5,
+            user=user,
+            values=values,
+        )
+
+    def _profile_edit_values(self, user: User) -> dict:
+        return {
+            "full_name": user.full_name,
+            "bio": user.profile.bio or "",
+            "location": user.profile.location or "",
+            "offered_skills": [skill.skill_name for skill in user.offered_skills],
+            "wanted_skills": [skill.skill_name for skill in user.wanted_skills],
+        }
+
+    def _submitted_profile_values(self) -> dict:
+        return {
+            "full_name": request.form.get("full_name", "").strip(),
+            "bio": request.form.get("bio", "").strip(),
+            "location": request.form.get("location", "").strip(),
+            "offered_skills": ProfileSkill.clean_skill_names(request.form.getlist("offered_skills")),
+            "wanted_skills": ProfileSkill.clean_skill_names(request.form.getlist("wanted_skills")),
+        }
+
+    def _validate_profile_edit(self, values: dict) -> dict[str, str]:
+        errors: dict[str, str] = {}
+        if not values["full_name"]:
+            errors["full_name"] = "Full name is required."
+        elif len(values["full_name"]) > 120:
+            errors["full_name"] = "Full name must be 120 characters or fewer."
+
+        if not values["location"]:
+            errors["location"] = "Location is required."
+        elif len(values["location"]) > 160:
+            errors["location"] = "Location must be 160 characters or fewer."
+
+        if len(values["bio"]) > 1000:
+            errors["bio"] = "Bio must be 1000 characters or fewer."
+
+        for field_name in ("offered_skills", "wanted_skills"):
+            if any(len(skill_name) > 120 for skill_name in values[field_name]):
+                errors[field_name] = "Each skill must be 120 characters or fewer."
+
+        return errors
+
+    def _validate_avatar_upload(self, avatar) -> tuple[str | None, str | None]:
+        filename = secure_filename(avatar.filename or "")
+        extension = Path(filename).suffix.lower()
+        if extension not in ALLOWED_AVATAR_EXTENSIONS:
+            return None, "Avatar must be a JPG or PNG file."
+        if avatar.mimetype not in ALLOWED_AVATAR_MIMETYPES:
+            return None, "Avatar must be uploaded as a JPG or PNG image."
+
+        try:
+            avatar.stream.seek(0, os.SEEK_END)
+            size = avatar.stream.tell()
+            avatar.stream.seek(0)
+            header = avatar.stream.read(16)
+            avatar.stream.seek(0)
+        except OSError:
+            return None, "Avatar could not be read. Please choose another file."
+
+        if size <= 0:
+            return None, "Avatar file is empty."
+        if size > MAX_AVATAR_BYTES:
+            return None, "Avatar must be under 5MB."
+        if extension == ".png" and not header.startswith(b"\x89PNG\r\n\x1a\n"):
+            return None, "Avatar file content must match the PNG format."
+        if extension in {".jpg", ".jpeg"} and not header.startswith(b"\xff\xd8\xff"):
+            return None, "Avatar file content must match the JPG format."
+
+        return extension, None
+
+    def _save_avatar_upload(self, avatar, extension: str) -> str:
+        avatar_dir = Path(current_app.config["UPLOAD_FOLDER"]) / "avatars"
+        avatar_dir.mkdir(parents=True, exist_ok=True)
+        filename = f"user-{current_user.id}-{uuid4().hex}{extension}"
+        avatar.stream.seek(0)
+        avatar.save(avatar_dir / filename)
+        return f"avatars/{filename}"
 
     @login_required
     def certificates(self):
