@@ -135,6 +135,31 @@ class Profile(BaseModel):
         finally:
             db.close()
 
+    @classmethod
+    def update_details(
+        cls,
+        user_id: int,
+        *,
+        location: str,
+        bio: str,
+        avatar_path: str | None = None,
+    ) -> None:
+        fields = ["location = %s", "bio = %s"]
+        params: list[str | int | None] = [location.strip(), bio.strip() or None]
+        if avatar_path:
+            fields.append("avatar_path = %s")
+            params.append(avatar_path)
+        params.append(user_id)
+
+        db = Database()
+        try:
+            db.execute(
+                f"UPDATE profiles SET {', '.join(fields)} WHERE user_id = %s",
+                tuple(params),
+            )
+        finally:
+            db.close()
+
 
 class User(UserMixin, BaseModel):
     def __init__(
@@ -217,6 +242,14 @@ class User(UserMixin, BaseModel):
         try:
             rows = db.fetch_all("SELECT * FROM users ORDER BY created_at DESC")
             return [cls.from_row(row) for row in rows if row]
+        finally:
+            db.close()
+
+    @classmethod
+    def update_full_name(cls, user_id: int, full_name: str) -> None:
+        db = Database()
+        try:
+            db.execute("UPDATE users SET full_name = %s WHERE id = %s", (full_name.strip(), user_id))
         finally:
             db.close()
 
