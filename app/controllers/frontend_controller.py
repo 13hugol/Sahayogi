@@ -7,7 +7,7 @@ from flask_login import current_user, login_required
 from markupsafe import Markup, escape
 
 from app.exceptions import ProfileNotFoundError
-from app.services import ProfileService, SkillService
+from app.services import ProfileService, SkillService, SkillSearchService
 from app.services.listing_catalog import (
     all_listings,
     categories,
@@ -20,9 +20,15 @@ from .base_controller import BaseController
 
 
 class FrontendController(BaseController):
-    def __init__(self, profile_service: ProfileService, skill_service: SkillService):
+    def __init__(
+        self,
+        profile_service: ProfileService,
+        skill_service: SkillService,
+        skill_search_service: SkillSearchService,
+    ):
         self._profile_service = profile_service
         self._skill_service = skill_service
+        self._skill_search_service = skill_search_service
 
     def _get_filtered_listings(self):
         q = request.args.get("q", "").strip()
@@ -273,6 +279,7 @@ class FrontendController(BaseController):
             total_results=len(listings),
         )
 
+    def listing_detail(self, listing_id: int):
     def listing_detail(self, listing_id: int):
         listing = self._skill_service.get_listing_by_id(listing_id)
         if not listing:

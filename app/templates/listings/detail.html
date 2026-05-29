@@ -12,7 +12,14 @@
               <span class="badge {% if listing.exchange_type == 'credit' %}text-bg-warning{% else %}text-bg-success{% endif %}">{{ listing.exchange_type|title }}</span>
               {% if listing.user.has_verified_skill(listing.skill_id) %}<span class="badge text-bg-info">Verified skill</span>{% endif %}
               <h1 class="h2 mt-3">{{ listing.title }}</h1>
-              <div class="text-muted">{{ listing.skill.name }} by {{ listing.user.full_name }}</div>
+              <div class="text-muted">
+                {{ listing.skill.name }} by
+                {% if listing.user_id %}
+                  <a href="{{ url_for('profile.view', user_id=listing.user_id) }}">{{ listing.user.full_name }}</a>
+                {% else %}
+                  {{ listing.user.full_name }}
+                {% endif %}
+              </div>
             </div>
             <div class="d-flex gap-2 flex-wrap justify-content-end">
               {% if listing.id in saved_listing_ids %}

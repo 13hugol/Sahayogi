@@ -8,11 +8,12 @@ from ..repositories import (
     ProfileRepository,
     ProfileReviewRepository,
     RoleRepository,
+    SkillSearchRepository,
     UserRepository,
     CategoryRepository,
     SkillRepository,
 )
-from ..services import ProfileService, SkillService
+from ..services import ProfileService, SkillService, SkillSearchService
 
 
 class FrontendRoutes:
@@ -33,6 +34,9 @@ class FrontendRoutes:
             skill_service=SkillService(
                 SkillRepository(),
                 CategoryRepository(),
+            ),
+            skill_search_service=SkillSearchService(
+                SkillSearchRepository(),
             ),
         )
 

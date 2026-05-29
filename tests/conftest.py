@@ -72,6 +72,7 @@ def _clear_database() -> None:
             "profile_reviews",
             "profile_certificates",
             "profile_skills",
+            "skill_search_listings",
             "password_reset_tokens",
             "profiles",
             "users",
