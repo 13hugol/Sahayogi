@@ -280,7 +280,6 @@ class FrontendController(BaseController):
         )
 
     def listing_detail(self, listing_id: int):
-    def listing_detail(self, listing_id: int):
         listing = self._skill_service.get_listing_by_id(listing_id)
         if not listing:
             abort(404)
