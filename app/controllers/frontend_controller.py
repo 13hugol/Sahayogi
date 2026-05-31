@@ -1,98 +1,118 @@
 from __future__ import annotations
 
-import os
-from pathlib import Path
 from types import SimpleNamespace
-from uuid import uuid4
 
-from flask import abort, current_app, flash, jsonify, redirect, render_template, request, session, url_for
+from flask import abort, flash, jsonify, redirect, request, session, url_for
 from flask_login import current_user, login_required
 from markupsafe import Markup, escape
-from werkzeug.utils import secure_filename
 
-from app.models import Profile, ProfileCertificate, ProfileReview, ProfileSkill, User
+from app.exceptions import ProfileNotFoundError
+from app.services import ProfileService
+from app.services.listing_catalog import (
+    all_listings,
+    categories,
+    filter_listings,
+    find_listing,
+    paginate_listings,
+)
 
 from .base_controller import BaseController
 
-MAX_AVATAR_BYTES = 5 * 1024 * 1024
-ALLOWED_AVATAR_EXTENSIONS = {".jpg", ".jpeg", ".png"}
-ALLOWED_AVATAR_MIMETYPES = {"image/jpeg", "image/png"}
-
 
 class FrontendController(BaseController):
+    def __init__(self, profile_service: ProfileService):
+        self._profile_service = profile_service
+
     def _categories(self):
-        return [
-            SimpleNamespace(id=1, name="Tech"),
-            SimpleNamespace(id=2, name="Music"),
-            SimpleNamespace(id=3, name="Language"),
-            SimpleNamespace(id=4, name="Kitchen"),
-        ]
+        return categories()
 
     def marketplace(self):
-        return render_template(
+        page_data = self._browse_page()
+        return self.render(
             "listings/index.html",
-            listings=[],
+            listings=page_data.listings,
             categories=self._categories(),
-            page=1,
-            total_pages=1,
-            total_results=0,
+            page=page_data.page,
+            total_pages=page_data.total_pages,
+            total_results=page_data.total_results,
+            saved_listing_ids=self._saved_listing_ids(),
+            active_filters=self._active_filters(),
+            catalog_total=len(all_listings()),
         )
 
     @login_required
     def post_listing(self):
-        return render_template("listings/form.html", form=ListingShellForm(), title="Create listing")
+        return self.render("listings/form.html", form=ListingShellForm(), title="Create listing")
 
     @login_required
     def my_listings(self):
-        return render_template("listings/mine.html", listings=[])
+        return self.render("listings/mine.html", listings=[])
+
+    def saved_listings(self):
+        saved_ids = self._saved_listing_ids()
+        listings = [listing for listing in all_listings() if listing.id in saved_ids]
+        return self.render(
+            "listings/saved.html",
+            listings=listings,
+            saved_listing_ids=saved_ids,
+            total_results=len(listings),
+        )
 
     def listing_detail(self, listing_id: int):
-        listing = SimpleNamespace(
-            id=listing_id,
-            title="Skill listing preview",
-            description="This frontend page is available, but listing persistence is not active in the backend scope.",
-            exchange_type="credit",
-            min_credits=10,
-            location_text="Kathmandu or remote",
-            contact_method="Platform messaging",
-            status="frontend-only",
-            availability=[],
-            skill=SimpleNamespace(name="Python"),
-            category=SimpleNamespace(name="Tech"),
-            user=SimpleNamespace(
-                id=0,
-                full_name="Sahayogi Member",
-                profile=SimpleNamespace(location="Kathmandu", reputation_score=0, contact_email=None),
-                has_verified_skill=lambda _skill_id: False,
-            ),
-            skill_id=1,
-            user_id=0,
+        listing = find_listing(listing_id)
+        if listing is None:
+            abort(404)
+        return self.render(
+            "listings/detail.html",
+            listing=listing,
+            request_form=RequestShellForm(),
+            saved_listing_ids=self._saved_listing_ids(),
         )
-        return render_template("listings/detail.html", listing=listing, request_form=RequestShellForm())
 
     def api_search(self):
-        html = render_template("partials/listing_cards.html", listings=[])
-        return jsonify({"count": 0, "html": html})
+        page_data = self._browse_page(page=1)
+        html = self.render(
+            "partials/listing_cards.html",
+            listings=page_data.listings,
+            saved_listing_ids=self._saved_listing_ids(),
+        )
+        return jsonify({"count": page_data.total_results, "html": html})
+
+    def save_listing(self, listing_id: int):
+        if find_listing(listing_id) is None:
+            abort(404)
+        saved_ids = self._saved_listing_ids()
+        saved_ids.add(listing_id)
+        self._store_saved_listing_ids(saved_ids)
+        flash("Listing saved to your browse list.", "success")
+        return redirect(request.referrer or url_for("listings.saved"))
+
+    def unsave_listing(self, listing_id: int):
+        saved_ids = self._saved_listing_ids()
+        saved_ids.discard(listing_id)
+        self._store_saved_listing_ids(saved_ids)
+        flash("Listing removed from your saved list.", "info")
+        return redirect(request.referrer or url_for("listings.saved"))
 
     @login_required
     def wallet(self):
-        return render_template("credits/ledger.html", entries=[], holds=[])
+        return self.render("credits/ledger.html", entries=[], holds=[])
 
     @login_required
     def matches(self):
-        return render_template("matches/index.html", matches=[])
+        return self.render("matches/index.html", matches=[])
 
     @login_required
     def requests(self):
-        return render_template("requests/inbox.html", requests=[])
+        return self.render("requests/inbox.html", requests=[])
 
     @login_required
     def sent_requests(self):
-        return render_template("requests/sent.html", requests=[])
+        return self.render("requests/sent.html", requests=[])
 
     @login_required
     def exchanges(self):
-        return render_template("exchanges/index.html", exchanges=[])
+        return self.render("exchanges/index.html", exchanges=[])
 
     @login_required
     def exchange_detail(self, exchange_id: int):
@@ -110,7 +130,7 @@ class FrontendController(BaseController):
             conversation=None,
             completion_marks=[],
         )
-        return render_template(
+        return self.render(
             "exchanges/detail.html",
             exchange=exchange,
             can_mark_complete=False,
@@ -120,7 +140,7 @@ class FrontendController(BaseController):
 
     @login_required
     def messages(self):
-        return render_template("messages/index.html", conversations=[])
+        return self.render("messages/index.html", conversations=[])
 
     @login_required
     def conversation(self, conversation_id: int):
@@ -130,11 +150,11 @@ class FrontendController(BaseController):
             messages=[],
             other_participant=lambda _user_id: SimpleNamespace(full_name="Exchange partner"),
         )
-        return render_template("messages/detail.html", conversation=conversation, form=MessageShellForm())
+        return self.render("messages/detail.html", conversation=conversation, form=MessageShellForm())
 
     @login_required
     def notifications(self):
-        return render_template("notifications/index.html", notifications=[])
+        return self.render("notifications/index.html", notifications=[])
 
     @login_required
     def notification_counts(self):
@@ -146,138 +166,23 @@ class FrontendController(BaseController):
 
     @login_required
     def profile_edit(self):
-        user = User.find_by_id(current_user.id)
-        if not user or not user.profile:
-            abort(404)
-
-        errors: dict[str, str] = {}
-        values = self._profile_edit_values(user)
-
-        if request.method == "POST":
-            values = self._submitted_profile_values()
-            errors = self._validate_profile_edit(values)
-            avatar = request.files.get("avatar")
-            avatar_extension = None
-
-            if avatar and avatar.filename:
-                avatar_extension, avatar_error = self._validate_avatar_upload(avatar)
-                if avatar_error:
-                    errors["avatar"] = avatar_error
-
-            if not errors:
-                avatar_path = None
-                if avatar and avatar.filename and avatar_extension:
-                    avatar_path = self._save_avatar_upload(avatar, avatar_extension)
-
-                User.update_full_name(user.id, values["full_name"])
-                Profile.update_details(
-                    user.id,
-                    location=values["location"],
-                    bio=values["bio"],
-                    avatar_path=avatar_path,
-                )
-                ProfileSkill.sync_for_user(user.id, "offered", values["offered_skills"])
-                ProfileSkill.sync_for_user(user.id, "wanted", values["wanted_skills"])
-                flash("Profile updated successfully.", "success")
-                return redirect(url_for("profile.edit"))
-
-        return render_template(
-            "profile/edit.html",
-            errors=errors,
-            max_avatar_mb=5,
-            user=user,
-            values=values,
-        )
-
-    def _profile_edit_values(self, user: User) -> dict:
-        return {
-            "full_name": user.full_name,
-            "bio": user.profile.bio or "",
-            "location": user.profile.location or "",
-            "offered_skills": [skill.skill_name for skill in user.offered_skills],
-            "wanted_skills": [skill.skill_name for skill in user.wanted_skills],
-        }
-
-    def _submitted_profile_values(self) -> dict:
-        return {
-            "full_name": request.form.get("full_name", "").strip(),
-            "bio": request.form.get("bio", "").strip(),
-            "location": request.form.get("location", "").strip(),
-            "offered_skills": ProfileSkill.clean_skill_names(request.form.getlist("offered_skills")),
-            "wanted_skills": ProfileSkill.clean_skill_names(request.form.getlist("wanted_skills")),
-        }
-
-    def _validate_profile_edit(self, values: dict) -> dict[str, str]:
-        errors: dict[str, str] = {}
-        if not values["full_name"]:
-            errors["full_name"] = "Full name is required."
-        elif len(values["full_name"]) > 120:
-            errors["full_name"] = "Full name must be 120 characters or fewer."
-
-        if not values["location"]:
-            errors["location"] = "Location is required."
-        elif len(values["location"]) > 160:
-            errors["location"] = "Location must be 160 characters or fewer."
-
-        if len(values["bio"]) > 1000:
-            errors["bio"] = "Bio must be 1000 characters or fewer."
-
-        for field_name in ("offered_skills", "wanted_skills"):
-            if any(len(skill_name) > 120 for skill_name in values[field_name]):
-                errors[field_name] = "Each skill must be 120 characters or fewer."
-
-        return errors
-
-    def _validate_avatar_upload(self, avatar) -> tuple[str | None, str | None]:
-        filename = secure_filename(avatar.filename or "")
-        extension = Path(filename).suffix.lower()
-        if extension not in ALLOWED_AVATAR_EXTENSIONS:
-            return None, "Avatar must be a JPG or PNG file."
-        if avatar.mimetype not in ALLOWED_AVATAR_MIMETYPES:
-            return None, "Avatar must be uploaded as a JPG or PNG image."
-
-        try:
-            avatar.stream.seek(0, os.SEEK_END)
-            size = avatar.stream.tell()
-            avatar.stream.seek(0)
-            header = avatar.stream.read(16)
-            avatar.stream.seek(0)
-        except OSError:
-            return None, "Avatar could not be read. Please choose another file."
-
-        if size <= 0:
-            return None, "Avatar file is empty."
-        if size > MAX_AVATAR_BYTES:
-            return None, "Avatar must be under 5MB."
-        if extension == ".png" and not header.startswith(b"\x89PNG\r\n\x1a\n"):
-            return None, "Avatar file content must match the PNG format."
-        if extension in {".jpg", ".jpeg"} and not header.startswith(b"\xff\xd8\xff"):
-            return None, "Avatar file content must match the JPG format."
-
-        return extension, None
-
-    def _save_avatar_upload(self, avatar, extension: str) -> str:
-        avatar_dir = Path(current_app.config["UPLOAD_FOLDER"]) / "avatars"
-        avatar_dir.mkdir(parents=True, exist_ok=True)
-        filename = f"user-{current_user.id}-{uuid4().hex}{extension}"
-        avatar.stream.seek(0)
-        avatar.save(avatar_dir / filename)
-        return f"avatars/{filename}"
+        return self.render("profile/edit.html", form=ProfileShellForm())
 
     @login_required
     def certificates(self):
-        return render_template("profile/certificates.html", form=CertificateShellForm(), certificates=[])
+        return self.render("profile/certificates.html", form=CertificateShellForm(), certificates=[])
 
     def profile_view(self, user_id: int):
-        user = User.find_by_id(user_id)
-        if not user or not user.profile:
+        try:
+            page_data = self._profile_service.get_profile_page_data(user_id)
+        except ProfileNotFoundError:
             abort(404)
-        return render_template(
+        return self.render(
             "profile/view.html",
-            user=user,
-            approved_listings=[],
-            approved_certificates=ProfileCertificate.approved_for_user(user.id),
-            recent_reviews=ProfileReview.recent_for_user(user.id),
+            user=page_data.user,
+            approved_listings=page_data.approved_listings,
+            approved_certificates=page_data.approved_certificates,
+            recent_reviews=page_data.recent_reviews,
             report_form=ReportShellForm(),
         )
 
@@ -285,41 +190,92 @@ class FrontendController(BaseController):
         return self.profile_view(user_id)
 
     def top_rated(self):
-        return render_template("reviews/top_rated.html", profiles=[])
+        return self.render("reviews/top_rated.html", profiles=self._profile_service.get_top_rated_profiles())
 
     def user_reviews(self, user_id: int):
-        return render_template("reviews/user_reviews.html", review_user=shell_user(user_id), reviews=[])
+        try:
+            review_user, reviews = self._profile_service.get_review_history(user_id)
+        except ProfileNotFoundError:
+            abort(404)
+        return self.render("reviews/user_reviews.html", review_user=review_user, reviews=reviews)
 
     @login_required
     def review_form(self, exchange_id: int):
         exchange = SimpleNamespace(id=exchange_id, listing=SimpleNamespace(title="Exchange preview"))
         reviewee = SimpleNamespace(full_name="Exchange partner")
-        return render_template("reviews/form.html", form=ReviewShellForm(), exchange=exchange, reviewee=reviewee)
+        return self.render("reviews/form.html", form=ReviewShellForm(), exchange=exchange, reviewee=reviewee)
 
     def frontend_only_action(self, *args, **kwargs):
         flash("This action is frontend-only in the current project scope.", "info")
         return redirect(request.referrer or url_for("main.dashboard"))
 
+    def _browse_page(self, page: int | None = None):
+        selected_categories = self._selected_category_ids()
+        listings = filter_listings(
+            query=request.args.get("q", ""),
+            category_ids=selected_categories,
+            radius=request.args.get("radius", ""),
+        )
+        current_page = page if page is not None else request.args.get("page", 1, type=int) or 1
+        return paginate_listings(listings, current_page)
 
-def shell_user(user_id: int):
-    return SimpleNamespace(
-        id=user_id,
-        full_name="Sahayogi Member",
-        email="member@example.com",
-        role=SimpleNamespace(name="user"),
-        offered_skills=[],
-        wanted_skills=[],
-        profile=SimpleNamespace(
-            avatar_path=None,
-            username=f"member{user_id}",
-            headline="Skill exchange member",
-            location="Kathmandu",
-            reputation_score=0,
-            completed_exchange_count=0,
-            bio="Frontend-only profile preview.",
-            contact_email=None,
-        ),
-    )
+    @staticmethod
+    def _selected_category_ids() -> set[int]:
+        selected_ids = set()
+        for raw_category_id in request.args.getlist("category"):
+            try:
+                selected_ids.add(int(raw_category_id))
+            except ValueError:
+                continue
+        return selected_ids
+
+    @staticmethod
+    def _saved_listing_ids() -> set[int]:
+        saved_ids = set()
+        for listing_id in session.get("saved_listing_ids", []):
+            try:
+                saved_ids.add(int(listing_id))
+            except (TypeError, ValueError):
+                continue
+        return saved_ids
+
+    @staticmethod
+    def _store_saved_listing_ids(saved_ids: set[int]) -> None:
+        session["saved_listing_ids"] = sorted(saved_ids)
+        session.modified = True
+
+    def _active_filters(self) -> list[dict[str, str]]:
+        filters = []
+        query = request.args.get("q", "").strip()
+        if query:
+            filters.append({"label": f"Keyword: {query}", "remove_url": self._filter_remove_url("q")})
+        category_lookup = {category.id: category.name for category in self._categories()}
+        for category_id in self._selected_category_ids():
+            if category_id in category_lookup:
+                filters.append(
+                    {
+                        "label": f"Category: {category_lookup[category_id]}",
+                        "remove_url": self._filter_remove_url("category", str(category_id)),
+                    }
+                )
+        radius = request.args.get("radius", "").strip()
+        if radius:
+            filters.append({"label": f"Radius: {radius} km", "remove_url": self._filter_remove_url("radius")})
+        return filters
+
+    @staticmethod
+    def _filter_remove_url(key: str, value: str | None = None) -> str:
+        params = request.args.to_dict(flat=False)
+        params.pop("page", None)
+        if value is None:
+            params.pop(key, None)
+        else:
+            remaining = [item for item in params.get(key, []) if item != value]
+            if remaining:
+                params[key] = remaining
+            else:
+                params.pop(key, None)
+        return url_for("listings.index", **params)
 
 
 class ShellForm:

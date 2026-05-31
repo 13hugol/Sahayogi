@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+import math
 
 from flask_login import UserMixin
-from werkzeug.security import check_password_hash, generate_password_hash
+from app.enums import SkillType, UserRole
+from app.utils.passwords import hash_password, verify_password
 
-from app.database import Database
 from .base_model import BaseModel
 
 
@@ -24,53 +25,27 @@ class Role(BaseModel):
 
     @classmethod
     def find_by_name(cls, name: str) -> "Role | None":
-        db = Database()
-        try:
-            row = db.fetch_one("SELECT * FROM roles WHERE name = %s", (name,))
-            return cls.from_row(row)
-        finally:
-            db.close()
+        from app.repositories import RoleRepository
+
+        return RoleRepository().find_by_name(name)
 
     @classmethod
     def find_by_id(cls, role_id: int) -> "Role | None":
-        db = Database()
-        try:
-            row = db.fetch_one("SELECT * FROM roles WHERE id = %s", (role_id,))
-            return cls.from_row(row)
-        finally:
-            db.close()
+        from app.repositories import RoleRepository
+
+        return RoleRepository().find_by_id(role_id)
 
     @classmethod
-    def ensure(cls, name: str, description: str) -> "Role":
-        role = cls.find_by_name(name)
-        if role:
-            return role
-        db = Database()
-        try:
-            role_id = db.execute(
-                "INSERT INTO roles (name, description) VALUES (%s, %s)",
-                (name, description),
-            )
-            return cls(id=role_id, name=name, description=description)
-        finally:
-            db.close()
+    def ensure(cls, name: str, description: str | None = None) -> "Role":
+        from app.repositories import RoleRepository
+
+        return RoleRepository().ensure(name, description)
 
     @classmethod
     def count_by_name(cls, name: str) -> int:
-        db = Database()
-        try:
-            row = db.fetch_one(
-                """
-                SELECT COUNT(*) AS count
-                FROM users
-                INNER JOIN roles ON users.role_id = roles.id
-                WHERE roles.name = %s
-                """,
-                (name,),
-            )
-            return int(row["count"])
-        finally:
-            db.close()
+        from app.repositories import RoleRepository
+
+        return RoleRepository().count_by_name(name)
 
 
 @dataclass
@@ -105,35 +80,21 @@ class Profile(BaseModel):
 
     @classmethod
     def find_by_user_id(cls, user_id: int) -> "Profile | None":
-        db = Database()
-        try:
-            row = db.fetch_one("SELECT * FROM profiles WHERE user_id = %s", (user_id,))
-            return cls.from_row(row)
-        finally:
-            db.close()
+        from app.repositories import ProfileRepository
+
+        return ProfileRepository().find_by_user_id(user_id)
 
     @classmethod
     def create(cls, user_id: int, username: str, location: str, contact_email: str) -> None:
-        db = Database()
-        try:
-            db.execute(
-                """
-                INSERT INTO profiles (user_id, username, location, contact_email)
-                VALUES (%s, %s, %s, %s)
-                """,
-                (user_id, username, location, contact_email),
-            )
-        finally:
-            db.close()
+        from app.repositories import ProfileRepository
+
+        ProfileRepository().create(user_id, username, location, contact_email)
 
     @classmethod
     def username_exists(cls, username: str) -> bool:
-        db = Database()
-        try:
-            row = db.fetch_one("SELECT user_id FROM profiles WHERE username = %s", (username,))
-            return row is not None
-        finally:
-            db.close()
+        from app.repositories import ProfileRepository
+
+        return ProfileRepository().username_exists(username)
 
     @classmethod
     def update_details(
@@ -183,12 +144,12 @@ class User(UserMixin, BaseModel):
         self.id = id
         self.full_name = full_name
         self.email = email
-        self.password_hash = password_hash
+        self._password_hash = password_hash
         self.is_email_verified = bool(is_email_verified)
         self.status = status
         self.role_id = role_id
-        self.failed_login_count = failed_login_count
-        self.locked_until = locked_until
+        self._failed_login_count = int(failed_login_count or 0)
+        self._locked_until = locked_until
         self.verification_token = verification_token
         self.verification_token_expires = verification_token_expires
         self.created_at = created_at
@@ -220,30 +181,21 @@ class User(UserMixin, BaseModel):
 
     @classmethod
     def find_by_email(cls, email: str) -> "User | None":
-        db = Database()
-        try:
-            row = db.fetch_one("SELECT * FROM users WHERE email = %s", (email.lower().strip(),))
-            return cls.from_row(row)
-        finally:
-            db.close()
+        from app.repositories import UserRepository
+
+        return UserRepository().find_by_email(email)
 
     @classmethod
     def find_by_id(cls, user_id: int) -> "User | None":
-        db = Database()
-        try:
-            row = db.fetch_one("SELECT * FROM users WHERE id = %s", (user_id,))
-            return cls.from_row(row)
-        finally:
-            db.close()
+        from app.repositories import UserRepository
+
+        return UserRepository().find_by_id(user_id)
 
     @classmethod
     def all(cls) -> list["User"]:
-        db = Database()
-        try:
-            rows = db.fetch_all("SELECT * FROM users ORDER BY created_at DESC")
-            return [cls.from_row(row) for row in rows if row]
-        finally:
-            db.close()
+        from app.repositories import UserRepository
+
+        return UserRepository().all()
 
     @classmethod
     def update_full_name(cls, user_id: int, full_name: str) -> None:
@@ -255,114 +207,112 @@ class User(UserMixin, BaseModel):
 
     @classmethod
     def count(cls) -> int:
-        db = Database()
-        try:
-            row = db.fetch_one("SELECT COUNT(*) AS count FROM users")
-            return int(row["count"])
-        finally:
-            db.close()
+        from app.repositories import UserRepository
+
+        return UserRepository().count()
 
     @classmethod
     def verified_count(cls) -> int:
-        db = Database()
-        try:
-            row = db.fetch_one("SELECT COUNT(*) AS count FROM users WHERE is_email_verified = TRUE")
-            return int(row["count"])
-        finally:
-            db.close()
+        from app.repositories import UserRepository
+
+        return UserRepository().verified_count()
 
     @classmethod
     def create_registered(cls, full_name: str, email: str, password: str, location: str, role: Role) -> "User":
-        password_hash = generate_password_hash(password)
-        username = unique_username(email.split("@")[0])
-        db = Database()
-        try:
-            user_id = db.execute(
-                """
-                INSERT INTO users (full_name, email, password_hash, role_id)
-                VALUES (%s, %s, %s, %s)
-                """,
-                (full_name, email.lower().strip(), password_hash, role.id),
-            )
-            Profile.create(user_id, username, location, email.lower().strip())
-            return cls.find_by_id(user_id)
-        finally:
-            db.close()
+        from app.repositories import UserRepository
 
-    def set_password(self, password: str) -> None:
-        self.password_hash = generate_password_hash(password)
-        db = Database()
-        try:
-            db.execute("UPDATE users SET password_hash = %s WHERE id = %s", (self.password_hash, self.id))
-        finally:
-            db.close()
+        return UserRepository().create_registered(full_name, email, password, location, role)
 
-    def check_password(self, password: str) -> bool:
-        return check_password_hash(self.password_hash, password)
+    @property
+    def password_hash(self) -> str:
+        return self._password_hash
 
-    def save_verification_token(self, token: str, expires_at: datetime) -> None:
+    @property
+    def failed_login_count(self) -> int:
+        return self._failed_login_count
+
+    @property
+    def locked_until(self) -> datetime | None:
+        return self._locked_until
+
+    @property
+    def is_locked(self) -> bool:
+        return self._locked_until is not None and self._locked_until > datetime.utcnow()
+
+    @property
+    def has_lockout_expired(self) -> bool:
+        return self._locked_until is not None and self._locked_until <= datetime.utcnow()
+
+    def minutes_until_unlock(self) -> int:
+        if not self.is_locked or self._locked_until is None:
+            return 0
+        remaining = self._locked_until - datetime.utcnow()
+        return max(1, math.ceil(remaining.total_seconds() / 60))
+
+    def _set_password_hash(self, password_hash: str) -> None:
+        self._password_hash = password_hash
+
+    def _assign_verification_token(self, token: str, expires_at: datetime) -> None:
         self.verification_token = token
         self.verification_token_expires = expires_at
-        db = Database()
-        try:
-            db.execute(
-                "UPDATE users SET verification_token = %s, verification_token_expires = %s WHERE id = %s",
-                (token, expires_at, self.id),
-            )
-        finally:
-            db.close()
 
-    def mark_email_verified(self) -> None:
+    def _mark_email_verified(self) -> None:
         self.is_email_verified = True
-        db = Database()
-        try:
-            db.execute(
-                """
-                UPDATE users
-                SET is_email_verified = TRUE, verification_token = NULL, verification_token_expires = NULL
-                WHERE id = %s
-                """,
-                (self.id,),
-            )
-        finally:
-            db.close()
+        self.verification_token = None
+        self.verification_token_expires = None
 
-    def register_failed_login(self, locked_until: datetime | None = None) -> None:
-        self.failed_login_count = 0 if locked_until else self.failed_login_count + 1
-        self.locked_until = locked_until
-        db = Database()
-        try:
-            db.execute(
-                "UPDATE users SET failed_login_count = %s, locked_until = %s WHERE id = %s",
-                (self.failed_login_count, locked_until, self.id),
-            )
-        finally:
-            db.close()
+    def _record_failed_login(self, locked_until: datetime | None = None) -> None:
+        self._failed_login_count += 1
+        self._locked_until = locked_until
 
-    def clear_failed_login(self) -> None:
-        self.failed_login_count = 0
-        self.locked_until = None
-        db = Database()
-        try:
-            db.execute(
-                "UPDATE users SET failed_login_count = 0, locked_until = NULL WHERE id = %s",
-                (self.id,),
-            )
-        finally:
-            db.close()
+    def _reset_login_security(self) -> None:
+        self._failed_login_count = 0
+        self._locked_until = None
 
-    def update_role(self, role: Role) -> None:
+    def _assign_role(self, role: Role) -> None:
         self.role = role
         self.role_id = role.id
-        db = Database()
-        try:
-            db.execute("UPDATE users SET role_id = %s WHERE id = %s", (role.id, self.id))
-        finally:
-            db.close()
+
+    def set_password(self, password: str) -> None:
+        from app.repositories import UserRepository
+
+        self._set_password_hash(hash_password(password))
+        UserRepository().update_password(self)
+
+    def check_password(self, password: str) -> bool:
+        return self._check_password(password)
+
+    def _check_password(self, password: str) -> bool:
+        return verify_password(self._password_hash, password)
+
+    def save_verification_token(self, token: str, expires_at: datetime) -> None:
+        from app.repositories import UserRepository
+
+        UserRepository().save_verification_token(self, token, expires_at)
+
+    def mark_email_verified(self) -> None:
+        from app.repositories import UserRepository
+
+        UserRepository().mark_email_verified(self)
+
+    def register_failed_login(self, locked_until: datetime | None = None) -> None:
+        from app.repositories import UserRepository
+
+        UserRepository().register_failed_login(self, locked_until)
+
+    def clear_failed_login(self) -> None:
+        from app.repositories import UserRepository
+
+        UserRepository().clear_failed_login(self)
+
+    def update_role(self, role: Role) -> None:
+        from app.repositories import UserRepository
+
+        UserRepository().update_role(self, role)
 
     @property
     def is_admin(self) -> bool:
-        return self.role is not None and self.role.name == "admin"
+        return self.role is not None and self.role.name == UserRole.ADMIN.value
 
     @property
     def available_credit_balance(self) -> int:
@@ -372,23 +322,27 @@ class User(UserMixin, BaseModel):
     def offered_skills(self) -> list:
         from .profile import ProfileSkill
 
-        return ProfileSkill.find_for_user(self.id, "offered")
+        return ProfileSkill.find_for_user(self.id, SkillType.OFFERED)
 
     @property
     def wanted_skills(self) -> list:
         from .profile import ProfileSkill
 
-        return ProfileSkill.find_for_user(self.id, "wanted")
+        return ProfileSkill.find_for_user(self.id, SkillType.WANTED)
 
-    def has_verified_skill(self, _skill_id: int) -> bool:
-        return False
+    def has_verified_skill(self, skill_id: int) -> bool:
+        return any(skill.id == skill_id and skill.has_verified_certificate for skill in self.offered_skills)
 
 
-def unique_username(base: str) -> str:
+def unique_username(base: str, profile_repository=None) -> str:
+    if profile_repository is None:
+        from app.repositories import ProfileRepository
+
+        profile_repository = ProfileRepository()
     clean = "".join(ch.lower() for ch in base if ch.isalnum())[:20] or "member"
     username = clean
     counter = 1
-    while Profile.username_exists(username):
+    while profile_repository.username_exists(username):
         counter += 1
         username = f"{clean}{counter}"
     return username

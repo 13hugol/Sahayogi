@@ -3,12 +3,34 @@ from __future__ import annotations
 from flask import Blueprint
 
 from ..controllers.auth_controller import AuthController
+from ..repositories import ProfileRepository, RoleRepository, UserRepository
+from ..services import AuthService
+from ..validators import (
+    LoginValidator,
+    PasswordChangeValidator,
+    PasswordResetRequestValidator,
+    PasswordResetValidator,
+    RegistrationValidator,
+)
 
 
 class AuthRoutes:
     def __init__(self):
         self.bp = Blueprint("auth", __name__, url_prefix="/auth")
-        self.controller = AuthController()
+        role_repository = RoleRepository()
+        profile_repository = ProfileRepository()
+        user_repository = UserRepository(
+            role_repository=role_repository,
+            profile_repository=profile_repository,
+        )
+        self.controller = AuthController(
+            AuthService(user_repository, role_repository),
+            RegistrationValidator(user_repository),
+            LoginValidator(),
+            PasswordResetRequestValidator(),
+            PasswordResetValidator(),
+            PasswordChangeValidator(),
+        )
 
     def register(self):
         self.bp.route("/register", methods=["GET", "POST"])(self.controller.register)
@@ -16,7 +38,8 @@ class AuthRoutes:
         self.bp.route("/profile-setup", methods=["GET", "POST"])(self.controller.profile_setup)
         self.bp.route("/resend-verification", methods=["GET", "POST"])(self.controller.resend_verification)
         self.bp.route("/login", methods=["GET", "POST"])(self.controller.login)
-        self.bp.route("/logout")(self.controller.logout)
+        self.bp.route("/logout", methods=["GET", "POST"])(self.controller.logout)
         self.bp.route("/forgot-password", methods=["GET", "POST"])(self.controller.forgot_password)
+        self.bp.route("/reset-password/<token>", methods=["GET", "POST"])(self.controller.reset_password)
+        self.bp.route("/change-password", methods=["POST"])(self.controller.change_password)
         return self.bp
-

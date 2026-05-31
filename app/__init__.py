@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from datetime import timedelta
 
 from flask import Flask, abort, render_template, request, session
 from flask_login import LoginManager
@@ -19,6 +20,7 @@ def create_app(config_object: type[Config] = Config) -> Flask:
     app.config.from_object(config_object)
     config_object.validate()
     app.secret_key = app.config["SECRET_KEY"]
+    app.permanent_session_lifetime = timedelta(days=7)
 
     os.makedirs(app.instance_path, exist_ok=True)
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)

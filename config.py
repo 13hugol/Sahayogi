@@ -64,6 +64,7 @@ class Config:
     UPLOAD_FOLDER = BASE_DIR / "instance" / "uploads"
     LOCKOUT_THRESHOLD = int(env_value("LOCKOUT_THRESHOLD", "3"))
     LOCKOUT_DURATION_MINUTES = int(env_value("LOCKOUT_DURATION_MINUTES", "10"))
+    PASSWORD_HASH_METHOD = env_value("PASSWORD_HASH_METHOD", "scrypt")
     PASSWORD_RESET_EXPIRY_SECONDS = int(env_value("PASSWORD_RESET_EXPIRY_SECONDS", "1800"))
     DEFAULT_ADMIN_EMAIL = env_value("DEFAULT_ADMIN_EMAIL", "admin@example.com")
     DEFAULT_ADMIN_PASSWORD = env_value("DEFAULT_ADMIN_PASSWORD", "Admin123!")

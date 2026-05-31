@@ -19,46 +19,69 @@ class Database:
             autocommit=False,
             charset="utf8mb4",
         )
+        self.__in_transaction = False
+
+    def __enter__(self) -> "Database":
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self.close()
 
     def fetch_one(self, query: str, params: Iterable[Any] | None = None) -> dict | None:
         cursor = self.__connection.cursor()
-        cursor.execute(query, params)
-        result = cursor.fetchone()
-        cursor.close()
-        return result
+        try:
+            cursor.execute(query, params)
+            return cursor.fetchone()
+        finally:
+            cursor.close()
 
     def fetch_all(self, query: str, params: Iterable[Any] | None = None) -> list[dict]:
         cursor = self.__connection.cursor()
-        cursor.execute(query, params)
-        results = cursor.fetchall()
-        cursor.close()
-        return list(results)
+        try:
+            cursor.execute(query, params)
+            results = cursor.fetchall()
+            return list(results)
+        finally:
+            cursor.close()
 
     def execute(self, query: str, params: Iterable[Any] | None = None) -> int:
         cursor = self.__connection.cursor()
-        cursor.execute(query, params)
-        self.__connection.commit()
-        lastrowid = cursor.lastrowid
-        cursor.close()
-        return int(lastrowid or 0)
+        try:
+            cursor.execute(query, params)
+            if not self.__in_transaction:
+                self.__connection.commit()
+            return int(cursor.lastrowid or 0)
+        finally:
+            cursor.close()
 
     def execute_many(self, query: str, params: Iterable[Iterable[Any]]) -> None:
         cursor = self.__connection.cursor()
-        cursor.executemany(query, params)
-        self.__connection.commit()
-        cursor.close()
+        try:
+            cursor.executemany(query, params)
+            if not self.__in_transaction:
+                self.__connection.commit()
+        finally:
+            cursor.close()
 
     def close(self) -> None:
         self.__connection.close()
 
     @contextmanager
     def transaction(self):
+        nested = self.__in_transaction
+        if not nested:
+            self.__in_transaction = True
         try:
             yield self
-            self.__connection.commit()
+            if not nested:
+                self.__connection.commit()
         except Exception:
-            self.__connection.rollback()
+            if not nested:
+                self.__connection.rollback()
             raise
+        finally:
+            if not nested:
+                self.__in_transaction = False
 
     @staticmethod
     def create_tables() -> None:
@@ -103,6 +126,19 @@ class Database:
                 review_count INT NOT NULL DEFAULT 0,
                 completed_exchange_count INT NOT NULL DEFAULT 0,
                 CONSTRAINT fk_profiles_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                token_hash CHAR(64) NOT NULL UNIQUE,
+                expires_at DATETIME NOT NULL,
+                used_at DATETIME,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                INDEX ix_password_reset_user_used (user_id, used_at),
+                INDEX ix_password_reset_expires (expires_at),
+                CONSTRAINT fk_password_reset_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """,
             """

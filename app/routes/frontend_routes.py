@@ -3,11 +3,32 @@ from __future__ import annotations
 from flask import Blueprint
 
 from ..controllers.frontend_controller import FrontendController
+from ..repositories import (
+    ProfileCertificateRepository,
+    ProfileRepository,
+    ProfileReviewRepository,
+    RoleRepository,
+    UserRepository,
+)
+from ..services import ProfileService
 
 
 class FrontendRoutes:
     def __init__(self):
-        self.controller = FrontendController()
+        profile_repository = ProfileRepository()
+        role_repository = RoleRepository()
+        user_repository = UserRepository(
+            role_repository=role_repository,
+            profile_repository=profile_repository,
+        )
+        self.controller = FrontendController(
+            ProfileService(
+                user_repository,
+                profile_repository,
+                ProfileCertificateRepository(),
+                ProfileReviewRepository(),
+            )
+        )
 
     def register(self):
         listings = Blueprint("listings", __name__, url_prefix="/listings")
@@ -15,6 +36,9 @@ class FrontendRoutes:
         listings.route("/api/search", endpoint="api_search")(self.controller.api_search)
         listings.route("/create", methods=["GET", "POST"], endpoint="create")(self.controller.post_listing)
         listings.route("/mine", endpoint="mine")(self.controller.my_listings)
+        listings.route("/saved", endpoint="saved")(self.controller.saved_listings)
+        listings.route("/<int:listing_id>/save", methods=["POST"], endpoint="save")(self.controller.save_listing)
+        listings.route("/<int:listing_id>/unsave", methods=["POST"], endpoint="unsave")(self.controller.unsave_listing)
         listings.route("/<int:listing_id>", endpoint="detail")(self.controller.listing_detail)
         listings.route("/<int:listing_id>/edit", methods=["GET", "POST"], endpoint="edit")(self.controller.post_listing)
         listings.route("/<int:listing_id>/delete", methods=["POST"], endpoint="delete")(self.controller.frontend_only_action)
