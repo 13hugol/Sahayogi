@@ -5,6 +5,7 @@ from .skill_search import SkillSearchListing
 from .user import Profile, Role, User
 from .skill import Category, Skill
 from .notification import Notification
+from .message import MessageConversation, MessagePost
 
 __all__ = [
     "AdminAuditLog",
@@ -19,4 +20,6 @@ __all__ = [
     "Category",
     "Skill",
     "Notification",
+    "MessageConversation",
+    "MessagePost",
 ]

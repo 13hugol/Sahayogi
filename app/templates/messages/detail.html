@@ -6,7 +6,7 @@
     <div>
       <span class="eyebrow">Conversation</span>
       <h1 class="h2 mb-1">{{ conversation.subject }}</h1>
-      <p class="page-subtitle">Messages are only available for accepted exchange conversations.</p>
+      <p class="page-subtitle">Messages are only available for accepted exchange conversations or mutual matches.</p>
     </div>
   </header>
 
@@ -17,8 +17,18 @@
       </div>
       <div class="list-group list-group-flush">
         {% for item in conversations %}
+          {% set partner = item.other_participant(current_user.id) %}
           <a class="list-group-item list-group-item-action {% if item.id == conversation.id %}active{% endif %}" href="{{ url_for('messages.detail', conversation_id=item.id) }}">
-            <strong>{{ item.subject }}</strong>
+            <div class="d-flex justify-content-between gap-2">
+              <strong>{{ item.subject }}</strong>
+              {% if item.unread_count %}
+                <span class="badge bg-warning text-dark">{{ item.unread_count }}</span>
+              {% endif %}
+            </div>
+            <div class="small text-muted">With {{ partner.full_name if partner else 'participant' }}</div>
+            {% if item.last_message %}
+              <div class="small text-muted text-truncate">{{ item.last_message.body }}</div>
+            {% endif %}
           </a>
         {% else %}
           <div class="empty-state m-4">No conversations yet.</div>
@@ -28,12 +38,23 @@
 
     <section class="card card-shell">
       <div class="card-body">
+        <div class="d-flex flex-column flex-lg-row justify-content-between gap-2 mb-3">
+          <div>
+            <span class="eyebrow">{{ conversation.permission_source.replace('_', ' ') }}</span>
+            <h2 class="h4 mb-0">{{ conversation.subject }}</h2>
+          </div>
+        </div>
         <div class="message-thread mb-4">
           {% for message in ordered_messages %}
             <article class="message-bubble {% if message.sender_id == current_user.id %}mine{% endif %}">
               <div class="small fw-bold">{{ message.sender.full_name }}</div>
               <div>{{ message.body }}</div>
-              <div class="small text-muted mt-1">{{ message.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+              <div class="small text-muted mt-1">
+                {{ message.created_at.strftime('%Y-%m-%d %H:%M') if message.created_at else '' }}
+                {% if message.sender_id == current_user.id %}
+                  · {{ 'Read' if message.read_at else 'Delivered' }}
+                {% endif %}
+              </div>
             </article>
           {% else %}
             <div class="empty-state">No messages yet.</div>
@@ -41,8 +62,8 @@
         </div>
         <form method="post">
           {{ form.hidden_tag() }}
-          <div class="mb-3">{{ form.body(class="form-control", rows="4", placeholder="Write your message") }}</div>
-          {{ form.submit(class="btn btn-accent") }}
+          <div class="mb-3">{{ form.body(class="form-control", rows="4", maxlength="2000", placeholder="Write your message") }}</div>
+          <button class="btn btn-accent" type="submit">Send</button>
         </form>
       </div>
     </section>

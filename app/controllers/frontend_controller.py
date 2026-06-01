@@ -12,7 +12,7 @@ from werkzeug.utils import secure_filename
 
 from app.exceptions import ProfileNotFoundError
 from app.models import Profile, ProfileCertificate, ProfileReview, ProfileSkill, User
-from app.services import ProfileService, SkillService, SkillSearchService
+from app.services import MessageService, ProfileService, SkillService, SkillSearchService
 from app.services.listing_catalog import (
     all_listings,
     categories,
@@ -34,10 +34,12 @@ class FrontendController(BaseController):
         profile_service: ProfileService,
         skill_service: SkillService,
         skill_search_service: SkillSearchService,
+        message_service: MessageService,
     ):
         self._profile_service = profile_service
         self._skill_service = skill_service
         self._skill_search_service = skill_search_service
+        self._message_service = message_service
 
     def _get_filtered_listings(self):
         q = request.args.get("q", "").strip()
@@ -388,17 +390,57 @@ class FrontendController(BaseController):
 
     @login_required
     def messages(self):
-        return self.render("messages/index.html", conversations=[])
+        conversations = self._message_service.list_conversations(current_user.id)
+        active_conversation = conversations[0] if conversations else None
+        ordered_messages = []
+        if active_conversation:
+            active_conversation = self._message_service.get_conversation(active_conversation.id, current_user.id)
+            if active_conversation:
+                self._message_service.mark_read(
+                    conversation_id=active_conversation.id,
+                    user_id=current_user.id,
+                )
+                conversations = self._message_service.list_conversations(current_user.id)
+                ordered_messages = active_conversation.messages
+        return self.render(
+            "messages/index.html",
+            conversations=conversations,
+            conversation=active_conversation,
+            ordered_messages=ordered_messages,
+            form=MessageShellForm(),
+        )
 
     @login_required
     def conversation(self, conversation_id: int):
-        conversation = SimpleNamespace(
-            id=conversation_id,
-            subject="Conversation preview",
-            messages=[],
-            other_participant=lambda _user_id: SimpleNamespace(full_name="Exchange partner"),
+        conversation = self._message_service.get_conversation(conversation_id, current_user.id)
+        if not conversation:
+            abort(404)
+        if request.method == "POST":
+            body = request.form.get("body", "")
+            try:
+                self._message_service.send_message(
+                    conversation_id=conversation_id,
+                    sender_id=current_user.id,
+                    body=body,
+                )
+            except ValueError as exc:
+                flash(str(exc), "danger")
+            except PermissionError:
+                abort(403)
+            else:
+                flash("Message sent.", "success")
+                return redirect(url_for("messages.detail", conversation_id=conversation_id))
+
+        self._message_service.mark_read(conversation_id=conversation_id, user_id=current_user.id)
+        conversation = self._message_service.get_conversation(conversation_id, current_user.id)
+        conversations = self._message_service.list_conversations(current_user.id)
+        return self.render(
+            "messages/detail.html",
+            conversation=conversation,
+            conversations=conversations,
+            ordered_messages=conversation.messages,
+            form=MessageShellForm(),
         )
-        return self.render("messages/detail.html", conversation=conversation, form=MessageShellForm())
 
     @login_required
     def notifications(self):

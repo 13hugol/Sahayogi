@@ -11,6 +11,7 @@ from .skill_search_repository import SkillSearchRepository
 from .user_repository import UserRepository
 from .skill_repository import CategoryRepository, SkillRepository
 from .notification_repository import NotificationRepository
+from .message_repository import MessageRepository
 
 __all__ = [
     "AdminAuditRepository",
@@ -25,4 +26,5 @@ __all__ = [
     "CategoryRepository",
     "SkillRepository",
     "NotificationRepository",
+    "MessageRepository",
 ]

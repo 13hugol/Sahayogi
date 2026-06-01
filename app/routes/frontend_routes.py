@@ -12,8 +12,9 @@ from ..repositories import (
     UserRepository,
     CategoryRepository,
     SkillRepository,
+    MessageRepository,
 )
-from ..services import ProfileService, SkillService, SkillSearchService
+from ..services import ProfileService, SkillService, SkillSearchService, MessageService
 
 
 class FrontendRoutes:
@@ -37,6 +38,9 @@ class FrontendRoutes:
             ),
             skill_search_service=SkillSearchService(
                 SkillSearchRepository(),
+            ),
+            message_service=MessageService(
+                MessageRepository(),
             ),
         )
 
@@ -74,7 +78,7 @@ class FrontendRoutes:
 
         messages = Blueprint("messages", __name__, url_prefix="/messages")
         messages.route("/", endpoint="index")(self.controller.messages)
-        messages.route("/<int:conversation_id>", endpoint="detail")(self.controller.conversation)
+        messages.route("/<int:conversation_id>", methods=["GET", "POST"], endpoint="detail")(self.controller.conversation)
 
         notifications = Blueprint("notifications", __name__, url_prefix="/notifications")
         notifications.route("/", endpoint="index")(self.controller.notifications)
