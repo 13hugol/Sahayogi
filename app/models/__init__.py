@@ -8,6 +8,7 @@ from .notification import Notification
 from .message import MessageConversation, MessagePost
 from .exchange_request import ExchangeRequest
 from .exchange import Exchange
+from .report import Report
 
 __all__ = [
     "AdminAuditLog",
@@ -26,4 +27,5 @@ __all__ = [
     "MessagePost",
     "ExchangeRequest",
     "Exchange",
+    "Report",
 ]
