@@ -710,8 +710,47 @@ class FrontendController(BaseController):
             report_form=ReportShellForm(),
         )
 
+    @login_required
     def report_user(self, user_id: int):
-        return self.profile_view(user_id)
+        target_user = User.find_by_id(user_id)
+        if not target_user:
+            abort(404)
+        if target_user.id == current_user.id:
+            flash("You cannot report yourself.", "danger")
+            return redirect(url_for("profile.view", user_id=user_id))
+
+        if request.method == "POST":
+            from app.repositories import ReportRepository
+            report_repo = ReportRepository()
+            if report_repo.has_recent_report(current_user.id, target_user.id, within_days=7):
+                flash("You cannot submit duplicate reports against the same user within a 7-day window.", "danger")
+                return redirect(url_for("profile.view", user_id=user_id))
+
+            reason = request.form.get("reason", "").strip()
+            description = request.form.get("description", "").strip() or None
+
+            valid_reasons = {"spam", "harassment", "fake_profile", "fraud", "other"}
+            if not reason or reason not in valid_reasons:
+                flash("Invalid report reason selected.", "danger")
+                return redirect(url_for("profile.view", user_id=user_id))
+
+            report_repo.create(
+                reporter_id=current_user.id,
+                reported_user_id=target_user.id,
+                reason=reason,
+                description=description,
+            )
+
+            from app.models.notification import Notification
+            Notification.create(
+                user_id=current_user.id,
+                message=f"Your report against {target_user.full_name} has been received and is under review."
+            )
+
+            flash("Your report has been submitted to the admin review team.", "success")
+            return redirect(url_for("profile.view", user_id=user_id))
+
+        return redirect(url_for("profile.view", user_id=user_id))
 
     def top_rated(self):
         return self.render("reviews/top_rated.html", profiles=self._profile_service.get_top_rated_profiles())
@@ -940,6 +979,16 @@ class MessageShellForm(ShellForm):
 
 class ReportShellForm(ShellForm):
     fields = {"reason": "select", "description": "textarea", "submit": "submit"}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.reason.choices = [
+            ("spam", "Spam"),
+            ("harassment", "Harassment"),
+            ("fake_profile", "Fake Profile"),
+            ("fraud", "Fraud"),
+            ("other", "Other"),
+        ]
 
 
 class ReviewShellForm(ShellForm):
