@@ -14,6 +14,7 @@ from .notification_repository import NotificationRepository
 from .message_repository import MessageRepository
 from .exchange_request_repository import ExchangeRequestRepository
 from .exchange_repository import ExchangeRepository
+from .report_repository import ReportRepository
 
 __all__ = [
     "AdminAuditRepository",
@@ -31,4 +32,5 @@ __all__ = [
     "MessageRepository",
     "ExchangeRequestRepository",
     "ExchangeRepository",
+    "ReportRepository",
 ]
