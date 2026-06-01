@@ -123,3 +123,29 @@ class AdminService:
         )
         return listing
 
+    def list_reports(self):
+        from app.repositories import ReportRepository
+        return ReportRepository().list_all()
+
+    def resolve_report(self, admin_user, report_id: int, decision: str):
+        from app.repositories import ReportRepository
+        report_repo = ReportRepository()
+        report = report_repo.find_by_id(report_id)
+        if not report:
+            return None
+        
+        # update status
+        status = "resolved" if decision == "resolved" else "dismissed"
+        report_repo.update_status(report_id, status)
+        report.status = status
+        
+        # audit log
+        self._audit_repository.create(
+            admin_id=admin_user.id,
+            action="resolve_report",
+            target_type="Report",
+            target_id=report_id,
+            detail=f"Report against {report.reported_user.full_name if report.reported_user else 'Unknown'} marked as {status} by admin {admin_user.email}",
+        )
+        return report
+

@@ -113,7 +113,23 @@ class AdminController(BaseController):
 
     @admin_required
     def reports(self):
-        return self.render("admin/reports.html", reports=[])
+        reports_list = self._admin_service.list_reports()
+        return self.render("admin/reports.html", reports=reports_list)
+
+    @admin_required
+    def resolve_report(self, report_id: int):
+        decision = request.args.get("decision", "").strip()
+        if decision not in {"resolved", "dismissed"}:
+            flash("Invalid decision.", "danger")
+            return redirect(url_for("admin.reports"))
+
+        report = self._admin_service.resolve_report(current_user, report_id, decision)
+        if not report:
+            flash("Report not found.", "danger")
+            return redirect(url_for("admin.reports"))
+
+        flash(f"Report has been {decision}.", "success")
+        return redirect(url_for("admin.reports"))
 
     @admin_required
     def reviews(self):
