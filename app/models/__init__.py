@@ -6,6 +6,8 @@ from .user import Profile, Role, User
 from .skill import Category, Skill
 from .notification import Notification
 from .message import MessageConversation, MessagePost
+from .exchange_request import ExchangeRequest
+from .exchange import Exchange
 
 __all__ = [
     "AdminAuditLog",
@@ -22,4 +24,6 @@ __all__ = [
     "Notification",
     "MessageConversation",
     "MessagePost",
+    "ExchangeRequest",
+    "Exchange",
 ]

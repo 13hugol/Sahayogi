@@ -295,6 +295,33 @@ class Database:
                 CONSTRAINT fk_message_posts_sender FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """,
+            """
+            CREATE TABLE IF NOT EXISTS exchange_requests (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                listing_id INT NOT NULL,
+                learner_id INT NOT NULL,
+                offered_skill_id INT DEFAULT NULL,
+                requested_message TEXT DEFAULT NULL,
+                status VARCHAR(32) NOT NULL DEFAULT 'pending',
+                decline_reason TEXT DEFAULT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                CONSTRAINT fk_exchange_requests_listing FOREIGN KEY (listing_id) REFERENCES skills(id) ON DELETE CASCADE,
+                CONSTRAINT fk_exchange_requests_learner FOREIGN KEY (learner_id) REFERENCES users(id) ON DELETE CASCADE,
+                CONSTRAINT fk_exchange_requests_offered_skill FOREIGN KEY (offered_skill_id) REFERENCES profile_skills(id) ON DELETE SET NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS exchanges (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                request_id INT NOT NULL,
+                status VARCHAR(32) NOT NULL DEFAULT 'active',
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                completed_at DATETIME DEFAULT NULL,
+                video_session_summary TEXT DEFAULT NULL,
+                CONSTRAINT fk_exchanges_request FOREIGN KEY (request_id) REFERENCES exchange_requests(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """,
         ]
         try:
             for statement in statements:

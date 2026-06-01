@@ -78,6 +78,25 @@ class ProfileSkillRepository(BaseRepository):
             )
         return [skill for row in rows if (skill := ProfileSkill.from_row(row))]
 
+    def find_by_id(self, skill_id: int) -> ProfileSkill | None:
+        with self._db() as db:
+            row = db.fetch_one(
+                """
+                SELECT
+                    profile_skills.*,
+                    EXISTS (
+                        SELECT 1
+                        FROM profile_certificates
+                        WHERE profile_certificates.profile_skill_id = profile_skills.id
+                          AND profile_certificates.status = %s
+                    ) AS has_verified_certificate
+                FROM profile_skills
+                WHERE id = %s
+                """,
+                (CertificateStatus.APPROVED.value, skill_id),
+            )
+        return ProfileSkill.from_row(row)
+
     def create(self, user_id: int, skill_name: str, skill_type: str | SkillType, sort_order: int = 0) -> ProfileSkill:
         normalized_type = self._normalize_skill_type(skill_type)
         with self._db() as db:

@@ -320,7 +320,7 @@ class User(UserMixin, BaseModel):
 
     @property
     def available_credit_balance(self) -> int:
-        return 0
+        return 100
 
     @property
     def offered_skills(self) -> list:

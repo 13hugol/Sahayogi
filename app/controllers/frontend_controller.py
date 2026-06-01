@@ -12,6 +12,8 @@ from werkzeug.utils import secure_filename
 
 from app.exceptions import ProfileNotFoundError
 from app.models import Profile, ProfileCertificate, ProfileReview, ProfileSkill, User
+from app.models.notification import Notification
+from app.repositories import ExchangeRequestRepository, ExchangeRepository, SkillRepository
 from app.services import MessageService, ProfileService, SkillService, SkillSearchService
 from app.services.listing_catalog import (
     all_listings,
@@ -294,10 +296,15 @@ class FrontendController(BaseController):
         listing = self._skill_service.get_listing_by_id(listing_id)
         if not listing:
             abort(404)
+        form = RequestShellForm()
+        if current_user.is_authenticated:
+            form.offered_skill_id.choices = [
+                (skill.id, skill.skill_name) for skill in current_user.offered_skills
+            ]
         return self.render(
             "listings/detail.html",
             listing=listing,
-            request_form=RequestShellForm(),
+            request_form=form,
             saved_listing_ids=self._saved_listing_ids(),
         )
 
@@ -354,32 +361,37 @@ class FrontendController(BaseController):
 
     @login_required
     def requests(self):
-        return self.render("requests/inbox.html", requests=[])
+        pending = ExchangeRequestRepository().list_incoming_pending(current_user.id)
+        history = ExchangeRequestRepository().list_incoming_history(current_user.id)
+        return self.render(
+            "requests/inbox.html",
+            pending_requests=pending,
+            history=history,
+        )
 
     @login_required
     def sent_requests(self):
-        return self.render("requests/sent.html", requests=[])
+        sent = ExchangeRequestRepository().list_sent(current_user.id)
+        return self.render("requests/sent.html", requests=sent)
 
     @login_required
     def exchanges(self):
-        return self.render("exchanges/index.html", exchanges=[])
+        exchanges_list = ExchangeRepository().list_for_user(current_user.id)
+        return self.render("exchanges/index.html", exchanges=exchanges_list)
 
     @login_required
     def exchange_detail(self, exchange_id: int):
-        exchange = SimpleNamespace(
-            id=exchange_id,
-            status="frontend-only",
-            exchange_type="credit",
-            created_at=None,
-            completed_at=None,
-            request=SimpleNamespace(credits_reserved=0),
-            barter_skill=None,
-            listing=SimpleNamespace(title="Exchange preview"),
-            teacher=SimpleNamespace(full_name="Teacher"),
-            learner=SimpleNamespace(full_name="Learner"),
-            conversation=None,
-            completion_marks=[],
-        )
+        exchange = ExchangeRepository().find_by_id(exchange_id)
+        if not exchange:
+            abort(404)
+        request_obj = exchange.request
+        if not request_obj:
+            abort(404)
+        listing = request_obj.listing
+        if not listing:
+            abort(404)
+        if current_user.id not in [request_obj.learner_id, listing.user_id]:
+            abort(403)
         return self.render(
             "exchanges/detail.html",
             exchange=exchange,
@@ -387,6 +399,110 @@ class FrontendController(BaseController):
             can_review=False,
             reviews=[],
         )
+
+    @login_required
+    def create_request(self, listing_id: int):
+        listing = SkillRepository().find_by_id(listing_id)
+        if not listing:
+            abort(404)
+        if current_user.id == listing.user_id:
+            flash("You cannot request your own listing.", "danger")
+            return redirect(url_for("listings.detail", listing_id=listing_id))
+        
+        if listing.exchange_type == "credit":
+            if current_user.available_credit_balance < listing.credit_cost:
+                flash("Your available credit balance is insufficient to request this skill.", "danger")
+                return redirect(url_for("listings.detail", listing_id=listing_id))
+        
+        offered_skill_id = request.form.get("offered_skill_id")
+        if offered_skill_id:
+            offered_skill_id = int(offered_skill_id)
+        else:
+            offered_skill_id = None
+            
+        requested_message = request.form.get("requested_message", "").strip() or None
+        
+        ExchangeRequestRepository().create(
+            listing_id=listing_id,
+            learner_id=current_user.id,
+            offered_skill_id=offered_skill_id,
+            requested_message=requested_message,
+        )
+        Notification.create(
+            user_id=listing.user_id,
+            message=f"New exchange request from {current_user.full_name} for '{listing.title}'."
+        )
+        flash("Your request has been submitted.", "success")
+        return redirect(url_for("requests_bp.sent"))
+
+    @login_required
+    def accept_request(self, request_id: int):
+        request_obj = ExchangeRequestRepository().find_by_id(request_id)
+        if not request_obj:
+            abort(404)
+        listing = request_obj.listing
+        if not listing:
+            abort(404)
+        if current_user.id != listing.user_id:
+            abort(403)
+        if request_obj.status != "pending":
+            return redirect(url_for("requests_bp.inbox"))
+            
+        ExchangeRequestRepository().update_status(request_id, "accepted")
+        ExchangeRepository().create(request_id=request_id)
+        
+        self._message_service.create_conversation(
+            subject=f"Exchange: {listing.title}",
+            permission_source="accepted_exchange",
+            participant_ids=[listing.user_id, request_obj.learner_id],
+        )
+        
+        Notification.create(
+            user_id=request_obj.learner_id,
+            message=f"Your request for '{listing.title}' was accepted by {current_user.full_name}."
+        )
+        
+        flash("Request accepted and exchange created.", "success")
+        return redirect(url_for("requests_bp.inbox"))
+
+    @login_required
+    def decline_request(self, request_id: int):
+        request_obj = ExchangeRequestRepository().find_by_id(request_id)
+        if not request_obj:
+            abort(404)
+        listing = request_obj.listing
+        if not listing:
+            abort(404)
+        if current_user.id != listing.user_id:
+            abort(403)
+        if request_obj.status != "pending":
+            return redirect(url_for("requests_bp.inbox"))
+            
+        decline_reason = request.form.get("decline_reason", "").strip() or None
+        ExchangeRequestRepository().update_status(request_id, "declined", decline_reason=decline_reason)
+        
+        msg = f"Your request for '{listing.title}' was declined."
+        if decline_reason:
+            msg += f" Reason: {decline_reason}"
+        Notification.create(user_id=request_obj.learner_id, message=msg)
+        
+        flash("Request declined.", "warning")
+        return redirect(url_for("requests_bp.inbox"))
+
+    @login_required
+    def cancel_request(self, request_id: int):
+        request_obj = ExchangeRequestRepository().find_by_id(request_id)
+        if not request_obj:
+            abort(404)
+        if current_user.id != request_obj.learner_id:
+            abort(403)
+        if request_obj.status != "pending":
+            return redirect(url_for("requests_bp.sent"))
+            
+        ExchangeRequestRepository().update_status(request_id, "cancelled")
+        
+        flash("Request cancelled.", "info")
+        return redirect(url_for("requests_bp.sent"))
 
     @login_required
     def messages(self):
