@@ -15,7 +15,7 @@
   </header>
 
   <div class="row g-4 mb-4">
-    {% for label, value in [('Listings', my_listings|length), ('Pending requests', pending_requests|length), ('Active exchanges', exchanges|length), ('Unread notices', notifications|length)] %}
+    {% for label, value in [('Listings', my_listings|length), ('Pending requests', pending_requests|length), ('Active exchanges', exchanges|length), ('Unread notices', unread_notification_count)] %}
       <div class="col-md-6 col-xl-3">
         <section class="metric-card">
           <div class="stat-value">{{ value }}</div>
@@ -100,7 +100,7 @@
         </div>
         <div class="clean-list">
           {% for item in notifications %}
-            <a class="clean-row" href="{{ item.url or url_for('notifications.index') }}">
+            <a class="clean-row" href="{{ url_for('notifications.open_item', notification_id=item.id) }}">
               <div>
                 <strong>{{ item.title }}</strong>
                 <div class="small text-muted">{{ item.body }}</div>

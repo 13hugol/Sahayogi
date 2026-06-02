@@ -4,7 +4,10 @@
 {% block content %}
   <div class="section-head mb-4">
     <div><span class="eyebrow">Activity feed</span><h1 class="h2 mb-0">Notifications</h1></div>
-    <form method="post" action="{{ url_for('notifications.mark_all_read') }}"><button class="btn btn-outline-primary">Mark all as read</button></form>
+    <form method="post" action="{{ url_for('notifications.mark_all_read') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-outline-primary" type="submit" {% if unread_count == 0 %}disabled{% endif %}>Mark all as read</button>
+    </form>
   </div>
   <div class="card card-shell">
     <div class="card-body">
@@ -15,6 +18,9 @@
             {% if not item.is_read %}<span class="badge text-bg-danger">New</span>{% endif %}
           </div>
           <div class="text-muted small">{{ item.body }}</div>
+          {% if item.created_at %}
+            <div class="text-muted small mt-1">{{ item.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+          {% endif %}
         </a>
       {% else %}
         <div class="text-muted">No notifications yet.</div>
