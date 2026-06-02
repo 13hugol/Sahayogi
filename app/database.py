@@ -192,6 +192,22 @@ class Database:
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """,
             """
+            CREATE TABLE IF NOT EXISTS notifications (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                event_type VARCHAR(40) NOT NULL,
+                title VARCHAR(160) NOT NULL,
+                body TEXT NOT NULL,
+                target_url VARCHAR(255),
+                is_read BOOLEAN NOT NULL DEFAULT FALSE,
+                read_at DATETIME,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                INDEX ix_notifications_user_read_created (user_id, is_read, created_at),
+                INDEX ix_notifications_event_type (event_type),
+                CONSTRAINT fk_notifications_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """,
+            """
             CREATE TABLE IF NOT EXISTS profile_reviews (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 reviewee_user_id INT NOT NULL,
