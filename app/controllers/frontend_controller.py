@@ -7,15 +7,21 @@ from flask_login import current_user, login_required
 from markupsafe import Markup, escape
 
 from app.exceptions import ProfileNotFoundError
-from app.services import ProfileService, SkillSearchService
+from app.services import NotificationService, ProfileService, SkillSearchService
 
 from .base_controller import BaseController
 
 
 class FrontendController(BaseController):
-    def __init__(self, profile_service: ProfileService, skill_search_service: SkillSearchService):
+    def __init__(
+        self,
+        profile_service: ProfileService,
+        skill_search_service: SkillSearchService,
+        notification_service: NotificationService,
+    ):
         self._profile_service = profile_service
         self._skill_search_service = skill_search_service
+        self._notification_service = notification_service
 
     def _categories(self):
         return [
@@ -140,11 +146,40 @@ class FrontendController(BaseController):
 
     @login_required
     def notifications(self):
-        return self.render("notifications/index.html", notifications=[])
+        return self.render(
+            "notifications/index.html",
+            notifications=self._notification_service.list_for_user(current_user.id),
+            unread_count=self._notification_service.unread_count(current_user.id),
+        )
 
     @login_required
     def notification_counts(self):
-        return jsonify({"messages": 0, "notifications": 0})
+        return jsonify(
+            {
+                "messages": 0,
+                "notifications": self._notification_service.unread_count(current_user.id),
+            }
+        )
+
+    @login_required
+    def mark_all_notifications_read(self):
+        updated = self._notification_service.mark_all_read(current_user.id)
+        if updated:
+            flash(f"{updated} notification{'s' if updated != 1 else ''} marked as read.", "success")
+        else:
+            flash("No unread notifications to mark.", "info")
+        return redirect(url_for("notifications.index"))
+
+    @login_required
+    def open_notification(self, notification_id: int):
+        notification = self._notification_service.mark_read(current_user.id, notification_id)
+        if not notification:
+            flash("Notification not found.", "warning")
+            return redirect(url_for("notifications.index"))
+        target_url = notification.target_url or url_for("notifications.index")
+        if not target_url.startswith("/") or target_url.startswith("//"):
+            target_url = url_for("notifications.index")
+        return redirect(target_url)
 
     @login_required
     def profile_me(self):
