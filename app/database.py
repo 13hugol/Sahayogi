@@ -155,6 +155,20 @@ class Database:
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """,
             """
+            CREATE TABLE IF NOT EXISTS categories (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(80) NOT NULL UNIQUE,
+                slug VARCHAR(100) NOT NULL UNIQUE,
+                icon VARCHAR(16) NOT NULL DEFAULT 'CAT',
+                description VARCHAR(255),
+                sort_order INT NOT NULL DEFAULT 0,
+                is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX ix_categories_active_order (is_active, sort_order, name)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """,
+            """
             CREATE TABLE IF NOT EXISTS profile_certificates (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 user_id INT NOT NULL,
@@ -199,6 +213,79 @@ class Database:
         try:
             for statement in statements:
                 db.execute(statement)
+            for statement, duplicate_code in (
+                ("ALTER TABLE categories ADD COLUMN slug VARCHAR(100)", 1060),
+                ("ALTER TABLE categories ADD COLUMN icon VARCHAR(16) NOT NULL DEFAULT 'CAT'", 1060),
+                ("ALTER TABLE categories ADD COLUMN description VARCHAR(255)", 1060),
+                ("ALTER TABLE categories ADD COLUMN sort_order INT NOT NULL DEFAULT 0", 1060),
+                ("ALTER TABLE categories ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT TRUE", 1060),
+                ("ALTER TABLE categories ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP", 1060),
+                (
+                    "ALTER TABLE categories ADD COLUMN updated_at DATETIME NOT NULL "
+                    "DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+                    1060,
+                ),
+                ("ALTER TABLE categories ADD UNIQUE INDEX uq_categories_name (name)", 1061),
+                ("ALTER TABLE categories ADD UNIQUE INDEX uq_categories_slug (slug)", 1061),
+                ("ALTER TABLE categories ADD INDEX ix_categories_active_order (is_active, sort_order, name)", 1061),
+            ):
+                try:
+                    db.execute(statement)
+                except pymysql.err.OperationalError as exc:
+                    if exc.args and exc.args[0] == duplicate_code:
+                        continue
+                    raise
+            db.execute(
+                """
+                UPDATE categories
+                SET slug = LOWER(REGEXP_REPLACE(name, '[^A-Za-z0-9]+', '-'))
+                WHERE slug IS NULL OR slug = ''
+                """
+            )
+            db.execute(
+                """
+                UPDATE categories
+                SET icon = LEFT(UPPER(REGEXP_REPLACE(name, '[^A-Za-z0-9]+', '')), 16)
+                WHERE icon IS NULL OR icon = '' OR icon = 'CAT'
+                """
+            )
+            db.execute(
+                """
+                UPDATE categories
+                SET description = ''
+                WHERE description IS NULL
+                """
+            )
+            db.execute(
+                """
+                UPDATE categories
+                SET sort_order = CASE id
+                    WHEN 1 THEN 1
+                    WHEN 2 THEN 2
+                    WHEN 3 THEN 3
+                    WHEN 4 THEN 4
+                    ELSE sort_order
+                END
+                WHERE id IN (1, 2, 3, 4) AND sort_order = 0
+                """
+            )
+            db.execute(
+                """
+                UPDATE categories
+                SET icon = CASE id
+                    WHEN 1 THEN 'TECH'
+                    WHEN 2 THEN 'MUS'
+                    WHEN 3 THEN 'LANG'
+                    WHEN 4 THEN 'KIT'
+                    ELSE icon
+                END
+                WHERE id IN (1, 2, 3, 4)
+                  AND icon IN ('CAT', 'TECH', 'MUSIC', 'LANGUAGE', 'KITCHEN')
+                """
+            )
+            from app.repositories.category_repository import CategoryRepository
+
+            CategoryRepository().seed_defaults()
             for statement in (
                 "ALTER TABLE profiles ADD COLUMN headline VARCHAR(160)",
                 "ALTER TABLE profiles ADD COLUMN bio TEXT",
