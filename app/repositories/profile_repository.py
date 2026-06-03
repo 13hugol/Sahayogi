@@ -15,6 +15,49 @@ class ProfileRepository(BaseRepository):
             row = db.fetch_one("SELECT * FROM profiles WHERE user_id = %s", (user_id,))
         return Profile.from_row(row)
 
+    def get_mutual_matches(self, user_id: int) -> list[dict]:
+        with self._db() as db:
+            my_offered_rows = db.fetch_all("SELECT skill_name FROM profile_skills WHERE user_id = %s AND skill_type = 'offered'", (user_id,))
+            my_wanted_rows = db.fetch_all("SELECT skill_name FROM profile_skills WHERE user_id = %s AND skill_type = 'wanted'", (user_id,))
+
+            my_offered = {r["skill_name"].strip().lower() for r in my_offered_rows if r["skill_name"]}
+            my_wanted = {r["skill_name"].strip().lower() for r in my_wanted_rows if r["skill_name"]}
+
+            rows = db.fetch_all(
+                """
+                SELECT
+                    u.id AS matched_user_id,
+                    u.full_name AS name,
+                    p.avatar_path AS avatar,
+                    p.location,
+                    p.reputation_score
+                FROM users u
+                JOIN profiles p ON u.id = p.user_id
+                WHERE u.id != %s AND u.status = 'active'
+                """,
+                (user_id,)
+            )
+
+            matches = []
+            for row in rows:
+                their_id = row["matched_user_id"]
+                their_offered_rows = db.fetch_all("SELECT skill_name FROM profile_skills WHERE user_id = %s AND skill_type = 'offered'", (their_id,))
+                their_wanted_rows = db.fetch_all("SELECT skill_name FROM profile_skills WHERE user_id = %s AND skill_type = 'wanted'", (their_id,))
+
+                their_offered = {r["skill_name"].strip().lower() for r in their_offered_rows if r["skill_name"]}
+                their_wanted = {r["skill_name"].strip().lower() for r in their_wanted_rows if r["skill_name"]}
+
+                they_want_mine = my_offered & their_wanted
+                i_want_theirs = my_wanted & their_offered
+
+                if they_want_mine and i_want_theirs:
+                    row["overlapping_skills"] = list(they_want_mine | i_want_theirs)
+                    row["match_score"] = len(they_want_mine) + len(i_want_theirs)
+                    matches.append(row)
+
+            matches.sort(key=lambda x: (x["match_score"], x["reputation_score"] or 0), reverse=True)
+            return matches
+
     def create(self, user_id: int, username: str, location: str, contact_email: str) -> None:
         with self._db() as db:
             db.execute(
