@@ -2,17 +2,37 @@
 {% extends "base.html" %}
 {% block title %}Edit Category | Sahayogi{% endblock %}
 {% block content %}
+  {% include "admin/_nav.html" %}
   <div class="row justify-content-center">
     <div class="col-lg-6">
       <div class="card card-shell">
         <div class="card-body">
-          <h1 class="h4 mb-3">Edit category</h1>
+          <h1 class="h4 mb-3">Edit {{ category.name }}</h1>
           <form method="post">
             {{ form.hidden_tag() }}
-            <div class="mb-3">{{ form.name.label(class="form-label") }}{{ form.name(class="form-control") }}</div>
-            <div class="mb-3">{{ form.slug.label(class="form-label") }}{{ form.slug(class="form-control") }}</div>
-            <div class="mb-3">{{ form.description.label(class="form-label") }}{{ form.description(class="form-control") }}</div>
+            <div class="mb-3">
+              {{ form.name.label(class="form-label") }}
+              {{ form.name(class="form-control", required=True) }}
+              {% for error in form.name.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="mb-3">
+              {{ form.slug.label(class="form-label") }}
+              {{ form.slug(class="form-control") }}
+              {% for error in form.slug.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="mb-3">
+              {{ form.icon.label(class="form-label") }}
+              {{ form.icon(class="form-control") }}
+              <div class="form-text">Example: TECH</div>
+              {% for error in form.icon.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="mb-3">
+              {{ form.description.label(class="form-label") }}
+              {{ form.description(class="form-control", rows="4") }}
+              {% for error in form.description.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+            </div>
             {{ form.submit(class="btn btn-accent") }}
+            <a class="btn btn-outline-secondary ms-2" href="{{ url_for('admin.categories') }}">Cancel</a>
           </form>
         </div>
       </div>

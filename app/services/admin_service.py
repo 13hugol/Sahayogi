@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from app.dto import DashboardStats
 from app.enums import UserRole
-from app.exceptions import InvalidRoleError, SelfRoleChangeError, UserNotFoundError
-from app.repositories import AdminAuditRepository, RoleRepository, UserRepository
+from app.exceptions import CategoryNotFoundError, InvalidRoleError, SelfRoleChangeError, UserNotFoundError
+from app.repositories import AdminAuditRepository, CategoryRepository, RoleRepository, UserRepository
 
 
 class AdminService:
@@ -12,10 +12,12 @@ class AdminService:
         user_repository: UserRepository,
         role_repository: RoleRepository,
         audit_repository: AdminAuditRepository,
+        category_repository: CategoryRepository | None = None,
     ):
         self._user_repository = user_repository
         self._role_repository = role_repository
         self._audit_repository = audit_repository
+        self._category_repository = category_repository or CategoryRepository()
 
     def dashboard_stats(self) -> DashboardStats:
         return DashboardStats(
@@ -56,4 +58,61 @@ class AdminService:
             detail=f"Role changed from '{old_role_name}' to '{normalized_role}' by admin {admin_user.email}",
         )
         return target_user
+
+    def list_categories(self):
+        return self._category_repository.all()
+
+    def find_category(self, category_id: int | None):
+        if category_id is None:
+            return None
+        return self._category_repository.find_by_id(category_id)
+
+    def category_name_exists(self, name: str, *, exclude_id: int | None = None) -> bool:
+        return self._category_repository.name_exists(name, exclude_id=exclude_id)
+
+    def category_slug_exists(self, slug: str, *, exclude_id: int | None = None) -> bool:
+        return self._category_repository.slug_exists(slug, exclude_id=exclude_id)
+
+    def create_category(self, *, admin_user, name: str, slug: str, icon: str, description: str):
+        category = self._category_repository.create(
+            name=name,
+            slug=slug,
+            icon=icon,
+            description=description,
+        )
+        self._audit_repository.create(
+            admin_id=admin_user.id,
+            action="create_category",
+            target_type="Category",
+            target_id=category.id,
+            detail=f"Category '{category.name}' created by admin {admin_user.email}",
+        )
+        return category
+
+    def update_category(self, *, admin_user, category_id: int, name: str, slug: str, icon: str, description: str):
+        previous = self._category_repository.find_by_id(category_id)
+        if not previous:
+            raise CategoryNotFoundError(category_id)
+
+        category = self._category_repository.update(
+            category_id,
+            name=name,
+            slug=slug,
+            icon=icon,
+            description=description,
+        )
+        if not category:
+            raise CategoryNotFoundError(category_id)
+
+        self._audit_repository.create(
+            admin_id=admin_user.id,
+            action="rename_category",
+            target_type="Category",
+            target_id=category.id,
+            detail=(
+                f"Category '{previous.name}' renamed to '{category.name}' "
+                f"by admin {admin_user.email}"
+            ),
+        )
+        return category
 
