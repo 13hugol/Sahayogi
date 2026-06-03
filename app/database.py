@@ -266,6 +266,8 @@ class Database:
             for statement in (
                 "ALTER TABLE profiles ADD COLUMN headline VARCHAR(160)",
                 "ALTER TABLE profiles ADD COLUMN bio TEXT",
+                "ALTER TABLE notifications ADD COLUMN type VARCHAR(50) DEFAULT 'general'",
+                "ALTER TABLE notifications ADD COLUMN target_url VARCHAR(255)",
             ):
                 try:
                     db.execute(statement)
