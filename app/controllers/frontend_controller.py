@@ -136,6 +136,8 @@ class FrontendController(BaseController):
                 abort(403)
                 
         skill_choices = [(ps.id, ps.skill_name) for ps in current_user.offered_skills]
+        if not skill_choices:
+            skill_choices = [("", "Please add offered skills to your profile first")]
         categories = self._skill_service.get_all_categories()
         category_choices = [(c.id, c.name) for c in categories]
         
