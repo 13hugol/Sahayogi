@@ -72,3 +72,19 @@ class TopRatedProfile:
     review_count: int
     completed_exchange_count: int
 
+
+@dataclass(frozen=True)
+class MutualSkillMatch:
+    user: User
+    my_offers_they_want: list[str]
+    their_offers_i_want: list[str]
+    relevance_score: int
+    is_new: bool = False
+
+    @property
+    def summary(self) -> str:
+        return (
+            f"You can help with {', '.join(self.my_offers_they_want)}. "
+            f"They can help with {', '.join(self.their_offers_i_want)}."
+        )
+
