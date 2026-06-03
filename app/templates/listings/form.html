@@ -20,7 +20,7 @@
               <div class="col-md-8">{{ form.title.label(class="form-label") }}{{ form.title(class="form-control") }}</div>
               <div class="col-md-4">{{ form.exchange_type.label(class="form-label d-block") }}{% for subfield in form.exchange_type %}<div class="form-check form-check-inline">{{ subfield(class="form-check-input") }}{{ subfield.label(class="form-check-label") }}</div>{% endfor %}</div>
               <div class="col-md-6">{{ form.skill_id.label(class="form-label") }}{{ form.skill_id(class="form-select") }}</div>
-              <div class="col-md-6">{{ form.category_id.label(class="form-label") }}{{ form.category_id(class="form-select") }}</div>
+              <div class="col-md-6">{{ form.category_id.label(class="form-label") }}{{ form.category_id(class="form-select", required=True) }}</div>
               <div class="col-12">{{ form.description.label(class="form-label") }}{{ form.description(class="form-control", rows="6") }}</div>
               <div class="col-md-4">{{ form.min_credits.label(class="form-label") }}{{ form.min_credits(class="form-control") }}</div>
               <div class="col-md-4">{{ form.location_text.label(class="form-label") }}{{ form.location_text(class="form-control") }}</div>
