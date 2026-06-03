@@ -1,0 +1,56 @@
+<div class="col" id="match-{{ match.matched_user_id }}">
+  <div class="card h-100 shadow-sm">
+    <div class="card-body">
+
+      <!-- User identity -->
+      <div class="d-flex align-items-center mb-3">
+        {% if match.avatar %}
+          <img src="{{ url_for('main.media', filename=match.avatar) }}"
+               class="rounded-circle me-3"
+               width="48" height="48" alt="{{ match.name }}">
+        {% else %}
+          <div class="rounded-circle me-3 bg-secondary text-white d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+            {{ match.name[:1] }}
+          </div>
+        {% endif %}
+        <div>
+          <a href="{{ url_for('profile.view', user_id=match.matched_user_id) }}" class="fw-semibold text-decoration-none">
+            {{ match.name }}
+          </a>
+          <div class="text-muted small">{{ match.location or 'No location' }}</div>
+        </div>
+      </div>
+
+      <!-- Reputation -->
+      <div class="mb-2">
+        {% if match.reputation_score %}
+          <span class="badge bg-warning text-dark">
+            ★ {{ match.reputation_score }}
+          </span>
+        {% else %}
+          <span class="badge bg-secondary">New Member</span>
+        {% endif %}
+        <span class="ms-2 text-muted small">
+          {{ match.match_score }} overlapping skill{{ 's' if match.match_score != 1 }}
+        </span>
+      </div>
+
+      <!-- Overlapping skills -->
+      <div class="mb-3">
+        {% for skill in match.overlapping_skills[:5] %}
+          <span class="badge bg-light text-dark border me-1 mb-1">{{ skill }}</span>
+        {% endfor %}
+        {% if match.overlapping_skills|length > 5 %}
+          <span class="text-muted small">+{{ match.overlapping_skills|length - 5 }} more</span>
+        {% endif %}
+      </div>
+
+      <!-- Action -->
+      <a href="/requests/new/{{ match.matched_user_id }}"
+         class="btn btn-primary btn-sm w-100">
+        Request Exchange
+      </a>
+
+    </div>
+  </div>
+</div>
