@@ -348,7 +348,25 @@ class FrontendController(BaseController):
 
     @login_required
     def matches(self):
-        return self.render("matches/index.html", matches=[])
+        from app.models.user import Profile
+        matches = Profile.get_mutual_matches(current_user.id)
+        return self.render("matches/index.html", matches=matches)
+
+    def _notify_new_matches(self, user_id: int):
+        from app.models.user import User, Profile
+        from app.models.notification import Notification
+
+        current_matches = Profile.get_mutual_matches(user_id)
+        existing_notified = Notification.get_notified_match_ids(user_id)
+
+        my_profile = User.find_by_id(user_id)
+
+        for match in current_matches:
+            mid = match["matched_user_id"]
+            if mid not in existing_notified:
+                Notification.create_new_match_notification(user_id, match["name"], mid)
+                if my_profile:
+                    Notification.create_new_match_notification(mid, my_profile.full_name, user_id)
 
     @login_required
     def requests(self):
@@ -448,6 +466,7 @@ class FrontendController(BaseController):
                 )
                 ProfileSkill.sync_for_user(user.id, "offered", values["offered_skills"])
                 ProfileSkill.sync_for_user(user.id, "wanted", values["wanted_skills"])
+                self._notify_new_matches(user.id)
                 flash("Profile updated successfully.", "success")
                 return redirect(url_for("profile.edit"))
 
