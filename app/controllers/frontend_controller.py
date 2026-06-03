@@ -11,6 +11,7 @@ from app.services import ProfileService
 from app.services.listing_catalog import (
     all_listings,
     categories,
+    category_overview,
     filter_listings,
     find_listing,
     paginate_listings,
@@ -40,9 +41,20 @@ class FrontendController(BaseController):
             catalog_total=len(all_listings()),
         )
 
+    def category_overview(self):
+        return self.render(
+            "listings/categories.html",
+            category_overview=category_overview(),
+            catalog_total=len(all_listings()),
+        )
+
     @login_required
     def post_listing(self):
-        return self.render("listings/form.html", form=ListingShellForm(), title="Create listing")
+        return self.render(
+            "listings/form.html",
+            form=ListingShellForm(categories=self._categories()),
+            title="Create listing",
+        )
 
     @login_required
     def my_listings(self):
@@ -281,19 +293,23 @@ class FrontendController(BaseController):
 class ShellForm:
     fields: dict[str, str] = {}
 
+    def __init__(self, *, choices: dict[str, list[tuple[str, str]]] | None = None):
+        self.choices = choices or {}
+
     def hidden_tag(self):
         token = session.get("csrf_token", "")
         return Markup(f'<input type="hidden" name="csrf_token" value="{escape(token)}">')
 
     def __getattr__(self, name: str):
         field_type = self.fields.get(name, "text")
-        return ShellField(name, field_type)
+        return ShellField(name, field_type, choices=self.choices.get(name, []))
 
 
 class ShellField:
-    def __init__(self, name: str, field_type: str = "text"):
+    def __init__(self, name: str, field_type: str = "text", *, choices: list[tuple[str, str]] | None = None):
         self.name = name
         self.field_type = field_type
+        self.choices = choices or []
         self.errors = []
         self.label = ShellLabel(name)
 
@@ -302,7 +318,12 @@ class ShellField:
         if self.field_type == "textarea":
             return Markup(f'<textarea name="{self.name}" {attrs}></textarea>')
         if self.field_type == "select":
-            return Markup(f'<select name="{self.name}" {attrs}></select>')
+            options = []
+            if self.name == "category_id":
+                options.append('<option value="">Choose one category</option>')
+            for value, label in self.choices:
+                options.append(f'<option value="{escape(value)}">{escape(label)}</option>')
+            return Markup(f'<select name="{self.name}" {attrs}>{"".join(options)}</select>')
         if self.field_type == "submit":
             return Markup(f'<button type="submit" {attrs}>Save</button>')
         return Markup(f'<input type="{self.field_type}" name="{self.name}" {attrs}>')
@@ -350,6 +371,22 @@ class ListingShellForm(ShellForm):
         "category_id": "select",
         "submit": "submit",
     }
+
+    def __init__(self, *, categories):
+        super().__init__(
+            choices={
+                "category_id": [
+                    (str(category.id), f"{category.icon} - {category.name}")
+                    for category in categories
+                ],
+                "skill_id": [
+                    ("1", "Python scripting"),
+                    ("2", "Guitar lessons"),
+                    ("3", "Nepali conversation"),
+                    ("4", "Newari cooking"),
+                ],
+            }
+        )
 
 
 class RequestShellForm(ShellForm):

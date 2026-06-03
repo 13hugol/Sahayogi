@@ -34,6 +34,7 @@ class FrontendRoutes:
         listings = Blueprint("listings", __name__, url_prefix="/listings")
         listings.route("/", endpoint="index")(self.controller.marketplace)
         listings.route("/api/search", endpoint="api_search")(self.controller.api_search)
+        listings.route("/categories", endpoint="categories")(self.controller.category_overview)
         listings.route("/create", methods=["GET", "POST"], endpoint="create")(self.controller.post_listing)
         listings.route("/mine", endpoint="mine")(self.controller.my_listings)
         listings.route("/saved", endpoint="saved")(self.controller.saved_listings)
