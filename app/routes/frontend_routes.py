@@ -14,7 +14,13 @@ from ..repositories import (
     SkillRepository,
     MessageRepository,
 )
-from ..services import ProfileService, SkillService, SkillSearchService, MessageService
+from ..services import (
+    MessageService,
+    NotificationService,
+    ProfileService,
+    SkillService,
+    SkillSearchService,
+)
 
 
 class FrontendRoutes:
@@ -42,6 +48,7 @@ class FrontendRoutes:
             message_service=MessageService(
                 MessageRepository(),
             ),
+            notification_service=NotificationService(),
         )
 
     def register(self):
@@ -83,8 +90,16 @@ class FrontendRoutes:
         notifications = Blueprint("notifications", __name__, url_prefix="/notifications")
         notifications.route("/", endpoint="index")(self.controller.notifications)
         notifications.route("/counts", endpoint="counts")(self.controller.notification_counts)
-        notifications.route("/mark-all-read", methods=["POST"], endpoint="mark_all_read")(self.controller.frontend_only_action)
-        notifications.route("/<int:notification_id>", endpoint="open_item")(self.controller.frontend_only_action)
+        notifications.route(
+            "/mark-all-read",
+            methods=["POST"],
+            endpoint="mark_all_read",
+        )(self.controller.mark_all_notifications_read)
+        notifications.route(
+            "/<int:notification_id>",
+            methods=["GET", "POST"],
+            endpoint="open_item",
+        )(self.controller.open_notification)
 
         profile = Blueprint("profile", __name__)
         profile.route("/profile/me", endpoint="me")(self.controller.profile_me)

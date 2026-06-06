@@ -14,7 +14,13 @@ from app.exceptions import ProfileNotFoundError
 from app.models import Profile, ProfileCertificate, ProfileReview, ProfileSkill, User
 from app.models.notification import Notification
 from app.repositories import ExchangeRequestRepository, ExchangeRepository, SkillRepository
-from app.services import MessageService, ProfileService, SkillService, SkillSearchService
+from app.services import (
+    MessageService,
+    NotificationService,
+    ProfileService,
+    SkillService,
+    SkillSearchService,
+)
 from app.services.listing_catalog import (
     all_listings,
     categories,
@@ -37,11 +43,13 @@ class FrontendController(BaseController):
         skill_service: SkillService,
         skill_search_service: SkillSearchService,
         message_service: MessageService,
+        notification_service: NotificationService | None = None,
     ):
         self._profile_service = profile_service
         self._skill_service = skill_service
         self._skill_search_service = skill_search_service
         self._message_service = message_service
+        self._notification_service = notification_service or NotificationService()
 
     def _get_filtered_listings(self):
         q = request.args.get("q", "").strip()
@@ -430,9 +438,11 @@ class FrontendController(BaseController):
             offered_skill_id=offered_skill_id,
             requested_message=requested_message,
         )
-        Notification.create(
+        self._notification_service.notify_exchange_request(
             user_id=listing.user_id,
-            message=f"New exchange request from {current_user.full_name} for '{listing.title}'."
+            requester_name=current_user.full_name,
+            skill_title=listing.title,
+            target_url="/requests/inbox",
         )
         flash("Your request has been submitted.", "success")
         return redirect(url_for("requests_bp.sent"))
@@ -458,12 +468,13 @@ class FrontendController(BaseController):
             permission_source="accepted_exchange",
             participant_ids=[listing.user_id, request_obj.learner_id],
         )
-        
-        Notification.create(
+
+        self._notification_service.notify_request_accepted(
             user_id=request_obj.learner_id,
-            message=f"Your request for '{listing.title}' was accepted by {current_user.full_name}."
+            skill_title=listing.title,
+            target_url="/requests/inbox",
         )
-        
+
         flash("Request accepted and exchange created.", "success")
         return redirect(url_for("requests_bp.inbox"))
 
@@ -482,12 +493,14 @@ class FrontendController(BaseController):
             
         decline_reason = request.form.get("decline_reason", "").strip() or None
         ExchangeRequestRepository().update_status(request_id, "declined", decline_reason=decline_reason)
-        
-        msg = f"Your request for '{listing.title}' was declined."
-        if decline_reason:
-            msg += f" Reason: {decline_reason}"
-        Notification.create(user_id=request_obj.learner_id, message=msg)
-        
+
+        self._notification_service.notify_request_declined(
+            user_id=request_obj.learner_id,
+            skill_title=listing.title,
+            reason=decline_reason,
+            target_url="/requests/inbox",
+        )
+
         flash("Request declined.", "warning")
         return redirect(url_for("requests_bp.inbox"))
 
@@ -566,9 +579,32 @@ class FrontendController(BaseController):
 
     @login_required
     def notification_counts(self):
-        from app.models.notification import Notification
-        unread = Notification.get_unread_count(current_user.id)
-        return jsonify({"messages": 0, "notifications": unread})
+        return jsonify(
+            {
+                "messages": 0,
+                "notifications": self._notification_service.unread_count(current_user.id),
+            }
+        )
+
+    @login_required
+    def mark_all_notifications_read(self):
+        updated = self._notification_service.mark_all_read(current_user.id)
+        if updated:
+            flash(f"{updated} notification{'s' if updated != 1 else ''} marked as read.", "success")
+        else:
+            flash("No unread notifications to mark.", "info")
+        return redirect(url_for("notifications.index"))
+
+    @login_required
+    def open_notification(self, notification_id: int):
+        notification = self._notification_service.mark_read(current_user.id, notification_id)
+        if not notification:
+            flash("Notification not found.", "warning")
+            return redirect(url_for("notifications.index"))
+        target_url = notification.target_url or url_for("notifications.index")
+        if not target_url.startswith("/") or target_url.startswith("//"):
+            target_url = url_for("notifications.index")
+        return redirect(target_url)
 
     @login_required
     def profile_me(self):
@@ -743,10 +779,10 @@ class FrontendController(BaseController):
                 description=description,
             )
 
-            from app.models.notification import Notification
-            Notification.create(
+            self._notification_service.notify_report_received(
                 user_id=current_user.id,
-                message=f"Your report against {target_user.full_name} has been received and is under review."
+                reported_name=target_user.full_name,
+                target_url=url_for("profile.view", user_id=user_id),
             )
 
             flash("Your report has been submitted to the admin review team.", "success")

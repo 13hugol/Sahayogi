@@ -102,8 +102,8 @@
           {% for item in notifications %}
             <a class="clean-row" href="{{ item.url or url_for('notifications.index') }}">
               <div>
-                <strong>{{ item.title }}</strong>
-                <div class="small text-muted">{{ item.body }}</div>
+                <strong>{{ item.display_title }}</strong>
+                <div class="small text-muted">{{ item.display_body }}</div>
               </div>
               {% if not item.is_read %}<span class="badge text-bg-danger">New</span>{% endif %}
             </a>
