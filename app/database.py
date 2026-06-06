@@ -252,10 +252,95 @@ class Database:
             CREATE TABLE IF NOT EXISTS notifications (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 user_id INT NOT NULL,
-                message TEXT NOT NULL,
+                event_type VARCHAR(40) NOT NULL DEFAULT 'general',
+                title VARCHAR(160) NOT NULL DEFAULT '',
+                body TEXT NOT NULL,
+                message TEXT,
+                target_url VARCHAR(255),
                 is_read BOOLEAN NOT NULL DEFAULT FALSE,
+                read_at DATETIME,
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                INDEX ix_notifications_user_read_created (user_id, is_read, created_at),
+                INDEX ix_notifications_event_type (event_type),
                 CONSTRAINT fk_notifications_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS message_conversations (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                subject VARCHAR(160) NOT NULL,
+                permission_source VARCHAR(32) NOT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX ix_message_conversations_updated (updated_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS message_participants (
+                conversation_id INT NOT NULL,
+                user_id INT NOT NULL,
+                last_read_at DATETIME,
+                joined_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (conversation_id, user_id),
+                INDEX ix_message_participants_user (user_id),
+                CONSTRAINT fk_message_participants_conversation FOREIGN KEY (conversation_id) REFERENCES message_conversations(id) ON DELETE CASCADE,
+                CONSTRAINT fk_message_participants_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS message_posts (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                conversation_id INT NOT NULL,
+                sender_id INT NOT NULL,
+                body VARCHAR(2000) NOT NULL,
+                delivered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                read_at DATETIME,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                INDEX ix_message_posts_conversation_created (conversation_id, created_at),
+                INDEX ix_message_posts_sender (sender_id),
+                CONSTRAINT fk_message_posts_conversation FOREIGN KEY (conversation_id) REFERENCES message_conversations(id) ON DELETE CASCADE,
+                CONSTRAINT fk_message_posts_sender FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS exchange_requests (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                listing_id INT NOT NULL,
+                learner_id INT NOT NULL,
+                offered_skill_id INT DEFAULT NULL,
+                requested_message TEXT DEFAULT NULL,
+                status VARCHAR(32) NOT NULL DEFAULT 'pending',
+                decline_reason TEXT DEFAULT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                CONSTRAINT fk_exchange_requests_listing FOREIGN KEY (listing_id) REFERENCES skills(id) ON DELETE CASCADE,
+                CONSTRAINT fk_exchange_requests_learner FOREIGN KEY (learner_id) REFERENCES users(id) ON DELETE CASCADE,
+                CONSTRAINT fk_exchange_requests_offered_skill FOREIGN KEY (offered_skill_id) REFERENCES profile_skills(id) ON DELETE SET NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS exchanges (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                request_id INT NOT NULL,
+                status VARCHAR(32) NOT NULL DEFAULT 'active',
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                completed_at DATETIME DEFAULT NULL,
+                video_session_summary TEXT DEFAULT NULL,
+                CONSTRAINT fk_exchanges_request FOREIGN KEY (request_id) REFERENCES exchange_requests(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS reports (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                reporter_id INT NOT NULL,
+                reported_user_id INT NOT NULL,
+                reason VARCHAR(64) NOT NULL,
+                description TEXT DEFAULT NULL,
+                status VARCHAR(32) NOT NULL DEFAULT 'open',
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                CONSTRAINT fk_reports_reporter FOREIGN KEY (reporter_id) REFERENCES users(id) ON DELETE CASCADE,
+                CONSTRAINT fk_reports_reported_user FOREIGN KEY (reported_user_id) REFERENCES users(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """,
         ]
@@ -266,15 +351,62 @@ class Database:
             for statement in (
                 "ALTER TABLE profiles ADD COLUMN headline VARCHAR(160)",
                 "ALTER TABLE profiles ADD COLUMN bio TEXT",
+                "ALTER TABLE notifications ADD COLUMN event_type VARCHAR(40) NOT NULL DEFAULT 'general'",
+                "ALTER TABLE notifications ADD COLUMN title VARCHAR(160) NOT NULL DEFAULT ''",
+                "ALTER TABLE notifications ADD COLUMN body TEXT",
+                "ALTER TABLE notifications ADD COLUMN target_url VARCHAR(255)",
+                "ALTER TABLE notifications ADD COLUMN read_at DATETIME",
+                "ALTER TABLE notifications ADD INDEX ix_notifications_user_read_created (user_id, is_read, created_at)",
+                "ALTER TABLE notifications ADD INDEX ix_notifications_event_type (event_type)",
+                "ALTER TABLE categories ADD COLUMN slug VARCHAR(80)",
+                "ALTER TABLE categories ADD COLUMN icon VARCHAR(8) NOT NULL DEFAULT 'CAT'",
+                "ALTER TABLE categories ADD COLUMN sort_order INT NOT NULL DEFAULT 0",
+                "ALTER TABLE categories ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT TRUE",
+                "ALTER TABLE categories ADD UNIQUE KEY uq_categories_slug (slug)",
             ):
                 try:
                     db.execute(statement)
                 except pymysql.err.OperationalError as exc:
-                    if exc.args and exc.args[0] == 1060:
+                    if exc.args and exc.args[0] in {1060, 1061, 1091}:
                         continue
                     raise
+            Database._backfill_notifications(db)
+            Database._backfill_categories(db)
         finally:
             db.close()
+
+    @staticmethod
+    def _backfill_notifications(db: "Database") -> None:
+        try:
+            db.execute(
+                """
+                UPDATE notifications
+                SET body = COALESCE(NULLIF(body, ''), message, '')
+                WHERE body IS NULL OR body = ''
+                """
+            )
+            db.execute(
+                """
+                UPDATE notifications
+                SET title = COALESCE(NULLIF(title, ''), LEFT(body, 80))
+                WHERE title IS NULL OR title = ''
+                """
+            )
+        except pymysql.err.OperationalError:
+            return
+
+    @staticmethod
+    def _backfill_categories(db: "Database") -> None:
+        try:
+            db.execute(
+                """
+                UPDATE categories
+                SET slug = LOWER(REPLACE(name, ' ', '-'))
+                WHERE slug IS NULL OR slug = ''
+                """
+            )
+        except pymysql.err.OperationalError:
+            return
 
     @staticmethod
     def seed_search_listing_examples(db: "Database") -> None:

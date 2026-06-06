@@ -11,10 +11,10 @@
       {% for item in notifications %}
         <a class="list-group-item list-group-item-action border-bottom d-block py-3 {% if not item.is_read %}bg-light-subtle{% endif %}" href="{{ url_for('notifications.open_item', notification_id=item.id) }}">
           <div class="d-flex justify-content-between">
-            <strong>{{ item.title }}</strong>
+            <strong>{{ item.display_title }}</strong>
             {% if not item.is_read %}<span class="badge text-bg-danger">New</span>{% endif %}
           </div>
-          <div class="text-muted small">{{ item.body }}</div>
+          <div class="text-muted small">{{ item.display_body }}</div>
         </a>
       {% else %}
         <div class="text-muted">No notifications yet.</div>

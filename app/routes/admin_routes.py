@@ -31,8 +31,16 @@ class AdminRoutes:
         self.bp.route("/listings/<int:listing_id>/reject", methods=["POST"])(self.controller.reject_listing)
         self.bp.route("/certificates")(self.controller.certificates)
         self.bp.route("/reports")(self.controller.reports)
+        self.bp.route("/reports/<int:report_id>/resolve", methods=["POST"])(self.controller.resolve_report)
         self.bp.route("/reviews")(self.controller.reviews)
         self.bp.route("/categories", methods=["GET", "POST"])(self.controller.categories)
-        self.bp.route("/categories/<int:category_id>/edit", methods=["GET", "POST"])(self.controller.edit_category)
+        self.bp.route(
+            "/categories/<int:category_id>/edit",
+            methods=["GET", "POST"],
+        )(self.controller.edit_category)
+        self.bp.route(
+            "/categories/<int:category_id>/delete",
+            methods=["POST"],
+        )(self.controller.delete_category)
         self.bp.route("/skills", methods=["GET", "POST"])(self.controller.skills)
         return self.bp

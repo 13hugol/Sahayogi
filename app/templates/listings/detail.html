@@ -8,7 +8,12 @@
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
             <div>
-              <span class="badge text-bg-light">{{ listing.category.name }}</span>
+              {% if listing.category %}
+                <span class="category-pill mb-2">
+                  <span class="category-icon">{{ listing.category.icon or 'CAT' }}</span>
+                  {{ listing.category.name }}
+                </span>
+              {% endif %}
               <span class="badge {% if listing.exchange_type == 'credit' %}text-bg-warning{% else %}text-bg-success{% endif %}">{{ listing.exchange_type|title }}</span>
               {% if listing.user.has_verified_skill(listing.skill_id) %}<span class="badge text-bg-info">Verified skill</span>{% endif %}
               <h1 class="h2 mt-3">{{ listing.title }}</h1>

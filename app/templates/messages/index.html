@@ -2,24 +2,74 @@
 {% extends "base.html" %}
 {% block title %}Messages | Sahayogi{% endblock %}
 {% block content %}
-  <div class="section-head mb-4">
-    <div><span class="eyebrow">Communication</span><h1 class="h2 mb-0">Conversations</h1></div>
-  </div>
-  <div class="card card-shell">
-    <div class="card-body">
+  <header class="page-header">
+    <div>
+      <span class="eyebrow">Communication</span>
+      <h1 class="h2 mb-1">Messages</h1>
+      <p class="page-subtitle">Message threads open after an accepted exchange or mutual match.</p>
+    </div>
+  </header>
+
+  <div class="message-layout">
+    <aside class="table-card">
+      <div class="table-card-header">
+        <h2 class="h4 mb-0">Conversations</h2>
+      </div>
       <div class="list-group list-group-flush">
-        {% for conversation in conversations %}
-          <a class="list-group-item list-group-item-action" href="{{ url_for('messages.detail', conversation_id=conversation.id) }}">
-            <div class="d-flex justify-content-between">
-              <strong>{{ conversation.subject }}</strong>
-              <span class="small text-muted">{{ conversation.created_at.strftime('%Y-%m-%d') }}</span>
+        {% for item in conversations %}
+          {% set partner = item.other_participant(current_user.id) %}
+          <a class="list-group-item list-group-item-action {% if conversation and item.id == conversation.id %}active{% endif %}" href="{{ url_for('messages.detail', conversation_id=item.id) }}">
+            <div class="d-flex justify-content-between gap-2">
+              <strong>{{ item.subject }}</strong>
+              {% if item.unread_count %}
+                <span class="badge bg-warning text-dark">{{ item.unread_count }}</span>
+              {% endif %}
             </div>
-            <div class="small text-muted">With {{ conversation.other_participant(current_user.id).full_name if conversation.other_participant(current_user.id) else 'participant' }}</div>
+            <div class="small text-muted">With {{ partner.full_name if partner else 'participant' }}</div>
+            {% if item.last_message %}
+              <div class="small text-muted text-truncate">{{ item.last_message.body }}</div>
+            {% endif %}
           </a>
         {% else %}
-          <div class="text-muted">Messages become available after an exchange request is accepted.</div>
+          <div class="empty-state m-4">Messages become available after an exchange request is accepted or a mutual match is created.</div>
         {% endfor %}
       </div>
-    </div>
+    </aside>
+
+    <section class="card card-shell">
+      <div class="card-body">
+        {% if conversation %}
+          <div class="d-flex flex-column flex-lg-row justify-content-between gap-2 mb-3">
+            <div>
+              <span class="eyebrow">{{ conversation.permission_source.replace('_', ' ') }}</span>
+              <h2 class="h4 mb-0">{{ conversation.subject }}</h2>
+            </div>
+          </div>
+          <div class="message-thread mb-4">
+            {% for message in ordered_messages %}
+              <article class="message-bubble {% if message.sender_id == current_user.id %}mine{% endif %}">
+                <div class="small fw-bold">{{ message.sender.full_name }}</div>
+                <div>{{ message.body }}</div>
+                <div class="small text-muted mt-1">
+                  {{ message.created_at.strftime('%Y-%m-%d %H:%M') if message.created_at else '' }}
+                  {% if message.sender_id == current_user.id %}
+                    ?? {{ 'Read' if message.read_at else 'Delivered' }}
+                  {% endif %}
+                </div>
+              </article>
+            {% else %}
+              <div class="empty-state">No messages yet.</div>
+            {% endfor %}
+          </div>
+          <form method="post" action="{{ url_for('messages.detail', conversation_id=conversation.id) }}">
+            {{ form.hidden_tag() }}
+            <div class="mb-3">{{ form.body(class="form-control", rows="4", maxlength="2000", placeholder="Write your message") }}</div>
+            <button class="btn btn-accent" type="submit">Send</button>
+          </form>
+        {% else %}
+          <div class="empty-state">Select a conversation to view the full message history.</div>
+        {% endif %}
+      </div>
+    </section>
   </div>
 {% endblock %}

@@ -12,7 +12,16 @@ from werkzeug.utils import secure_filename
 
 from app.exceptions import ProfileNotFoundError
 from app.models import Profile, ProfileCertificate, ProfileReview, ProfileSkill, User
-from app.services import ProfileService, SkillService, SkillSearchService
+from app.models.notification import Notification
+from app.repositories import ExchangeRequestRepository, ExchangeRepository, SkillRepository
+from app.services import (
+    MatchService,
+    MessageService,
+    NotificationService,
+    ProfileService,
+    SkillService,
+    SkillSearchService,
+)
 from app.services.listing_catalog import (
     all_listings,
     categories,
@@ -34,10 +43,16 @@ class FrontendController(BaseController):
         profile_service: ProfileService,
         skill_service: SkillService,
         skill_search_service: SkillSearchService,
+        message_service: MessageService,
+        notification_service: NotificationService | None = None,
+        match_service: MatchService | None = None,
     ):
         self._profile_service = profile_service
         self._skill_service = skill_service
         self._skill_search_service = skill_search_service
+        self._message_service = message_service
+        self._notification_service = notification_service or NotificationService()
+        self._match_service = match_service
 
     def _get_filtered_listings(self):
         q = request.args.get("q", "").strip()
@@ -132,6 +147,8 @@ class FrontendController(BaseController):
                 abort(403)
                 
         skill_choices = [(ps.id, ps.skill_name) for ps in current_user.offered_skills]
+        if not skill_choices:
+            skill_choices = [("", "Please add offered skills to your profile first")]
         categories = self._skill_service.get_all_categories()
         category_choices = [(c.id, c.name) for c in categories]
         
@@ -274,6 +291,12 @@ class FrontendController(BaseController):
         listings = self._skill_service.get_listings_by_user(current_user.id)
         return self.render("listings/mine.html", listings=listings)
 
+    def categories_overview(self):
+        from app.repositories import CategoryRepository
+
+        categories = CategoryRepository().all_with_counts()
+        return self.render("listings/categories.html", categories=categories)
+
     def saved_listings(self):
         saved_ids = self._saved_listing_ids()
         listings = []
@@ -292,10 +315,15 @@ class FrontendController(BaseController):
         listing = self._skill_service.get_listing_by_id(listing_id)
         if not listing:
             abort(404)
+        form = RequestShellForm()
+        if current_user.is_authenticated:
+            form.offered_skill_id.choices = [
+                (skill.id, skill.skill_name) for skill in current_user.offered_skills
+            ]
         return self.render(
             "listings/detail.html",
             listing=listing,
-            request_form=RequestShellForm(),
+            request_form=form,
             saved_listing_ids=self._saved_listing_ids(),
         )
 
@@ -348,36 +376,77 @@ class FrontendController(BaseController):
 
     @login_required
     def matches(self):
-        return self.render("matches/index.html", matches=[])
+        from app.repositories import (
+            NotificationRepository,
+            ProfileRepository,
+            ProfileSkillRepository,
+            RoleRepository,
+            UserRepository,
+        )
+
+        if self._match_service is None:
+            role_repo = RoleRepository()
+            profile_repo = ProfileRepository()
+            user_repo = UserRepository(role_repository=role_repo, profile_repository=profile_repo)
+            self._match_service = MatchService(
+                user_repository=user_repo,
+                profile_skill_repository=ProfileSkillRepository(),
+                notification_repository=NotificationRepository(),
+            )
+
+        try:
+            matches = self._match_service.mutual_matches_for_user(current_user, notify=True)
+        except Exception:
+            matches = []
+        return self.render(
+            "matches/index.html",
+            matches=matches,
+            empty_state_reason=self._matches_empty_reason(current_user),
+        )
+
+    @staticmethod
+    def _matches_empty_reason(user) -> str | None:
+        if not user.offered_skills and not user.wanted_skills:
+            return "Add offered and wanted skills to your profile to generate mutual matches."
+        if not user.offered_skills:
+            return "Add at least one offered skill so others can find you as a match."
+        if not user.wanted_skills:
+            return "Add at least one wanted skill to discover people who can help."
+        return None
 
     @login_required
     def requests(self):
-        return self.render("requests/inbox.html", requests=[])
+        pending = ExchangeRequestRepository().list_incoming_pending(current_user.id)
+        history = ExchangeRequestRepository().list_incoming_history(current_user.id)
+        return self.render(
+            "requests/inbox.html",
+            pending_requests=pending,
+            history=history,
+        )
 
     @login_required
     def sent_requests(self):
-        return self.render("requests/sent.html", requests=[])
+        sent = ExchangeRequestRepository().list_sent(current_user.id)
+        return self.render("requests/sent.html", requests=sent)
 
     @login_required
     def exchanges(self):
-        return self.render("exchanges/index.html", exchanges=[])
+        exchanges_list = ExchangeRepository().list_for_user(current_user.id)
+        return self.render("exchanges/index.html", exchanges=exchanges_list)
 
     @login_required
     def exchange_detail(self, exchange_id: int):
-        exchange = SimpleNamespace(
-            id=exchange_id,
-            status="frontend-only",
-            exchange_type="credit",
-            created_at=None,
-            completed_at=None,
-            request=SimpleNamespace(credits_reserved=0),
-            barter_skill=None,
-            listing=SimpleNamespace(title="Exchange preview"),
-            teacher=SimpleNamespace(full_name="Teacher"),
-            learner=SimpleNamespace(full_name="Learner"),
-            conversation=None,
-            completion_marks=[],
-        )
+        exchange = ExchangeRepository().find_by_id(exchange_id)
+        if not exchange:
+            abort(404)
+        request_obj = exchange.request
+        if not request_obj:
+            abort(404)
+        listing = request_obj.listing
+        if not listing:
+            abort(404)
+        if current_user.id not in [request_obj.learner_id, listing.user_id]:
+            abort(403)
         return self.render(
             "exchanges/detail.html",
             exchange=exchange,
@@ -387,18 +456,167 @@ class FrontendController(BaseController):
         )
 
     @login_required
+    def create_request(self, listing_id: int):
+        listing = SkillRepository().find_by_id(listing_id)
+        if not listing:
+            abort(404)
+        if current_user.id == listing.user_id:
+            flash("You cannot request your own listing.", "danger")
+            return redirect(url_for("listings.detail", listing_id=listing_id))
+        
+        if listing.exchange_type == "credit":
+            if current_user.available_credit_balance < listing.credit_cost:
+                flash("Your available credit balance is insufficient to request this skill.", "danger")
+                return redirect(url_for("listings.detail", listing_id=listing_id))
+        
+        offered_skill_id = request.form.get("offered_skill_id")
+        if offered_skill_id:
+            offered_skill_id = int(offered_skill_id)
+        else:
+            offered_skill_id = None
+            
+        requested_message = request.form.get("requested_message", "").strip() or None
+        
+        ExchangeRequestRepository().create(
+            listing_id=listing_id,
+            learner_id=current_user.id,
+            offered_skill_id=offered_skill_id,
+            requested_message=requested_message,
+        )
+        self._notification_service.notify_exchange_request(
+            user_id=listing.user_id,
+            requester_name=current_user.full_name,
+            skill_title=listing.title,
+            target_url="/requests/inbox",
+        )
+        flash("Your request has been submitted.", "success")
+        return redirect(url_for("requests_bp.sent"))
+
+    @login_required
+    def accept_request(self, request_id: int):
+        request_obj = ExchangeRequestRepository().find_by_id(request_id)
+        if not request_obj:
+            abort(404)
+        listing = request_obj.listing
+        if not listing:
+            abort(404)
+        if current_user.id != listing.user_id:
+            abort(403)
+        if request_obj.status != "pending":
+            return redirect(url_for("requests_bp.inbox"))
+            
+        ExchangeRequestRepository().update_status(request_id, "accepted")
+        ExchangeRepository().create(request_id=request_id)
+        
+        self._message_service.create_conversation(
+            subject=f"Exchange: {listing.title}",
+            permission_source="accepted_exchange",
+            participant_ids=[listing.user_id, request_obj.learner_id],
+        )
+
+        self._notification_service.notify_request_accepted(
+            user_id=request_obj.learner_id,
+            skill_title=listing.title,
+            target_url="/requests/inbox",
+        )
+
+        flash("Request accepted and exchange created.", "success")
+        return redirect(url_for("requests_bp.inbox"))
+
+    @login_required
+    def decline_request(self, request_id: int):
+        request_obj = ExchangeRequestRepository().find_by_id(request_id)
+        if not request_obj:
+            abort(404)
+        listing = request_obj.listing
+        if not listing:
+            abort(404)
+        if current_user.id != listing.user_id:
+            abort(403)
+        if request_obj.status != "pending":
+            return redirect(url_for("requests_bp.inbox"))
+            
+        decline_reason = request.form.get("decline_reason", "").strip() or None
+        ExchangeRequestRepository().update_status(request_id, "declined", decline_reason=decline_reason)
+
+        self._notification_service.notify_request_declined(
+            user_id=request_obj.learner_id,
+            skill_title=listing.title,
+            reason=decline_reason,
+            target_url="/requests/inbox",
+        )
+
+        flash("Request declined.", "warning")
+        return redirect(url_for("requests_bp.inbox"))
+
+    @login_required
+    def cancel_request(self, request_id: int):
+        request_obj = ExchangeRequestRepository().find_by_id(request_id)
+        if not request_obj:
+            abort(404)
+        if current_user.id != request_obj.learner_id:
+            abort(403)
+        if request_obj.status != "pending":
+            return redirect(url_for("requests_bp.sent"))
+            
+        ExchangeRequestRepository().update_status(request_id, "cancelled")
+        
+        flash("Request cancelled.", "info")
+        return redirect(url_for("requests_bp.sent"))
+
+    @login_required
     def messages(self):
-        return self.render("messages/index.html", conversations=[])
+        conversations = self._message_service.list_conversations(current_user.id)
+        active_conversation = conversations[0] if conversations else None
+        ordered_messages = []
+        if active_conversation:
+            active_conversation = self._message_service.get_conversation(active_conversation.id, current_user.id)
+            if active_conversation:
+                self._message_service.mark_read(
+                    conversation_id=active_conversation.id,
+                    user_id=current_user.id,
+                )
+                conversations = self._message_service.list_conversations(current_user.id)
+                ordered_messages = active_conversation.messages
+        return self.render(
+            "messages/index.html",
+            conversations=conversations,
+            conversation=active_conversation,
+            ordered_messages=ordered_messages,
+            form=MessageShellForm(),
+        )
 
     @login_required
     def conversation(self, conversation_id: int):
-        conversation = SimpleNamespace(
-            id=conversation_id,
-            subject="Conversation preview",
-            messages=[],
-            other_participant=lambda _user_id: SimpleNamespace(full_name="Exchange partner"),
+        conversation = self._message_service.get_conversation(conversation_id, current_user.id)
+        if not conversation:
+            abort(404)
+        if request.method == "POST":
+            body = request.form.get("body", "")
+            try:
+                self._message_service.send_message(
+                    conversation_id=conversation_id,
+                    sender_id=current_user.id,
+                    body=body,
+                )
+            except ValueError as exc:
+                flash(str(exc), "danger")
+            except PermissionError:
+                abort(403)
+            else:
+                flash("Message sent.", "success")
+                return redirect(url_for("messages.detail", conversation_id=conversation_id))
+
+        self._message_service.mark_read(conversation_id=conversation_id, user_id=current_user.id)
+        conversation = self._message_service.get_conversation(conversation_id, current_user.id)
+        conversations = self._message_service.list_conversations(current_user.id)
+        return self.render(
+            "messages/detail.html",
+            conversation=conversation,
+            conversations=conversations,
+            ordered_messages=conversation.messages,
+            form=MessageShellForm(),
         )
-        return self.render("messages/detail.html", conversation=conversation, form=MessageShellForm())
 
     @login_required
     def notifications(self):
@@ -406,9 +624,32 @@ class FrontendController(BaseController):
 
     @login_required
     def notification_counts(self):
-        from app.models.notification import Notification
-        unread = Notification.get_unread_count(current_user.id)
-        return jsonify({"messages": 0, "notifications": unread})
+        return jsonify(
+            {
+                "messages": 0,
+                "notifications": self._notification_service.unread_count(current_user.id),
+            }
+        )
+
+    @login_required
+    def mark_all_notifications_read(self):
+        updated = self._notification_service.mark_all_read(current_user.id)
+        if updated:
+            flash(f"{updated} notification{'s' if updated != 1 else ''} marked as read.", "success")
+        else:
+            flash("No unread notifications to mark.", "info")
+        return redirect(url_for("notifications.index"))
+
+    @login_required
+    def open_notification(self, notification_id: int):
+        notification = self._notification_service.mark_read(current_user.id, notification_id)
+        if not notification:
+            flash("Notification not found.", "warning")
+            return redirect(url_for("notifications.index"))
+        target_url = notification.target_url or url_for("notifications.index")
+        if not target_url.startswith("/") or target_url.startswith("//"):
+            target_url = url_for("notifications.index")
+        return redirect(target_url)
 
     @login_required
     def profile_me(self):
@@ -552,8 +793,47 @@ class FrontendController(BaseController):
             report_form=ReportShellForm(),
         )
 
+    @login_required
     def report_user(self, user_id: int):
-        return self.profile_view(user_id)
+        target_user = User.find_by_id(user_id)
+        if not target_user:
+            abort(404)
+        if target_user.id == current_user.id:
+            flash("You cannot report yourself.", "danger")
+            return redirect(url_for("profile.view", user_id=user_id))
+
+        if request.method == "POST":
+            from app.repositories import ReportRepository
+            report_repo = ReportRepository()
+            if report_repo.has_recent_report(current_user.id, target_user.id, within_days=7):
+                flash("You cannot submit duplicate reports against the same user within a 7-day window.", "danger")
+                return redirect(url_for("profile.view", user_id=user_id))
+
+            reason = request.form.get("reason", "").strip()
+            description = request.form.get("description", "").strip() or None
+
+            valid_reasons = {"spam", "harassment", "fake_profile", "fraud", "other"}
+            if not reason or reason not in valid_reasons:
+                flash("Invalid report reason selected.", "danger")
+                return redirect(url_for("profile.view", user_id=user_id))
+
+            report_repo.create(
+                reporter_id=current_user.id,
+                reported_user_id=target_user.id,
+                reason=reason,
+                description=description,
+            )
+
+            self._notification_service.notify_report_received(
+                user_id=current_user.id,
+                reported_name=target_user.full_name,
+                target_url=url_for("profile.view", user_id=user_id),
+            )
+
+            flash("Your report has been submitted to the admin review team.", "success")
+            return redirect(url_for("profile.view", user_id=user_id))
+
+        return redirect(url_for("profile.view", user_id=user_id))
 
     def top_rated(self):
         return self.render("reviews/top_rated.html", profiles=self._profile_service.get_top_rated_profiles())
@@ -782,6 +1062,16 @@ class MessageShellForm(ShellForm):
 
 class ReportShellForm(ShellForm):
     fields = {"reason": "select", "description": "textarea", "submit": "submit"}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.reason.choices = [
+            ("spam", "Spam"),
+            ("harassment", "Harassment"),
+            ("fake_profile", "Fake Profile"),
+            ("fraud", "Fraud"),
+            ("other", "Other"),
+        ]
 
 
 class ReviewShellForm(ShellForm):

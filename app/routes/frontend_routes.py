@@ -12,8 +12,15 @@ from ..repositories import (
     UserRepository,
     CategoryRepository,
     SkillRepository,
+    MessageRepository,
 )
-from ..services import ProfileService, SkillService, SkillSearchService
+from ..services import (
+    MessageService,
+    NotificationService,
+    ProfileService,
+    SkillService,
+    SkillSearchService,
+)
 
 
 class FrontendRoutes:
@@ -38,11 +45,16 @@ class FrontendRoutes:
             skill_search_service=SkillSearchService(
                 SkillSearchRepository(),
             ),
+            message_service=MessageService(
+                MessageRepository(),
+            ),
+            notification_service=NotificationService(),
         )
 
     def register(self):
         listings = Blueprint("listings", __name__, url_prefix="/listings")
         listings.route("/", endpoint="index")(self.controller.marketplace)
+        listings.route("/categories", endpoint="categories")(self.controller.categories_overview)
         listings.route("/api/search", endpoint="api_search")(self.controller.api_search)
         listings.route("/create", methods=["GET", "POST"], endpoint="create")(self.controller.post_listing)
         listings.route("/mine", endpoint="mine")(self.controller.my_listings)
@@ -62,10 +74,10 @@ class FrontendRoutes:
         requests_bp = Blueprint("requests_bp", __name__, url_prefix="/requests")
         requests_bp.route("/inbox", endpoint="inbox")(self.controller.requests)
         requests_bp.route("/sent", endpoint="sent")(self.controller.sent_requests)
-        requests_bp.route("/create/<int:listing_id>", methods=["POST"], endpoint="create")(self.controller.frontend_only_action)
-        requests_bp.route("/<int:request_id>/accept", methods=["POST"], endpoint="accept")(self.controller.frontend_only_action)
-        requests_bp.route("/<int:request_id>/decline", methods=["POST"], endpoint="decline")(self.controller.frontend_only_action)
-        requests_bp.route("/<int:request_id>/cancel", methods=["POST"], endpoint="cancel")(self.controller.frontend_only_action)
+        requests_bp.route("/create/<int:listing_id>", methods=["POST"], endpoint="create")(self.controller.create_request)
+        requests_bp.route("/<int:request_id>/accept", methods=["POST"], endpoint="accept")(self.controller.accept_request)
+        requests_bp.route("/<int:request_id>/decline", methods=["POST"], endpoint="decline")(self.controller.decline_request)
+        requests_bp.route("/<int:request_id>/cancel", methods=["POST"], endpoint="cancel")(self.controller.cancel_request)
 
         exchanges = Blueprint("exchanges", __name__, url_prefix="/exchanges")
         exchanges.route("/", endpoint="index")(self.controller.exchanges)
@@ -74,13 +86,21 @@ class FrontendRoutes:
 
         messages = Blueprint("messages", __name__, url_prefix="/messages")
         messages.route("/", endpoint="index")(self.controller.messages)
-        messages.route("/<int:conversation_id>", endpoint="detail")(self.controller.conversation)
+        messages.route("/<int:conversation_id>", methods=["GET", "POST"], endpoint="detail")(self.controller.conversation)
 
         notifications = Blueprint("notifications", __name__, url_prefix="/notifications")
         notifications.route("/", endpoint="index")(self.controller.notifications)
         notifications.route("/counts", endpoint="counts")(self.controller.notification_counts)
-        notifications.route("/mark-all-read", methods=["POST"], endpoint="mark_all_read")(self.controller.frontend_only_action)
-        notifications.route("/<int:notification_id>", endpoint="open_item")(self.controller.frontend_only_action)
+        notifications.route(
+            "/mark-all-read",
+            methods=["POST"],
+            endpoint="mark_all_read",
+        )(self.controller.mark_all_notifications_read)
+        notifications.route(
+            "/<int:notification_id>",
+            methods=["GET", "POST"],
+            endpoint="open_item",
+        )(self.controller.open_notification)
 
         profile = Blueprint("profile", __name__)
         profile.route("/profile/me", endpoint="me")(self.controller.profile_me)
