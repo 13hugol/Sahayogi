@@ -147,3 +147,16 @@ class NotificationRepository(BaseRepository):
                 except (TypeError, ValueError):
                     continue
         return sorted(ids)
+
+    def message_exists(self, user_id: int, body: str) -> bool:
+        with self._db() as db:
+            row = db.fetch_one(
+                """
+                SELECT 1
+                FROM notifications
+                WHERE user_id = %s AND body = %s
+                LIMIT 1
+                """,
+                (user_id, body),
+            )
+        return row is not None

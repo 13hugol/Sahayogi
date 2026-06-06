@@ -15,6 +15,7 @@ from app.models import Profile, ProfileCertificate, ProfileReview, ProfileSkill,
 from app.models.notification import Notification
 from app.repositories import ExchangeRequestRepository, ExchangeRepository, SkillRepository
 from app.services import (
+    MatchService,
     MessageService,
     NotificationService,
     ProfileService,
@@ -44,12 +45,14 @@ class FrontendController(BaseController):
         skill_search_service: SkillSearchService,
         message_service: MessageService,
         notification_service: NotificationService | None = None,
+        match_service: MatchService | None = None,
     ):
         self._profile_service = profile_service
         self._skill_service = skill_service
         self._skill_search_service = skill_search_service
         self._message_service = message_service
         self._notification_service = notification_service or NotificationService()
+        self._match_service = match_service
 
     def _get_filtered_listings(self):
         q = request.args.get("q", "").strip()
@@ -373,7 +376,43 @@ class FrontendController(BaseController):
 
     @login_required
     def matches(self):
-        return self.render("matches/index.html", matches=[])
+        from app.repositories import (
+            NotificationRepository,
+            ProfileRepository,
+            ProfileSkillRepository,
+            RoleRepository,
+            UserRepository,
+        )
+
+        if self._match_service is None:
+            role_repo = RoleRepository()
+            profile_repo = ProfileRepository()
+            user_repo = UserRepository(role_repository=role_repo, profile_repository=profile_repo)
+            self._match_service = MatchService(
+                user_repository=user_repo,
+                profile_skill_repository=ProfileSkillRepository(),
+                notification_repository=NotificationRepository(),
+            )
+
+        try:
+            matches = self._match_service.mutual_matches_for_user(current_user, notify=True)
+        except Exception:
+            matches = []
+        return self.render(
+            "matches/index.html",
+            matches=matches,
+            empty_state_reason=self._matches_empty_reason(current_user),
+        )
+
+    @staticmethod
+    def _matches_empty_reason(user) -> str | None:
+        if not user.offered_skills and not user.wanted_skills:
+            return "Add offered and wanted skills to your profile to generate mutual matches."
+        if not user.offered_skills:
+            return "Add at least one offered skill so others can find you as a match."
+        if not user.wanted_skills:
+            return "Add at least one wanted skill to discover people who can help."
+        return None
 
     @login_required
     def requests(self):

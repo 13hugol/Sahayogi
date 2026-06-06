@@ -72,3 +72,22 @@ class TopRatedProfile:
     review_count: int
     completed_exchange_count: int
 
+
+@dataclass(frozen=True)
+class MutualSkillMatch:
+    user: User
+    my_offers_they_want: tuple[str, ...]
+    their_offers_i_want: tuple[str, ...]
+    relevance_score: int
+    is_new: bool = False
+
+    @property
+    def summary(self) -> str:
+        offer = ", ".join(self.my_offers_they_want) or "your skills"
+        want = ", ".join(self.their_offers_i_want) or "their skills"
+        return f"You can help with {offer}. They can help with {want}."
+
+    @property
+    def overlap_count(self) -> int:
+        return len(self.my_offers_they_want) + len(self.their_offers_i_want)
+
