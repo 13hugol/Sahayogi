@@ -103,7 +103,10 @@ def test_create_request_validation_and_success(app, client, login, setup_listing
         # Verify notification was sent to teacher
         unread_notifs = Notification.get_unread_notifications(setup_listing["teacher"].id)
         assert len(unread_notifs) == 1
-        assert "New exchange request" in unread_notifs[0].message
+        notification = unread_notifs[0]
+        assert notification.event_type == "exchange_request"
+        assert notification.title == "New exchange request"
+        assert "Guitar for Beginners" in notification.body
 
 
 def test_requests_inbox_and_sent_views(app, client, login, setup_listing):
