@@ -2,7 +2,14 @@ from __future__ import annotations
 
 from app.dto import DashboardStats
 from app.enums import UserRole
-from app.exceptions import InvalidRoleError, SelfRoleChangeError, UserNotFoundError
+from app.exceptions import (
+    CategoryInUseError,
+    CategoryNotFoundError,
+    DuplicateCategoryError,
+    InvalidRoleError,
+    SelfRoleChangeError,
+    UserNotFoundError,
+)
 from app.repositories import AdminAuditRepository, RoleRepository, UserRepository
 
 
@@ -13,12 +20,22 @@ class AdminService:
         role_repository: RoleRepository,
         audit_repository: AdminAuditRepository,
         skill_repository=None,
+        category_repository=None,
+        notification_service=None,
     ):
         self._user_repository = user_repository
         self._role_repository = role_repository
         self._audit_repository = audit_repository
-        from app.repositories import SkillRepository
+        from app.repositories import CategoryRepository, SkillRepository
+
         self._skill_repository = skill_repository or SkillRepository()
+        self._category_repository = category_repository or CategoryRepository()
+        if notification_service is None:
+            from app.services import NotificationService
+
+            self._notification_service = NotificationService()
+        else:
+            self._notification_service = notification_service
 
     def dashboard_stats(self) -> DashboardStats:
         return DashboardStats(
@@ -133,12 +150,12 @@ class AdminService:
         report = report_repo.find_by_id(report_id)
         if not report:
             return None
-        
+
         # update status
         status = "resolved" if decision == "resolved" else "dismissed"
         report_repo.update_status(report_id, status)
         report.status = status
-        
+
         # audit log
         self._audit_repository.create(
             admin_id=admin_user.id,
@@ -148,4 +165,88 @@ class AdminService:
             detail=f"Report against {report.reported_user.full_name if report.reported_user else 'Unknown'} marked as {status} by admin {admin_user.email}",
         )
         return report
+
+    def list_categories(self):
+        return self._category_repository.all_with_counts()
+
+    def find_category(self, category_id: int):
+        return self._category_repository.find_by_id(category_id)
+
+    def create_category(
+        self,
+        admin_user,
+        *,
+        name: str,
+        description: str | None = None,
+        icon: str = "CAT",
+        sort_order: int = 0,
+    ):
+        clean_name = (name or "").strip()
+        if not clean_name:
+            raise ValueError("Category name is required.")
+        if self._category_repository.find_by_name(clean_name):
+            raise DuplicateCategoryError(clean_name)
+        category = self._category_repository.create(
+            name=clean_name,
+            description=(description or None),
+            icon=icon or "CAT",
+            sort_order=sort_order,
+            is_active=True,
+        )
+        self._audit_repository.create(
+            admin_id=admin_user.id,
+            action="create_category",
+            target_type="Category",
+            target_id=category.id,
+            detail=f"Category '{category.name}' created by admin {admin_user.email}",
+        )
+        return category
+
+    def update_category(
+        self,
+        admin_user,
+        category_id: int,
+        *,
+        name: str | None = None,
+        description: str | None = None,
+        icon: str | None = None,
+        sort_order: int | None = None,
+        is_active: bool | None = None,
+    ):
+        existing = self._category_repository.find_by_id(category_id)
+        if not existing:
+            raise CategoryNotFoundError(category_id)
+        updated = self._category_repository.update(
+            category_id,
+            name=name,
+            description=description,
+            icon=icon,
+            sort_order=sort_order,
+            is_active=is_active,
+        )
+        self._audit_repository.create(
+            admin_id=admin_user.id,
+            action="update_category",
+            target_type="Category",
+            target_id=category_id,
+            detail=f"Category '{updated.name if updated else existing.name}' updated by admin {admin_user.email}",
+        )
+        return updated
+
+    def delete_category(self, admin_user, category_id: int):
+        existing = self._category_repository.find_by_id(category_id)
+        if not existing:
+            raise CategoryNotFoundError(category_id)
+        try:
+            self._category_repository.delete(category_id)
+        except CategoryInUseError:
+            raise
+        self._audit_repository.create(
+            admin_id=admin_user.id,
+            action="delete_category",
+            target_type="Category",
+            target_id=category_id,
+            detail=f"Category '{existing.name}' deleted by admin {admin_user.email}",
+        )
+        return True
 

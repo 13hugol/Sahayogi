@@ -288,6 +288,12 @@ class FrontendController(BaseController):
         listings = self._skill_service.get_listings_by_user(current_user.id)
         return self.render("listings/mine.html", listings=listings)
 
+    def categories_overview(self):
+        from app.repositories import CategoryRepository
+
+        categories = CategoryRepository().all_with_counts()
+        return self.render("listings/categories.html", categories=categories)
+
     def saved_listings(self):
         saved_ids = self._saved_listing_ids()
         listings = []

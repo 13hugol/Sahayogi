@@ -7,11 +7,24 @@ from types import SimpleNamespace
 from .base_model import BaseModel
 
 
+def _slugify(value: str) -> str:
+    cleaned = "".join(ch.lower() if ch.isalnum() else "-" for ch in value.strip())
+    while "--" in cleaned:
+        cleaned = cleaned.replace("--", "-")
+    return cleaned.strip("-") or "category"
+
+
 @dataclass
 class Category(BaseModel):
     id: int
     name: str
     description: str | None = None
+    slug: str | None = None
+    icon: str = "CAT"
+    sort_order: int = 0
+    is_active: bool = True
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
     @classmethod
     def from_row(cls, row: dict | None) -> Category | None:
@@ -21,6 +34,12 @@ class Category(BaseModel):
             id=row["id"],
             name=row["name"],
             description=row.get("description"),
+            slug=row.get("slug") or _slugify(row["name"]),
+            icon=row.get("icon") or "CAT",
+            sort_order=int(row.get("sort_order") or 0),
+            is_active=bool(row.get("is_active", True)),
+            created_at=row.get("created_at"),
+            updated_at=row.get("updated_at"),
         )
 
     @classmethod
@@ -34,6 +53,12 @@ class Category(BaseModel):
         from app.repositories import CategoryRepository
 
         return CategoryRepository().find_by_name(name)
+
+    @classmethod
+    def find_by_slug(cls, slug: str) -> Category | None:
+        from app.repositories import CategoryRepository
+
+        return CategoryRepository().find_by_slug(slug)
 
     @classmethod
     def all(cls) -> list[Category]:
