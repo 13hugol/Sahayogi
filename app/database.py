@@ -104,6 +104,8 @@ class Database:
                 verification_token VARCHAR(255),
                 verification_token_expires DATETIME,
                 status VARCHAR(32) NOT NULL DEFAULT 'active',
+                suspended_until DATETIME,
+                suspension_reason TEXT,
                 failed_login_count INT NOT NULL DEFAULT 0,
                 locked_until DATETIME,
                 role_id INT NOT NULL,
@@ -363,6 +365,8 @@ class Database:
                 "ALTER TABLE categories ADD COLUMN sort_order INT NOT NULL DEFAULT 0",
                 "ALTER TABLE categories ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT TRUE",
                 "ALTER TABLE categories ADD UNIQUE KEY uq_categories_slug (slug)",
+                "ALTER TABLE users ADD COLUMN suspended_until DATETIME",
+                "ALTER TABLE users ADD COLUMN suspension_reason TEXT",
             ):
                 try:
                     db.execute(statement)
