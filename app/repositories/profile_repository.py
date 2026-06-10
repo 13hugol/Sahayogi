@@ -228,5 +228,36 @@ class ProfileReviewRepository(BaseRepository):
                 (reviewee_user_id, reviewer_id, reviewer_name.strip(), rating, comment),
             )
             row = db.fetch_one("SELECT * FROM profile_reviews WHERE id = %s", (review_id,))
+        self.update_cached_score(reviewee_user_id)
         return ProfileReview.from_row(row)
+
+    def get_reputation_score(self, user_id: int) -> dict:
+        with self._db() as db:
+            row = db.fetch_one(
+                """
+                SELECT
+                    COUNT(*)                      AS review_count,
+                    ROUND(AVG(rating), 1)         AS avg_score
+                FROM profile_reviews
+                WHERE reviewee_user_id = %s
+                """,
+                (user_id,)
+            )
+        count = row["review_count"] if row else 0
+        score = float(row["avg_score"]) if row and row["avg_score"] and count >= 3 else None
+        return {"score": score, "count": count}
+
+    def update_cached_score(self, user_id: int) -> None:
+        data = self.get_reputation_score(user_id)
+        with self._db() as db:
+            db.execute(
+                """
+                UPDATE profiles
+                SET reputation_score  = %s,
+                    review_count      = %s,
+                    score_updated_at  = NOW()
+                WHERE user_id = %s
+                """,
+                (data["score"], data["count"], user_id)
+            )
 
