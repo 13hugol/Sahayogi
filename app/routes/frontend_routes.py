@@ -4,6 +4,7 @@ from flask import Blueprint
 
 from ..controllers.frontend_controller import FrontendController
 from ..repositories import (
+    ExchangeHistoryRepository,
     ProfileCertificateRepository,
     NotificationRepository,
     ProfileRepository,
@@ -12,7 +13,7 @@ from ..repositories import (
     SkillSearchRepository,
     UserRepository,
 )
-from ..services import NotificationService, ProfileService, SkillSearchService
+from ..services import ExchangeHistoryService, NotificationService, ProfileService, SkillSearchService
 
 
 class FrontendRoutes:
@@ -32,6 +33,7 @@ class FrontendRoutes:
             ),
             SkillSearchService(SkillSearchRepository()),
             NotificationService(NotificationRepository()),
+            ExchangeHistoryService(ExchangeHistoryRepository()),
         )
 
     def register(self):

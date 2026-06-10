@@ -3,14 +3,17 @@ from __future__ import annotations
 from flask import Blueprint
 
 from ..controllers.main_controller import MainController
-from ..repositories import NotificationRepository
-from ..services import NotificationService
+from ..repositories import ExchangeHistoryRepository, NotificationRepository
+from ..services import ExchangeHistoryService, NotificationService
 
 
 class MainRoutes:
     def __init__(self):
         self.bp = Blueprint("main", __name__)
-        self.controller = MainController(NotificationService(NotificationRepository()))
+        self.controller = MainController(
+            NotificationService(NotificationRepository()),
+            ExchangeHistoryService(ExchangeHistoryRepository()),
+        )
 
     def register(self):
         self.bp.route("/")(self.controller.home)

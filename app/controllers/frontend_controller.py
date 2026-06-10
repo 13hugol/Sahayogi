@@ -7,7 +7,7 @@ from flask_login import current_user, login_required
 from markupsafe import Markup, escape
 
 from app.exceptions import ProfileNotFoundError
-from app.services import NotificationService, ProfileService, SkillSearchService
+from app.services import ExchangeHistoryService, NotificationService, ProfileService, SkillSearchService
 
 from .base_controller import BaseController
 
@@ -18,10 +18,12 @@ class FrontendController(BaseController):
         profile_service: ProfileService,
         skill_search_service: SkillSearchService,
         notification_service: NotificationService,
+        exchange_history_service: ExchangeHistoryService,
     ):
         self._profile_service = profile_service
         self._skill_search_service = skill_search_service
         self._notification_service = notification_service
+        self._exchange_history_service = exchange_history_service
 
     def _categories(self):
         return [
@@ -104,10 +106,31 @@ class FrontendController(BaseController):
 
     @login_required
     def exchanges(self):
-        return self.render("exchanges/index.html", exchanges=[])
+        history_query = self._exchange_history_service.build_query(
+            status=request.args.get("status"),
+            start_date=request.args.get("start_date"),
+            end_date=request.args.get("end_date"),
+        )
+        return self.render(
+            "exchanges/index.html",
+            exchanges=self._exchange_history_service.list_for_user(current_user.id, query=history_query),
+            selected_status=history_query.status or "",
+            status_options=self._exchange_history_service.status_options(),
+            start_date_value=history_query.start_date_value,
+            end_date_value=history_query.end_date_value,
+        )
 
     @login_required
     def exchange_detail(self, exchange_id: int):
+        history_item = self._exchange_history_service.find_for_user(current_user.id, exchange_id)
+        if history_item:
+            return self.render(
+                "exchanges/detail.html",
+                exchange=history_item,
+                can_mark_complete=False,
+                can_review=history_item.can_review,
+                reviews=[],
+            )
         exchange = SimpleNamespace(
             id=exchange_id,
             status="frontend-only",
