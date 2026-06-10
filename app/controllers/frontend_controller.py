@@ -372,7 +372,11 @@ class FrontendController(BaseController):
 
     @login_required
     def wallet(self):
-        return self.render("credits/ledger.html", entries=[], holds=[])
+        from app.repositories.credit_repository import CreditRepository
+        credit_repo = CreditRepository()
+        entries = credit_repo.get_history_for_user(current_user.id)
+        holds = credit_repo.get_active_holds_for_user(current_user.id)
+        return self.render("credits/ledger.html", entries=entries, holds=holds)
 
     @login_required
     def matches(self):
