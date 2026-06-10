@@ -30,7 +30,8 @@ class ProfileRepository(BaseRepository):
                     u.full_name AS name,
                     p.avatar_path AS avatar,
                     p.location,
-                    p.reputation_score
+                    p.reputation_score,
+                    p.review_count
                 FROM users u
                 JOIN profiles p ON u.id = p.user_id
                 WHERE u.id != %s AND u.status = 'active'
