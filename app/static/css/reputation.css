@@ -1,0 +1,12 @@
+.star { color: #ccc; font-size: 1.1rem; }
+.star.filled { color: #f5a623; }
+.star-mini { color: #ccc; font-size: 0.9rem; }
+.star-mini.filled { color: #f5a623; }
+.tier-badge { border-radius: 4px; padding: 2px 6px; font-size: 0.75rem; font-weight: 600; margin-left: 0.25rem; }
+.tier-trusted { background: #d4edda; color: #155724; }
+.tier-top-rated { background: #fff3cd; color: #856404; }
+.tier-member { background: #e2e3e5; color: #383d41; }
+.tier-new-member { background: #e2e3e5; color: #383d41; }
+.new-member-label { color: #6c757d; font-style: italic; }
+.new-member-label-sm { font-size: 0.75rem; }
+.score-tooltip { cursor: help; margin-left: 0.25rem; font-size: 0.85rem; color: #6c757d; }

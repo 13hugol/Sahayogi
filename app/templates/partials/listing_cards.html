@@ -21,7 +21,15 @@
             <p class="flex-grow-1">{{ listing.description[:160] }}{% if listing.description|length > 160 %}...{% endif %}</p>
             <div class="listing-meta mb-3">
               <div>Location: {{ listing.location_text or listing.user.profile.location or "Flexible" }}{% if listing.distance is defined and listing.distance is not none %} ({{ listing.distance|round(1) }} km away){% endif %}</div>
-              <div>Reputation: {{ listing.user.profile.reputation_score }} / 5</div>
+              <div class="listing-card-score mt-1 mb-1">
+                {% if listing.user.profile.reputation_score %}
+                  <span class="star-mini filled">★</span>
+                  <span>{{ listing.user.profile.reputation_score }}</span>
+                  <span class="text-muted small">({{ listing.user.profile.review_count }})</span>
+                {% else %}
+                  <span class="new-member-label-sm badge text-bg-secondary">New</span>
+                {% endif %}
+              </div>
               <div>Status: {{ listing.status|title }}</div>
               {% if listing.exchange_type == "credit" %}
                 <div>Credits: {{ listing.min_credits }}</div>
