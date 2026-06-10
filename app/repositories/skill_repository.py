@@ -284,3 +284,10 @@ class SkillRepository(BaseRepository):
         with self._db() as db:
             rows = db.fetch_all(sql, params)
         return [s for row in rows if (s := Skill.from_row(row))]
+
+    def deactivate_all_for_user(self, user_id: int) -> None:
+        with self._db() as db:
+            db.execute(
+                "UPDATE skills SET status = 'deactivated' WHERE user_id = %s",
+                (user_id,),
+            )
