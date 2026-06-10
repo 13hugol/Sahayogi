@@ -15,6 +15,7 @@ from .message_repository import MessageRepository
 from .exchange_request_repository import ExchangeRequestRepository
 from .exchange_repository import ExchangeRepository
 from .report_repository import ReportRepository
+from .credit_repository import CreditRepository
 
 __all__ = [
     "AdminAuditRepository",
@@ -33,4 +34,5 @@ __all__ = [
     "ExchangeRequestRepository",
     "ExchangeRepository",
     "ReportRepository",
+    "CreditRepository",
 ]

@@ -9,6 +9,7 @@ from .message import MessageConversation, MessagePost
 from .exchange_request import ExchangeRequest
 from .exchange import Exchange
 from .report import Report
+from .credit_transaction import CreditTransaction, CreditHold
 
 __all__ = [
     "AdminAuditLog",
@@ -28,4 +29,6 @@ __all__ = [
     "ExchangeRequest",
     "Exchange",
     "Report",
+    "CreditTransaction",
+    "CreditHold",
 ]

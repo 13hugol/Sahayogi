@@ -477,12 +477,16 @@ class FrontendController(BaseController):
             
         requested_message = request.form.get("requested_message", "").strip() or None
         
-        ExchangeRequestRepository().create(
+        request_obj = ExchangeRequestRepository().create(
             listing_id=listing_id,
             learner_id=current_user.id,
             offered_skill_id=offered_skill_id,
             requested_message=requested_message,
         )
+        if listing.exchange_type == "credit":
+            from app.repositories.credit_repository import CreditRepository
+            CreditRepository().create_hold(current_user.id, request_obj.id, listing.credit_cost)
+            
         self._notification_service.notify_exchange_request(
             user_id=listing.user_id,
             requester_name=current_user.full_name,
@@ -538,6 +542,9 @@ class FrontendController(BaseController):
             
         decline_reason = request.form.get("decline_reason", "").strip() or None
         ExchangeRequestRepository().update_status(request_id, "declined", decline_reason=decline_reason)
+        if listing.exchange_type == "credit":
+            from app.repositories.credit_repository import CreditRepository
+            CreditRepository().release_hold(request_id)
 
         self._notification_service.notify_request_declined(
             user_id=request_obj.learner_id,
@@ -560,6 +567,8 @@ class FrontendController(BaseController):
             return redirect(url_for("requests_bp.sent"))
             
         ExchangeRequestRepository().update_status(request_id, "cancelled")
+        from app.repositories.credit_repository import CreditRepository
+        CreditRepository().release_hold(request_id)
         
         flash("Request cancelled.", "info")
         return redirect(url_for("requests_bp.sent"))
