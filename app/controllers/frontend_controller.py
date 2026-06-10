@@ -447,13 +447,75 @@ class FrontendController(BaseController):
             abort(404)
         if current_user.id not in [request_obj.learner_id, listing.user_id]:
             abort(403)
+        can_mark_complete = (exchange.status == "active")
+        can_review = (exchange.status == "completed")
         return self.render(
             "exchanges/detail.html",
             exchange=exchange,
-            can_mark_complete=False,
-            can_review=False,
+            can_mark_complete=can_mark_complete,
+            can_review=can_review,
             reviews=[],
         )
+
+    @login_required
+    def mark_complete(self, exchange_id: int):
+        exchange = ExchangeRepository().find_by_id(exchange_id)
+        if not exchange:
+            abort(404)
+        request_obj = exchange.request
+        if not request_obj:
+            abort(404)
+        listing = request_obj.listing
+        if not listing:
+            abort(404)
+        if current_user.id not in [request_obj.learner_id, listing.user_id]:
+            abort(403)
+        if exchange.status != "active":
+            flash("This exchange is not active.", "warning")
+            return redirect(url_for("exchanges.detail", exchange_id=exchange_id))
+
+        from datetime import datetime
+        completed_at = datetime.utcnow()
+        from app.database import Database
+        from app.repositories.credit_repository import CreditRepository
+
+        db = Database()
+        try:
+            with db.transaction():
+                ExchangeRepository(lambda: db).update_status(exchange_id, "completed", completed_at)
+                if listing.exchange_type == "credit":
+                    CreditRepository(lambda: db).clear_hold(request_obj.id)
+                    # Deduct from learner
+                    CreditRepository(lambda: db).create_transaction(
+                        user_id=request_obj.learner_id,
+                        amount_delta=-listing.credit_cost,
+                        entry_type="deduction",
+                        description=f"Spent on learning '{listing.title}'",
+                        skill_id=listing.id,
+                        exchange_id=exchange.id,
+                    )
+                    # Credit to teacher
+                    CreditRepository(lambda: db).create_transaction(
+                        user_id=listing.user_id,
+                        amount_delta=listing.credit_cost,
+                        entry_type="earning",
+                        description=f"Earned from teaching '{listing.title}'",
+                        skill_id=listing.id,
+                        exchange_id=exchange.id,
+                    )
+        finally:
+            db.close()
+
+        other_user_id = listing.user_id if current_user.id == request_obj.learner_id else request_obj.learner_id
+        self._notification_service.create_notification(
+            user_id=other_user_id,
+            title="Exchange Completed",
+            body=f"Your exchange for '{listing.title}' has been marked completed.",
+            target_url=f"/exchanges/{exchange.id}",
+        )
+
+        flash("Exchange marked completed successfully.", "success")
+        return redirect(url_for("exchanges.detail", exchange_id=exchange_id))
 
     @login_required
     def create_request(self, listing_id: int):
