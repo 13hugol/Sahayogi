@@ -227,6 +227,58 @@ class AdminController(BaseController):
             flash("Skill management is frontend-only in the current project scope.", "info")
         return self.render("admin/skills.html", skills=[], form=EmptyForm())
 
+    @admin_required
+    def suspend_user(self, user_id: int):
+        try:
+            days = int(request.form.get("days", "0"))
+            reason = request.form.get("reason", "").strip()
+            self._admin_service.suspend_user(
+                admin_user=current_user,
+                target_user_id=user_id,
+                days=days,
+                reason=reason,
+            )
+            flash("User has been temporarily suspended.", "success")
+        except ValueError as exc:
+            flash(str(exc), "danger")
+        except UserNotFoundError as exc:
+            flash(str(exc), "danger")
+            return redirect(url_for("admin.users"))
+            
+        return redirect(url_for("admin.users", user_id=user_id))
+
+    @admin_required
+    def ban_user(self, user_id: int):
+        try:
+            reason = request.form.get("reason", "").strip()
+            self._admin_service.ban_user(
+                admin_user=current_user,
+                target_user_id=user_id,
+                reason=reason,
+            )
+            flash("User has been permanently banned and their active listings deactivated.", "success")
+        except ValueError as exc:
+            flash(str(exc), "danger")
+        except UserNotFoundError as exc:
+            flash(str(exc), "danger")
+            return redirect(url_for("admin.users"))
+            
+        return redirect(url_for("admin.users", user_id=user_id))
+
+    @admin_required
+    def unsuspend_user(self, user_id: int):
+        try:
+            self._admin_service.unsuspend_user(
+                admin_user=current_user,
+                target_user_id=user_id,
+            )
+            flash("User restriction has been lifted.", "success")
+        except UserNotFoundError as exc:
+            flash(str(exc), "danger")
+            return redirect(url_for("admin.users"))
+            
+        return redirect(url_for("admin.users", user_id=user_id))
+
 
 class EmptyForm:
     def hidden_tag(self):
