@@ -109,6 +109,7 @@ class Database:
                 failed_login_count INT NOT NULL DEFAULT 0,
                 locked_until DATETIME,
                 role_id INT NOT NULL,
+                credit_balance INT NOT NULL DEFAULT 100,
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 INDEX ix_users_email (email),
@@ -345,6 +346,33 @@ class Database:
                 CONSTRAINT fk_reports_reported_user FOREIGN KEY (reported_user_id) REFERENCES users(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """,
+            """
+            CREATE TABLE IF NOT EXISTS credit_transactions (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                amount_delta INT NOT NULL,
+                entry_type VARCHAR(50) NOT NULL,
+                description VARCHAR(255) NOT NULL,
+                skill_id INT DEFAULT NULL,
+                exchange_id INT DEFAULT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT fk_credit_transactions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                CONSTRAINT fk_credit_transactions_skill FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE SET NULL,
+                CONSTRAINT fk_credit_transactions_exchange FOREIGN KEY (exchange_id) REFERENCES exchanges(id) ON DELETE SET NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS credit_holds (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                request_id INT NOT NULL,
+                amount INT NOT NULL,
+                status VARCHAR(32) NOT NULL DEFAULT 'active',
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT fk_credit_holds_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                CONSTRAINT fk_credit_holds_request FOREIGN KEY (request_id) REFERENCES exchange_requests(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """,
         ]
         try:
             for statement in statements:
@@ -367,6 +395,7 @@ class Database:
                 "ALTER TABLE categories ADD UNIQUE KEY uq_categories_slug (slug)",
                 "ALTER TABLE users ADD COLUMN suspended_until DATETIME",
                 "ALTER TABLE users ADD COLUMN suspension_reason TEXT",
+                "ALTER TABLE users ADD COLUMN credit_balance INT NOT NULL DEFAULT 100",
             ):
                 try:
                     db.execute(statement)
