@@ -208,6 +208,27 @@ class Database:
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """,
             """
+            CREATE TABLE IF NOT EXISTS exchange_history_items (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                listing_id INT,
+                listing_title VARCHAR(160) NOT NULL,
+                exchange_type VARCHAR(16) NOT NULL DEFAULT 'credit',
+                partner_name VARCHAR(120) NOT NULL,
+                user_role VARCHAR(24) NOT NULL DEFAULT 'learner',
+                status VARCHAR(24) NOT NULL DEFAULT 'pending',
+                conversation_id INT,
+                review_submitted BOOLEAN NOT NULL DEFAULT FALSE,
+                completed_at DATETIME,
+                declined_at DATETIME,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX ix_exchange_history_user_status_created (user_id, status, created_at),
+                INDEX ix_exchange_history_user_created (user_id, created_at),
+                CONSTRAINT fk_exchange_history_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """,
+            """
             CREATE TABLE IF NOT EXISTS profile_reviews (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 reviewee_user_id INT NOT NULL,
