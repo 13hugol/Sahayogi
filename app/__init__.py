@@ -121,6 +121,7 @@ def register_template_context(app: Flask) -> None:
         from flask_login import current_user
         from app.models.notification import Notification
 
+        unread_notifications = 0
         available_credits = 0
         if current_user and current_user.is_authenticated:
             try:
