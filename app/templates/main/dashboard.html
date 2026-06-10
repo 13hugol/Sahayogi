@@ -15,7 +15,7 @@
   </header>
 
   <div class="row g-4 mb-4">
-    {% for label, value in [('Listings', my_listings|length), ('Pending requests', pending_requests|length), ('Active exchanges', exchanges|length), ('Unread notices', unread_notification_count)] %}
+    {% for label, value in [('Listings', my_listings|length), ('Pending requests', pending_requests|length), ('Exchanges', exchange_count), ('Unread notices', unread_notification_count)] %}
       <div class="col-md-6 col-xl-3">
         <section class="metric-card">
           <div class="stat-value">{{ value }}</div>
@@ -73,15 +73,19 @@
     <div class="col-xl-6">
       <section class="table-card h-100">
         <div class="table-card-header">
-          <h2 class="h4 mb-0">Active exchanges</h2>
-          <a class="fw-bold" href="{{ url_for('exchanges.index') }}">History</a>
+          <h2 class="h4 mb-0">Exchange history</h2>
+          <a class="fw-bold" href="{{ url_for('exchanges.index') }}">View all</a>
         </div>
         <div class="clean-list">
           {% for exchange in exchanges %}
             <a class="clean-row" href="{{ url_for('exchanges.detail', exchange_id=exchange.id) }}">
               <div>
                 <strong>{{ exchange.listing.title }}</strong>
-                <div class="small text-muted">{{ exchange.exchange_type|title }} &middot; {{ exchange.created_at.strftime('%Y-%m-%d') }}</div>
+                <div class="small text-muted">
+                  {{ exchange.exchange_type|title }} &middot;
+                  {{ exchange.status|title }} &middot;
+                  {{ exchange.created_at.strftime('%Y-%m-%d %H:%M') }}
+                </div>
               </div>
               <span class="badge text-bg-light">{{ exchange.status|title }}</span>
             </a>
