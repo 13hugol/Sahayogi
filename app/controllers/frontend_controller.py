@@ -562,6 +562,11 @@ class FrontendController(BaseController):
             page_data = self._profile_service.get_profile_page_data(user_id)
         except ProfileNotFoundError:
             abort(404)
+            
+        score_data = ProfileReview.get_reputation_score(user_id)
+        from app.models.profile import get_score_tier
+        tier = get_score_tier(score_data['score'], score_data['count'])
+            
         return self.render(
             "profile/view.html",
             user=page_data.user,
@@ -569,7 +574,21 @@ class FrontendController(BaseController):
             approved_certificates=page_data.approved_certificates,
             recent_reviews=page_data.recent_reviews,
             report_form=ReportShellForm(),
+            score=score_data['score'],
+            count=score_data['count'],
+            tier=tier,
         )
+
+    @login_required
+    def get_reputation_json(self, user_id: int):
+        score_data = ProfileReview.get_reputation_score(user_id)
+        from app.models.profile import get_score_tier
+        tier = get_score_tier(score_data["score"], score_data["count"])
+        return jsonify({
+            "score": score_data["score"],
+            "count": score_data["count"],
+            "tier": tier,
+        })
 
     def report_user(self, user_id: int):
         return self.profile_view(user_id)

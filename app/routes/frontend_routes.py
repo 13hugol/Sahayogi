@@ -88,6 +88,7 @@ class FrontendRoutes:
         profile.route("/profile/certificates", endpoint="certificates")(self.controller.certificates)
         profile.route("/profile/delete", methods=["POST"], endpoint="delete_account")(self.controller.frontend_only_action)
         profile.route("/users/<int:user_id>", endpoint="view")(self.controller.profile_view)
+        profile.route("/api/reputation/<int:user_id>", endpoint="api_reputation")(self.controller.get_reputation_json)
         profile.route("/users/<int:user_id>/report", methods=["GET", "POST"], endpoint="report")(self.controller.report_user)
 
         reviews = Blueprint("reviews", __name__, url_prefix="/reviews")
