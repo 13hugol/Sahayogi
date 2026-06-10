@@ -127,7 +127,18 @@ class AuthService:
                 )
             raise InvalidCredentialsError(field="password")
 
-        if user.status != AccountStatus.ACTIVE.value:
+        if user.status == AccountStatus.SUSPENDED.value:
+            if user.suspended_until and user.suspended_until <= datetime.utcnow():
+                user.status = AccountStatus.ACTIVE.value
+                user.suspended_until = None
+                user.suspension_reason = None
+                self._user_repository.update_status(user.id, AccountStatus.ACTIVE.value, None, None)
+            else:
+                local_time_str = user.suspended_until.strftime('%Y-%m-%d %H:%M:%S')
+                raise InactiveAccountError(f"Your account is suspended until {local_time_str} UTC. Reason: {user.suspension_reason}")
+        elif user.status == AccountStatus.BANNED.value:
+            raise InactiveAccountError(f"Your account has been permanently banned. Reason: {user.suspension_reason}")
+        elif user.status != AccountStatus.ACTIVE.value:
             raise InactiveAccountError()
 
         self._user_repository.clear_failed_login(user)
