@@ -142,6 +142,8 @@ class User(UserMixin, BaseModel):
         created_at: datetime | None = None,
         role: Role | None = None,
         profile: Profile | None = None,
+        suspended_until: datetime | None = None,
+        suspension_reason: str | None = None,
     ):
         self.id = id
         self.full_name = full_name
@@ -157,6 +159,8 @@ class User(UserMixin, BaseModel):
         self.created_at = created_at
         self.role = role
         self.profile = profile
+        self.suspended_until = suspended_until
+        self.suspension_reason = suspension_reason
 
     @classmethod
     def from_row(cls, row: dict | None) -> "User | None":
@@ -179,6 +183,8 @@ class User(UserMixin, BaseModel):
             created_at=row.get("created_at"),
             role=role,
             profile=profile,
+            suspended_until=row.get("suspended_until"),
+            suspension_reason=row.get("suspension_reason"),
         )
 
     @classmethod
