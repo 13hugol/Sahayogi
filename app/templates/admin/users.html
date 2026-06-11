@@ -26,6 +26,70 @@
         </form>
       </div>
     </div>
+
+    <div class="card card-shell mb-4 border-danger">
+      <div class="card-header bg-danger text-white">
+        <h2 class="h5 mb-0">Account Enforcement</h2>
+      </div>
+      <div class="card-body">
+        <p>Current Status: 
+          {% if target_user.status == 'active' %}
+            <span class="badge bg-success">Active</span>
+          {% elif target_user.status == 'suspended' %}
+            <span class="badge bg-warning text-dark">Suspended</span> (until {{ target_user.suspended_until }})
+          {% elif target_user.status == 'banned' %}
+            <span class="badge bg-danger">Banned</span>
+          {% else %}
+            <span class="badge bg-secondary">{{ target_user.status }}</span>
+          {% endif %}
+        </p>
+
+        {% if target_user.id != current_user.id %}
+          {% if target_user.status == 'suspended' or target_user.status == 'banned' %}
+            <form method="post" action="{{ url_for('admin.unsuspend_user', user_id=target_user.id) }}" class="mb-3">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-outline-success" type="submit">Lift Restriction</button>
+            </form>
+          {% endif %}
+
+          <hr>
+
+          <h3 class="h6">Suspend User</h3>
+          <form method="post" action="{{ url_for('admin.suspend_user', user_id=target_user.id) }}" class="mb-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="row g-3 align-items-end">
+              <div class="col-md-3">
+                <label class="form-label" for="suspendDays">Duration (1-30 days)</label>
+                <input type="number" class="form-control" id="suspendDays" name="days" min="1" max="30" required value="7">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="suspendReason">Reason</label>
+                <input type="text" class="form-control" id="suspendReason" name="reason" required placeholder="Enter suspension reason...">
+              </div>
+              <div class="col-md-3">
+                <button class="btn btn-warning w-100" type="submit">Suspend</button>
+              </div>
+            </div>
+          </form>
+
+          <h3 class="h6 text-danger">Permanently Ban User</h3>
+          <form method="post" action="{{ url_for('admin.ban_user', user_id=target_user.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="row g-3 align-items-end">
+              <div class="col-md-9">
+                <label class="form-label" for="banReason">Reason for Ban</label>
+                <input type="text" class="form-control" id="banReason" name="reason" required placeholder="Enter permanent ban reason...">
+              </div>
+              <div class="col-md-3">
+                <button class="btn btn-danger w-100" type="submit">Permanently Ban</button>
+              </div>
+            </div>
+          </form>
+        {% else %}
+          <p class="text-muted small">You cannot enforce restrictions on your own account.</p>
+        {% endif %}
+      </div>
+    </div>
   {% endif %}
   <div class="card card-shell">
     <div class="card-body">
