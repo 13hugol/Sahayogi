@@ -49,3 +49,21 @@ class Exchange(BaseModel):
             return None
         from app.models.user import User
         return User.find_by_id(listing.user_id)
+
+    @property
+    def exchange_type(self) -> str:
+        listing = self.listing
+        return listing.exchange_type if listing else "credit"
+
+    @property
+    def barter_skill(self):
+        req = self.request
+        return req.offered_skill if req else None
+
+    @property
+    def completion_marks(self) -> list:
+        if self.status == "completed" and self.completed_at:
+            from types import SimpleNamespace
+            user_obj = self.teacher or self.learner
+            return [SimpleNamespace(user=user_obj, completed_at=self.completed_at)]
+        return []

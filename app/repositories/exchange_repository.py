@@ -41,3 +41,14 @@ class ExchangeRepository(BaseRepository):
         with self._db() as db:
             row = db.fetch_one("SELECT * FROM exchanges WHERE request_id = %s", (request_id,))
         return Exchange.from_row(row)
+
+    def update_status(self, exchange_id: int, status: str, completed_at: datetime | None = None) -> None:
+        with self._db() as db:
+            db.execute(
+                """
+                UPDATE exchanges
+                SET status = %s, completed_at = %s
+                WHERE id = %s
+                """,
+                (status, completed_at, exchange_id),
+            )

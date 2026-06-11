@@ -82,7 +82,7 @@ class FrontendRoutes:
         exchanges = Blueprint("exchanges", __name__, url_prefix="/exchanges")
         exchanges.route("/", endpoint="index")(self.controller.exchanges)
         exchanges.route("/<int:exchange_id>", endpoint="detail")(self.controller.exchange_detail)
-        exchanges.route("/<int:exchange_id>/complete", methods=["POST"], endpoint="mark_complete")(self.controller.frontend_only_action)
+        exchanges.route("/<int:exchange_id>/complete", methods=["POST"], endpoint="mark_complete")(self.controller.mark_complete)
 
         messages = Blueprint("messages", __name__, url_prefix="/messages")
         messages.route("/", endpoint="index")(self.controller.messages)
