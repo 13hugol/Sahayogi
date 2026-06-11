@@ -1,19 +1,19 @@
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from types import SimpleNamespace
+from uuid import uuid4
 
-<<<<<<<<< Temporary merge branch 1
-from flask import abort, flash, jsonify, redirect, request, session, url_for
-=========
-from flask import abort, current_app, flash, jsonify, redirect, render_template, request, session, url_for
->>>>>>>>> Temporary merge branch 2
+from flask import abort, current_app, flash, jsonify, redirect, request, session, url_for
 from flask_login import current_user, login_required
 from markupsafe import Markup, escape
+from werkzeug.utils import secure_filename
 
 from app.exceptions import ProfileNotFoundError
 from app.models import Profile, ProfileCertificate, ProfileReview, ProfileSkill, User
 from app.models.notification import Notification
-from app.repositories import ExchangeRequestRepository, ExchangeRepository, SkillRepository
+from app.repositories import ExchangeRequestRepository, ExchangeRepository, ProfileReviewRepository, SkillRepository
 from app.services import (
     MatchService,
     MessageService,
@@ -32,6 +32,10 @@ from app.services.listing_catalog import (
 )
 
 from .base_controller import BaseController
+
+MAX_AVATAR_BYTES = 5 * 1024 * 1024
+ALLOWED_AVATAR_EXTENSIONS = {".jpg", ".jpeg", ".png"}
+ALLOWED_AVATAR_MIMETYPES = {"image/jpeg", "image/png"}
 
 
 class FrontendController(BaseController):
@@ -291,7 +295,9 @@ class FrontendController(BaseController):
 
     @login_required
     def exchange_detail(self, exchange_id: int):
-        exchange = ExchangeRepository().find_by_id(exchange_id)
+        exchange_repo = ExchangeRepository()
+        review_repo = ProfileReviewRepository()
+        exchange = exchange_repo.find_by_id(exchange_id)
         if not exchange:
             abort(404)
         request_obj = exchange.request
@@ -302,13 +308,31 @@ class FrontendController(BaseController):
             abort(404)
         if current_user.id not in [request_obj.learner_id, listing.user_id]:
             abort(403)
+        completion_marks = exchange_repo.completion_marks(exchange.id)
+        existing_review = review_repo.find_for_exchange_by_reviewer(exchange.id, current_user.id)
         return self.render(
             "exchanges/detail.html",
             exchange=exchange,
-            can_mark_complete=False,
-            can_review=False,
-            reviews=[],
+            can_mark_complete=current_user.id not in {mark.user_id for mark in completion_marks},
+            can_review=exchange_repo.is_fully_completed(exchange.id) and existing_review is None,
+            reviews=review_repo.for_exchange(exchange.id),
         )
+
+    @login_required
+    def mark_exchange_complete(self, exchange_id: int):
+        exchange_repo = ExchangeRepository()
+        exchange = exchange_repo.find_by_id(exchange_id)
+        if not exchange:
+            abort(404)
+        if not exchange_repo.is_participant(exchange_id, current_user.id):
+            abort(403)
+
+        exchange = exchange_repo.mark_complete(exchange_id=exchange_id, user_id=current_user.id)
+        if exchange.status == "completed":
+            flash("Both parties have marked this exchange complete. Reviews are now open.", "success")
+        else:
+            flash("Your completion mark has been recorded.", "success")
+        return redirect(url_for("exchanges.detail", exchange_id=exchange_id))
 
     @login_required
     def create_request(self, listing_id: int):
@@ -512,9 +536,6 @@ class FrontendController(BaseController):
 
     @login_required
     def profile_edit(self):
-<<<<<<<<< Temporary merge branch 1
-        return self.render("profile/edit.html", form=ProfileShellForm())
-=========
         user = User.find_by_id(current_user.id)
         if not user or not user.profile:
             abort(404)
@@ -550,8 +571,9 @@ class FrontendController(BaseController):
                 flash("Profile updated successfully.", "success")
                 return redirect(url_for("profile.edit"))
 
-        return render_template(
+        return self.render(
             "profile/edit.html",
+            form=ProfileShellForm(),
             errors=errors,
             max_avatar_mb=5,
             user=user,
@@ -632,7 +654,6 @@ class FrontendController(BaseController):
         avatar.stream.seek(0)
         avatar.save(avatar_dir / filename)
         return f"avatars/{filename}"
->>>>>>>>> Temporary merge branch 2
 
     @login_required
     def certificates(self):
@@ -706,9 +727,61 @@ class FrontendController(BaseController):
 
     @login_required
     def review_form(self, exchange_id: int):
-        exchange = SimpleNamespace(id=exchange_id, listing=SimpleNamespace(title="Exchange preview"))
-        reviewee = SimpleNamespace(full_name="Exchange partner")
-        return self.render("reviews/form.html", form=ReviewShellForm(), exchange=exchange, reviewee=reviewee)
+        exchange_repo = ExchangeRepository()
+        review_repo = ProfileReviewRepository()
+        exchange = exchange_repo.find_by_id(exchange_id)
+        if not exchange:
+            abort(404)
+        request_obj = exchange.request
+        listing = request_obj.listing if request_obj else None
+        if not request_obj or not listing:
+            abort(404)
+        if current_user.id not in [request_obj.learner_id, listing.user_id]:
+            abort(403)
+        if not exchange_repo.is_fully_completed(exchange.id):
+            flash("Reviews unlock after both parties mark the exchange complete.", "warning")
+            return redirect(url_for("exchanges.detail", exchange_id=exchange.id))
+        if review_repo.find_for_exchange_by_reviewer(exchange.id, current_user.id):
+            flash("You have already reviewed this completed exchange.", "info")
+            return redirect(url_for("exchanges.detail", exchange_id=exchange.id))
+
+        reviewee = exchange.teacher if current_user.id == request_obj.learner_id else exchange.learner
+        if not reviewee:
+            abort(404)
+
+        form = ReviewShellForm(data={"rating": request.form.get("rating", ""), "comment": request.form.get("comment", "")})
+        if request.method == "POST":
+            rating_raw = request.form.get("rating", "").strip()
+            comment = request.form.get("comment", "").strip()
+            rating = None
+            try:
+                rating = int(rating_raw)
+            except ValueError:
+                form.rating.errors.append("Choose a star rating from 1 to 5.")
+            else:
+                if rating < 1 or rating > 5:
+                    form.rating.errors.append("Choose a star rating from 1 to 5.")
+            if len(comment) > 500:
+                form.comment.errors.append("Comment must be 500 characters or fewer.")
+
+            if not form.rating.errors and not form.comment.errors:
+                review_repo.create(
+                    exchange_id=exchange.id,
+                    reviewee_user_id=reviewee.id,
+                    reviewer_id=current_user.id,
+                    reviewer_name=current_user.full_name,
+                    rating=rating,
+                    comment=comment or None,
+                )
+                self._notification_service.notify_new_review(
+                    user_id=reviewee.id,
+                    reviewer_name=current_user.full_name,
+                    target_url=url_for("profile.view", user_id=reviewee.id),
+                )
+                flash("Your review has been published.", "success")
+                return redirect(url_for("profile.view", user_id=reviewee.id))
+
+        return self.render("reviews/form.html", form=form, exchange=exchange, reviewee=reviewee)
 
     def frontend_only_action(self, *args, **kwargs):
         flash("This action is frontend-only in the current project scope.", "info")
@@ -786,6 +859,22 @@ class FrontendController(BaseController):
 class ShellForm:
     fields: dict[str, str] = {}
 
+    def __init__(self, data=None, **kwargs):
+        self._fields_cache = {}
+        self.data_dict = {}
+        if data:
+            if isinstance(data, dict):
+                self.data_dict.update(data)
+            else:
+                for key in self.fields:
+                    if hasattr(data, key):
+                        self.data_dict[key] = getattr(data, key)
+                for key in ["title", "min_credits", "location_text", "contact_method"]:
+                    if hasattr(data, key):
+                        self.data_dict[key] = getattr(data, key)
+        for key, value in kwargs.items():
+            self.data_dict[key] = value
+
     def hidden_tag(self):
         token = session.get("csrf_token", "")
         return Markup(f'<input type="hidden" name="csrf_token" value="{escape(token)}">')
@@ -794,14 +883,17 @@ class ShellForm:
         if name in self._fields_cache:
             return self._fields_cache[name]
         field_type = self.fields.get(name, "text")
-        return ShellField(name, field_type)
+        field = ShellField(name, field_type)
+        if name in self.data_dict:
+            field.data = self.data_dict[name]
+        self._fields_cache[name] = field
+        return field
 
 
 class ShellField:
-    def __init__(self, name: str, field_type: str = "text", *, choices: list[tuple[str, str]] | None = None):
+    def __init__(self, name: str, field_type: str = "text"):
         self.name = name
         self.field_type = field_type
-        self.choices = choices or []
         self.errors = []
         self.label = ShellLabel(name)
         self.choices = []
@@ -815,7 +907,11 @@ class ShellField:
             val = escape(str(self.data)) if self.data is not None else ""
             return Markup(f'<textarea name="{self.name}" {attrs}>{val}</textarea>')
         if self.field_type == "select":
-            return Markup(f'<select name="{self.name}" {attrs}></select>')
+            options = []
+            for value, label in self.choices:
+                selected = ' selected' if self.data is not None and str(value) == str(self.data) else ""
+                options.append(f'<option value="{escape(str(value))}"{selected}>{escape(str(label))}</option>')
+            return Markup(f'<select name="{self.name}" {attrs}>{"".join(options)}</select>')
         if self.field_type == "submit":
             return Markup(f'<button type="submit" {attrs}>Save</button>')
         return Markup(f'<input type="{self.field_type}" name="{self.name}" {attrs}>')
@@ -873,22 +969,6 @@ class ListingShellForm(ShellForm):
         "submit": "submit",
     }
 
-    def __init__(self, *, categories):
-        super().__init__(
-            choices={
-                "category_id": [
-                    (str(category.id), f"{category.icon} - {category.name}")
-                    for category in categories
-                ],
-                "skill_id": [
-                    ("1", "Python scripting"),
-                    ("2", "Guitar lessons"),
-                    ("3", "Nepali conversation"),
-                    ("4", "Newari cooking"),
-                ],
-            }
-        )
-
 
 class RequestShellForm(ShellForm):
     fields = {"offered_skill_id": "select", "requested_message": "textarea", "submit": "submit"}
@@ -928,6 +1008,17 @@ class ReportShellForm(ShellForm):
 
 class ReviewShellForm(ShellForm):
     fields = {"rating": "select", "comment": "textarea", "submit": "submit"}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.rating.choices = [
+            ("", "Choose a rating"),
+            ("5", "5 stars"),
+            ("4", "4 stars"),
+            ("3", "3 stars"),
+            ("2", "2 stars"),
+            ("1", "1 star"),
+        ]
 
 
 def html_attrs(attrs: dict) -> str:

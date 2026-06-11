@@ -77,28 +77,6 @@ class AdminService:
         )
         return target_user
 
-<<<<<<< HEAD
-    def list_categories(self):
-        return self._category_repository.all()
-
-    def find_category(self, category_id: int | None):
-        if category_id is None:
-            return None
-        return self._category_repository.find_by_id(category_id)
-
-    def category_name_exists(self, name: str, *, exclude_id: int | None = None) -> bool:
-        return self._category_repository.name_exists(name, exclude_id=exclude_id)
-
-    def category_slug_exists(self, slug: str, *, exclude_id: int | None = None) -> bool:
-        return self._category_repository.slug_exists(slug, exclude_id=exclude_id)
-
-    def create_category(self, *, admin_user, name: str, slug: str, icon: str, description: str):
-        category = self._category_repository.create(
-            name=name,
-            slug=slug,
-            icon=icon,
-            description=description,
-=======
     def get_pending_listings(
         self,
         category_id: int | None = None,
@@ -214,7 +192,6 @@ class AdminService:
             icon=icon or "CAT",
             sort_order=sort_order,
             is_active=True,
->>>>>>> e38cbda6645fa3211fdeb0889beaec2fe1e0012a
         )
         self._audit_repository.create(
             admin_id=admin_user.id,
@@ -225,34 +202,6 @@ class AdminService:
         )
         return category
 
-<<<<<<< HEAD
-    def update_category(self, *, admin_user, category_id: int, name: str, slug: str, icon: str, description: str):
-        previous = self._category_repository.find_by_id(category_id)
-        if not previous:
-            raise CategoryNotFoundError(category_id)
-
-        category = self._category_repository.update(
-            category_id,
-            name=name,
-            slug=slug,
-            icon=icon,
-            description=description,
-        )
-        if not category:
-            raise CategoryNotFoundError(category_id)
-
-        self._audit_repository.create(
-            admin_id=admin_user.id,
-            action="rename_category",
-            target_type="Category",
-            target_id=category.id,
-            detail=(
-                f"Category '{previous.name}' renamed to '{category.name}' "
-                f"by admin {admin_user.email}"
-            ),
-        )
-        return category
-=======
     def update_category(
         self,
         admin_user,
@@ -362,5 +311,3 @@ class AdminService:
             detail=f"Unsuspended / unbanned by admin {admin_user.email}",
         )
         return target_user
->>>>>>> e38cbda6645fa3211fdeb0889beaec2fe1e0012a
-

@@ -152,19 +152,7 @@ class AdminController(BaseController):
 
     @admin_required
     def categories(self):
-        form = CategoryForm(submit_label="Create category")
         if request.method == "POST":
-<<<<<<< HEAD
-            form = CategoryForm(request.form, submit_label="Create category")
-            if form.validate(self._admin_service):
-                category = self._admin_service.create_category(
-                    admin_user=current_user,
-                    **form.cleaned,
-                )
-                flash(f"Category {category.name} created.", "success")
-                return redirect(url_for("admin.categories"))
-        return self.render("admin/categories.html", categories=self._admin_service.list_categories(), form=form)
-=======
             name = request.form.get("name", "").strip()
             description = request.form.get("description", "").strip() or None
             icon = (request.form.get("icon", "CAT") or "CAT").strip().upper()[:8] or "CAT"
@@ -190,33 +178,11 @@ class AdminController(BaseController):
 
         categories = self._admin_service.list_categories()
         return self.render("admin/categories.html", categories=categories, form=EmptyForm())
->>>>>>> e38cbda6645fa3211fdeb0889beaec2fe1e0012a
 
     @admin_required
     def edit_category(self, category_id: int):
         category = self._admin_service.find_category(category_id)
         if not category:
-<<<<<<< HEAD
-            flash("Category not found.", "danger")
-            return redirect(url_for("admin.categories"))
-
-        form = CategoryForm(category=category, submit_label="Save category")
-        if request.method == "POST":
-            form = CategoryForm(request.form, category=category, submit_label="Save category")
-            if form.validate(self._admin_service, exclude_id=category.id):
-                try:
-                    category = self._admin_service.update_category(
-                        admin_user=current_user,
-                        category_id=category.id,
-                        **form.cleaned,
-                    )
-                except CategoryNotFoundError:
-                    flash("Category not found.", "danger")
-                    return redirect(url_for("admin.categories"))
-                flash(f"Category {category.name} updated.", "success")
-                return redirect(url_for("admin.categories"))
-        return self.render("admin/category_form.html", form=form, category=category)
-=======
             abort(404)
         if request.method == "POST":
             name = request.form.get("name", "").strip() or category.name
@@ -256,7 +222,6 @@ class AdminController(BaseController):
             return redirect(url_for("admin.categories"))
         flash("Category removed.", "success")
         return redirect(url_for("admin.categories"))
->>>>>>> e38cbda6645fa3211fdeb0889beaec2fe1e0012a
 
     @admin_required
     def skills(self):

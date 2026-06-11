@@ -5,6 +5,13 @@ from app.models.category import Category
 from .base_repository import BaseRepository
 
 
+def _slugify(value: str) -> str:
+    cleaned = "".join(ch.lower() if ch.isalnum() else "-" for ch in value.strip())
+    while "--" in cleaned:
+        cleaned = cleaned.replace("--", "-")
+    return cleaned.strip("-") or "category"
+
+
 DEFAULT_CATEGORIES: tuple[dict[str, object], ...] = (
     {
         "id": 1,
@@ -91,6 +98,30 @@ class CategoryRepository(BaseRepository):
             row = db.fetch_one("SELECT * FROM categories WHERE id = %s", (category_id,))
         return Category.from_row(row)
 
+    def find_by_name(self, name: str) -> Category | None:
+        with self._db() as db:
+            row = db.fetch_one("SELECT * FROM categories WHERE LOWER(name) = LOWER(%s)", (name.strip(),))
+        return Category.from_row(row)
+
+    def find_by_slug(self, slug: str) -> Category | None:
+        with self._db() as db:
+            row = db.fetch_one("SELECT * FROM categories WHERE slug = %s", (slug.strip(),))
+        return Category.from_row(row)
+
+    def all_with_counts(self) -> list[dict]:
+        with self._db() as db:
+            rows = db.fetch_all(
+                """
+                SELECT c.*, COUNT(s.id) AS listing_count
+                FROM categories c
+                LEFT JOIN skills s ON s.category_id = c.id AND s.status = 'approved'
+                WHERE c.is_active = TRUE
+                GROUP BY c.id
+                ORDER BY c.sort_order ASC, c.name ASC
+                """
+            )
+        return rows or []
+
     def name_exists(self, name: str, *, exclude_id: int | None = None) -> bool:
         params: tuple[object, ...]
         query = "SELECT id FROM categories WHERE LOWER(name) = LOWER(%s)"
@@ -113,29 +144,84 @@ class CategoryRepository(BaseRepository):
             row = db.fetch_one(query, params)
         return row is not None
 
-    def create(self, *, name: str, slug: str, icon: str, description: str) -> Category:
+    def create(
+        self,
+        *,
+        name: str,
+        slug: str | None = None,
+        icon: str = "CAT",
+        description: str | None = "",
+        sort_order: int | None = None,
+        is_active: bool = True,
+    ) -> Category:
         with self._db() as db:
-            sort_row = db.fetch_one("SELECT COALESCE(MAX(sort_order), 0) + 1 AS next_order FROM categories")
+            if sort_order is None:
+                sort_row = db.fetch_one("SELECT COALESCE(MAX(sort_order), 0) + 1 AS next_order FROM categories")
+                sort_order = int((sort_row or {}).get("next_order") or 1)
             category_id = db.execute(
                 """
-                INSERT INTO categories (name, slug, icon, description, sort_order)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO categories (name, slug, icon, description, sort_order, is_active)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 """,
-                (name, slug, icon, description, int((sort_row or {}).get("next_order") or 1)),
+                (name.strip(), slug or _slugify(name), (icon or "CAT")[:16], description, int(sort_order), bool(is_active)),
             )
             row = db.fetch_one("SELECT * FROM categories WHERE id = %s", (category_id,))
         return Category.from_row(row)
 
-    def update(self, category_id: int, *, name: str, slug: str, icon: str, description: str) -> Category | None:
+    def update(
+        self,
+        category_id: int,
+        *,
+        name: str | None = None,
+        slug: str | None = None,
+        icon: str | None = None,
+        description: str | None = None,
+        sort_order: int | None = None,
+        is_active: bool | None = None,
+    ) -> Category | None:
+        fields: list[str] = []
+        params: list[object] = []
+        if name is not None:
+            fields.append("name = %s")
+            params.append(name.strip())
+            fields.append("slug = %s")
+            params.append(slug or _slugify(name))
+        elif slug is not None:
+            fields.append("slug = %s")
+            params.append(slug)
+        if icon is not None:
+            fields.append("icon = %s")
+            params.append((icon or "CAT")[:16])
+        if description is not None:
+            fields.append("description = %s")
+            params.append(description)
+        if sort_order is not None:
+            fields.append("sort_order = %s")
+            params.append(int(sort_order))
+        if is_active is not None:
+            fields.append("is_active = %s")
+            params.append(bool(is_active))
+        if not fields:
+            return self.find_by_id(category_id)
+        params.append(category_id)
         with self._db() as db:
             db.execute(
-                """
-                UPDATE categories
-                SET name = %s, slug = %s, icon = %s, description = %s
-                WHERE id = %s
-                """,
-                (name, slug, icon, description, category_id),
+                f"UPDATE categories SET {', '.join(fields)} WHERE id = %s",
+                tuple(params),
             )
             row = db.fetch_one("SELECT * FROM categories WHERE id = %s", (category_id,))
         return Category.from_row(row)
 
+    def delete(self, category_id: int) -> bool:
+        from app.exceptions import CategoryInUseError
+
+        with self._db() as db:
+            row = db.fetch_one(
+                "SELECT COUNT(*) AS count FROM skills WHERE category_id = %s",
+                (category_id,),
+            )
+        if int((row or {}).get("count") or 0) > 0:
+            raise CategoryInUseError(category_id)
+        with self._db() as db:
+            db.execute("DELETE FROM categories WHERE id = %s", (category_id,))
+        return True
