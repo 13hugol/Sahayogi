@@ -481,31 +481,42 @@ class FrontendController(BaseController):
         from datetime import datetime
         completed_at = datetime.utcnow()
         from app.database import Database
-        from app.repositories.credit_repository import CreditRepository
 
         db = Database()
         try:
             with db.transaction():
-                ExchangeRepository(lambda: db).update_status(exchange_id, "completed", completed_at)
+                db.execute(
+                    "UPDATE exchanges SET status = 'completed', completed_at = %s WHERE id = %s",
+                    (completed_at, exchange_id),
+                )
                 if listing.exchange_type == "credit":
-                    CreditRepository(lambda: db).clear_hold(request_obj.id)
+                    db.execute(
+                        "UPDATE credit_holds SET status = 'cleared' WHERE request_id = %s AND status = 'active'",
+                        (request_obj.id,),
+                    )
                     # Deduct from learner
-                    CreditRepository(lambda: db).create_transaction(
-                        user_id=request_obj.learner_id,
-                        amount_delta=-listing.credit_cost,
-                        entry_type="deduction",
-                        description=f"Spent on learning '{listing.title}'",
-                        skill_id=listing.id,
-                        exchange_id=exchange.id,
+                    db.execute(
+                        """
+                        INSERT INTO credit_transactions (user_id, amount_delta, entry_type, description, skill_id, exchange_id)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                        """,
+                        (request_obj.learner_id, -listing.credit_cost, "deduction", f"Spent on learning '{listing.title}'", listing.id, exchange.id),
+                    )
+                    db.execute(
+                        "UPDATE users SET credit_balance = credit_balance - %s WHERE id = %s",
+                        (listing.credit_cost, request_obj.learner_id),
                     )
                     # Credit to teacher
-                    CreditRepository(lambda: db).create_transaction(
-                        user_id=listing.user_id,
-                        amount_delta=listing.credit_cost,
-                        entry_type="earning",
-                        description=f"Earned from teaching '{listing.title}'",
-                        skill_id=listing.id,
-                        exchange_id=exchange.id,
+                    db.execute(
+                        """
+                        INSERT INTO credit_transactions (user_id, amount_delta, entry_type, description, skill_id, exchange_id)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                        """,
+                        (listing.user_id, listing.credit_cost, "earning", f"Earned from teaching '{listing.title}'", listing.id, exchange.id),
+                    )
+                    db.execute(
+                        "UPDATE users SET credit_balance = credit_balance + %s WHERE id = %s",
+                        (listing.credit_cost, listing.user_id),
                     )
         finally:
             db.close()
