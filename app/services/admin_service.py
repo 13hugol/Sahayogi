@@ -250,3 +250,65 @@ class AdminService:
         )
         return True
 
+    def suspend_user(self, admin_user, target_user_id: int, days: int, reason: str):
+        target_user = self._user_repository.find_by_id(target_user_id)
+        if not target_user:
+            raise UserNotFoundError()
+        if target_user.id == admin_user.id:
+            raise ValueError("You cannot suspend yourself.")
+        if days < 1 or days > 30:
+            raise ValueError("Suspension duration must be between 1 and 30 days.")
+        reason = reason.strip()
+        if not reason:
+            raise ValueError("Suspension reason is required.")
+        
+        from datetime import datetime, timedelta
+        suspended_until = datetime.utcnow() + timedelta(days=days)
+        
+        self._user_repository.update_status(target_user.id, "suspended", suspended_until, reason)
+        self._audit_repository.create(
+            admin_id=admin_user.id,
+            action="suspend_user",
+            target_type="User",
+            target_id=target_user.id,
+            detail=f"Suspended for {days} days by admin {admin_user.email}. Reason: {reason}",
+        )
+        return target_user
+
+    def ban_user(self, admin_user, target_user_id: int, reason: str):
+        target_user = self._user_repository.find_by_id(target_user_id)
+        if not target_user:
+            raise UserNotFoundError()
+        if target_user.id == admin_user.id:
+            raise ValueError("You cannot ban yourself.")
+        reason = reason.strip()
+        if not reason:
+            raise ValueError("Ban reason is required.")
+        
+        self._user_repository.update_status(target_user.id, "banned", None, reason)
+        self._audit_repository.create(
+            admin_id=admin_user.id,
+            action="ban_user",
+            target_type="User",
+            target_id=target_user.id,
+            detail=f"Permanently banned by admin {admin_user.email}. Reason: {reason}",
+        )
+        
+        self._skill_repository.deactivate_all_for_user(target_user.id)
+        return target_user
+
+    def unsuspend_user(self, admin_user, target_user_id: int):
+        target_user = self._user_repository.find_by_id(target_user_id)
+        if not target_user:
+            raise UserNotFoundError()
+        
+        self._user_repository.update_status(target_user.id, "active", None, None)
+        self._audit_repository.create(
+            admin_id=admin_user.id,
+            action="unsuspend_user",
+            target_type="User",
+            target_id=target_user.id,
+            detail=f"Unsuspended / unbanned by admin {admin_user.email}",
+        )
+        return target_user
+
