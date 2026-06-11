@@ -54,7 +54,6 @@ class FrontendRoutes:
     def register(self):
         listings = Blueprint("listings", __name__, url_prefix="/listings")
         listings.route("/", endpoint="index")(self.controller.marketplace)
-        listings.route("/categories", endpoint="categories")(self.controller.categories_overview)
         listings.route("/api/search", endpoint="api_search")(self.controller.api_search)
         listings.route("/categories", endpoint="categories")(self.controller.category_overview)
         listings.route("/create", methods=["GET", "POST"], endpoint="create")(self.controller.post_listing)
@@ -83,7 +82,9 @@ class FrontendRoutes:
         exchanges = Blueprint("exchanges", __name__, url_prefix="/exchanges")
         exchanges.route("/", endpoint="index")(self.controller.exchanges)
         exchanges.route("/<int:exchange_id>", endpoint="detail")(self.controller.exchange_detail)
-        exchanges.route("/<int:exchange_id>/complete", methods=["POST"], endpoint="mark_complete")(self.controller.frontend_only_action)
+        exchanges.route("/<int:exchange_id>/complete", methods=["POST"], endpoint="mark_complete")(
+            self.controller.mark_exchange_complete
+        )
 
         messages = Blueprint("messages", __name__, url_prefix="/messages")
         messages.route("/", endpoint="index")(self.controller.messages)
