@@ -144,6 +144,7 @@ class User(UserMixin, BaseModel):
         profile: Profile | None = None,
         suspended_until: datetime | None = None,
         suspension_reason: str | None = None,
+        credit_balance: int = 100,
     ):
         self.id = id
         self.full_name = full_name
@@ -161,6 +162,7 @@ class User(UserMixin, BaseModel):
         self.profile = profile
         self.suspended_until = suspended_until
         self.suspension_reason = suspension_reason
+        self.credit_balance = credit_balance
 
     @classmethod
     def from_row(cls, row: dict | None) -> "User | None":
@@ -185,6 +187,7 @@ class User(UserMixin, BaseModel):
             profile=profile,
             suspended_until=row.get("suspended_until"),
             suspension_reason=row.get("suspension_reason"),
+            credit_balance=int(row.get("credit_balance") if row.get("credit_balance") is not None else 100),
         )
 
     @classmethod
@@ -326,7 +329,17 @@ class User(UserMixin, BaseModel):
 
     @property
     def available_credit_balance(self) -> int:
-        return 100
+        from app.database import Database
+        db = Database()
+        try:
+            row = db.fetch_one(
+                "SELECT COALESCE(SUM(amount), 0) AS active_holds FROM credit_holds WHERE user_id = %s AND status = 'active'",
+                (self.id,),
+            )
+            holds = int((row or {}).get("active_holds") or 0)
+            return self.credit_balance - holds
+        finally:
+            db.close()
 
     @property
     def offered_skills(self) -> list:

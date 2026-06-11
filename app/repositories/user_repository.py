@@ -213,6 +213,7 @@ class UserRepository(BaseRepository):
             profile=profile,
             suspended_until=row.get("suspended_until"),
             suspension_reason=row.get("suspension_reason"),
+            credit_balance=int(row.get("credit_balance") if row.get("credit_balance") is not None else 100),
         )
 
     def _persist_login_security(self, user: User) -> None:

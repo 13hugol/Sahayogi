@@ -121,15 +121,16 @@ def register_template_context(app: Flask) -> None:
         from flask_login import current_user
         from app.models.notification import Notification
 
-        unread_notifications = 0
+        available_credits = 0
         if current_user and current_user.is_authenticated:
             try:
                 unread_notifications = Notification.get_unread_count(current_user.id)
+                available_credits = current_user.available_credit_balance
             except Exception:
                 pass
 
         return {
-            "available_credits": 0,
+            "available_credits": available_credits,
             "nav_counts": {"messages": 0, "notifications": unread_notifications},
             "csrf_token": lambda: session.get("csrf_token", ""),
         }
