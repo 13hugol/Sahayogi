@@ -41,7 +41,10 @@
           </ul>
           <div class="d-flex flex-wrap gap-2">
             {% if can_mark_complete %}
-              <form method="post" action="{{ url_for('exchanges.mark_complete', exchange_id=exchange.id) }}"><button class="btn btn-accent">Mark complete</button></form>
+              <form method="post" action="{{ url_for('exchanges.mark_complete', exchange_id=exchange.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-accent">Mark complete</button>
+              </form>
             {% endif %}
             {% if can_review %}
               <a class="btn btn-outline-primary" href="{{ url_for('reviews.create', exchange_id=exchange.id) }}">Leave review</a>
@@ -63,7 +66,11 @@
               <p class="mb-0">{{ review.comment or "No written comment." }}</p>
             </article>
           {% else %}
-            <div class="text-muted">Reviews unlock after both parties mark the exchange complete.</div>
+            {% if exchange.status == "completed" %}
+              <div class="text-muted">No reviews have been submitted for this completed exchange yet.</div>
+            {% else %}
+              <div class="text-muted">Reviews unlock after both parties mark the exchange complete.</div>
+            {% endif %}
           {% endfor %}
         </div>
       </div>
