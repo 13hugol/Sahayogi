@@ -8,7 +8,7 @@ from .skill import Category, Skill
 from .notification import Notification
 from .message import MessageConversation, MessagePost
 from .exchange_request import ExchangeRequest
-from .exchange import Exchange
+from .exchange import Exchange, ExchangeCompletionMark
 from .report import Report
 
 __all__ = [
@@ -29,5 +29,6 @@ __all__ = [
     "MessagePost",
     "ExchangeRequest",
     "Exchange",
+    "ExchangeCompletionMark",
     "Report",
 ]

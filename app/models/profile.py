@@ -172,6 +172,7 @@ class ProfileCertificate(BaseModel):
 @dataclass
 class ProfileReview(BaseModel):
     id: int
+    exchange_id: int | None
     reviewee_user_id: int
     reviewer_id: int | None
     reviewer_name: str
@@ -189,6 +190,7 @@ class ProfileReview(BaseModel):
             return None
         return cls(
             id=row["id"],
+            exchange_id=row.get("exchange_id"),
             reviewee_user_id=row["reviewee_user_id"],
             reviewer_id=row.get("reviewer_id"),
             reviewer_name=row["reviewer_name"],
@@ -216,6 +218,7 @@ class ProfileReview(BaseModel):
         reviewee_user_id: int,
         reviewer_name: str,
         rating: int,
+        exchange_id: int | None = None,
         reviewer_id: int | None = None,
         comment: str | None = None,
     ) -> "ProfileReview":
@@ -225,6 +228,7 @@ class ProfileReview(BaseModel):
             reviewee_user_id=reviewee_user_id,
             reviewer_name=reviewer_name,
             rating=rating,
+            exchange_id=exchange_id,
             reviewer_id=reviewer_id,
             comment=comment,
         )
