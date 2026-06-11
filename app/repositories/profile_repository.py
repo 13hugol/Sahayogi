@@ -185,24 +185,69 @@ class ProfileReviewRepository(BaseRepository):
             )
         return [review for row in rows if (review := ProfileReview.from_row(row))]
 
+    def for_exchange(self, exchange_id: int) -> list[ProfileReview]:
+        with self._db() as db:
+            rows = db.fetch_all(
+                """
+                SELECT *
+                FROM profile_reviews
+                WHERE exchange_id = %s
+                ORDER BY created_at DESC, id DESC
+                """,
+                (exchange_id,),
+            )
+        return [review for row in rows if (review := ProfileReview.from_row(row))]
+
+    def find_for_exchange_by_reviewer(self, exchange_id: int, reviewer_id: int) -> ProfileReview | None:
+        with self._db() as db:
+            row = db.fetch_one(
+                """
+                SELECT *
+                FROM profile_reviews
+                WHERE exchange_id = %s AND reviewer_id = %s
+                """,
+                (exchange_id, reviewer_id),
+            )
+        return ProfileReview.from_row(row)
+
     def create(
         self,
         *,
         reviewee_user_id: int,
         reviewer_name: str,
         rating: int,
+        exchange_id: int | None = None,
         reviewer_id: int | None = None,
         comment: str | None = None,
     ) -> ProfileReview:
         with self._db() as db:
-            review_id = db.execute(
-                """
-                INSERT INTO profile_reviews
-                    (reviewee_user_id, reviewer_id, reviewer_name, rating, comment)
-                VALUES (%s, %s, %s, %s, %s)
-                """,
-                (reviewee_user_id, reviewer_id, reviewer_name.strip(), rating, comment),
-            )
+            with db.transaction():
+                review_id = db.execute(
+                    """
+                    INSERT INTO profile_reviews
+                        (exchange_id, reviewee_user_id, reviewer_id, reviewer_name, rating, comment)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    """,
+                    (exchange_id, reviewee_user_id, reviewer_id, reviewer_name.strip(), rating, comment),
+                )
+                if exchange_id is not None:
+                    db.execute(
+                        """
+                        UPDATE profiles
+                        SET review_count = (
+                                SELECT COUNT(*)
+                                FROM profile_reviews
+                                WHERE reviewee_user_id = %s
+                            ),
+                            reputation_score = COALESCE((
+                                SELECT ROUND(AVG(rating), 1)
+                                FROM profile_reviews
+                                WHERE reviewee_user_id = %s
+                            ), 0)
+                        WHERE user_id = %s
+                        """,
+                        (reviewee_user_id, reviewee_user_id, reviewee_user_id),
+                    )
             row = db.fetch_one("SELECT * FROM profile_reviews WHERE id = %s", (review_id,))
         return ProfileReview.from_row(row)
 
