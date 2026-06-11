@@ -92,3 +92,24 @@ class InvalidSkillTypeError(SahayogiException):
     def __init__(self, skill_type: str):
         super().__init__(f"Invalid skill type '{skill_type}'.")
         self.skill_type = skill_type
+
+
+class DuplicateCategoryError(SahayogiException):
+    def __init__(self, name: str):
+        super().__init__(f"A category named '{name}' already exists.")
+        self.name = name
+
+
+class CategoryInUseError(SahayogiException):
+    def __init__(self, category_id: int):
+        super().__init__(
+            f"Category {category_id} is still used by one or more listings and cannot be removed."
+        )
+        self.category_id = category_id
+
+
+class CategoryNotFoundError(SahayogiException):
+    def __init__(self, category_id: int | None = None):
+        identifier = category_id if category_id is not None else "unknown"
+        super().__init__(f"Category {identifier} was not found.")
+        self.category_id = category_id

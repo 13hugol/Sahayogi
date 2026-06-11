@@ -24,17 +24,24 @@
     </div>
     <div class="card-body">
       <form id="searchForm" data-live-search="true" class="row g-3" method="get" action="{{ url_for('listings.index') }}">
-        <div class="col-lg-4">
+        <div class="col-lg-3">
           <label class="form-label" for="q">Keyword</label>
           <input class="form-control" id="q" name="q" value="{{ request.args.get('q', '') }}" placeholder="Search by skill, title, or topic">
         </div>
-        <div class="col-lg-4">
+        <div class="col-lg-3">
           <label class="form-label" for="category">Categories</label>
           <select class="form-select" id="category" name="category" multiple size="4">
             {% for category in categories %}
               <option value="{{ category.id }}" {% if category.id|string in request.args.getlist('category') %}selected{% endif %}>{{ category.name }}</option>
             {% endfor %}
           </select>
+        </div>
+        <div class="col-lg-3">
+          <label class="form-label" for="location">Location</label>
+          <div class="input-group">
+            <input class="form-control" id="location" name="location" value="{{ request.args.get('location', '') }}" placeholder="City or coordinates">
+            <button class="btn btn-outline-secondary" type="button" id="detectLocationBtn" title="Detect Location">📍 Detect Location</button>
+          </div>
         </div>
         <div class="col-lg-2">
           <label class="form-label" for="radius">Radius km</label>
@@ -45,7 +52,7 @@
             {% endfor %}
           </select>
         </div>
-        <div class="col-lg-2 d-flex align-items-end">
+        <div class="col-lg-1 d-flex align-items-end">
           <button class="btn btn-accent w-100" type="submit">Search</button>
         </div>
       </form>
@@ -60,6 +67,8 @@
     </div>
   </section>
 
+  <div id="activeFilters" class="mb-3 d-flex flex-wrap gap-2"></div>
+
   <div class="d-flex justify-content-between align-items-center mb-3">
     <div class="text-muted"><span id="resultCount">{{ total_results }}</span> result(s)</div>
     <div class="text-muted small">Newest approved listings first, 20 per page</div>
@@ -73,10 +82,110 @@
       <ul class="pagination">
         {% for number in range(1, total_pages + 1) %}
           <li class="page-item {% if number == page %}active{% endif %}">
-            <a class="page-link" href="{{ url_for('listings.index', page=number, q=request.args.get('q'), radius=request.args.get('radius'), category=request.args.getlist('category')) }}">{{ number }}</a>
+            <a class="page-link" href="{{ url_for('listings.index', page=number, q=request.args.get('q'), location=request.args.get('location'), radius=request.args.get('radius'), category=request.args.getlist('category')) }}">{{ number }}</a>
           </li>
         {% endfor %}
       </ul>
     </nav>
   {% endif %}
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const detectBtn = document.getElementById("detectLocationBtn");
+        const locationInput = document.getElementById("location");
+        if (detectBtn && locationInput) {
+            detectBtn.addEventListener("click", () => {
+                if (navigator.geolocation) {
+                    detectBtn.disabled = true;
+                    detectBtn.innerHTML = "⌛ ...";
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                            const lat = position.coords.latitude.toFixed(4);
+                            const lon = position.coords.longitude.toFixed(4);
+                            locationInput.value = lat + ", " + lon;
+                            locationInput.dispatchEvent(new Event("input"));
+                            locationInput.dispatchEvent(new Event("change"));
+                            detectBtn.disabled = false;
+                            detectBtn.innerHTML = "📍 Detect Location";
+                        },
+                        (error) => {
+                            alert("Error detecting location: " + error.message);
+                            detectBtn.disabled = false;
+                            detectBtn.innerHTML = "📍 Detect Location";
+                        }
+                    );
+                } else {
+                    alert("Geolocation is not supported by this browser.");
+                }
+            });
+        }
+
+        const activeFiltersContainer = document.getElementById("activeFilters");
+        const form = document.getElementById("searchForm");
+
+        function updateFilterTags() {
+            if (!activeFiltersContainer || !form) return;
+            activeFiltersContainer.innerHTML = "";
+
+            const qInput = form.querySelector("#q");
+            const locInput = form.querySelector("#location");
+            const radSelect = form.querySelector("#radius");
+            const catSelect = form.querySelector("#category");
+
+            const qVal = qInput ? qInput.value.trim() : "";
+            const locVal = locInput ? locInput.value.trim() : "";
+            const radVal = radSelect ? radSelect.value : "";
+
+            function createTag(label, onRemove) {
+                const tag = document.createElement("span");
+                tag.className = "badge bg-light text-dark border d-inline-flex align-items-center gap-1 p-2 me-2 mb-2";
+                tag.style.cursor = "default";
+                tag.innerHTML = label + ' <span class="ms-1 fw-bold text-danger" style="cursor:pointer;" role="button">&times;</span>';
+                tag.querySelector("span").addEventListener("click", function(e) {
+                    e.preventDefault();
+                    onRemove();
+                });
+                return tag;
+            }
+
+            if (qVal) {
+                activeFiltersContainer.appendChild(createTag('Keyword: "' + qVal + '"', function() {
+                    qInput.value = "";
+                    qInput.dispatchEvent(new Event("input"));
+                    qInput.dispatchEvent(new Event("change"));
+                }));
+            }
+
+            if (locVal) {
+                activeFiltersContainer.appendChild(createTag('Location: ' + locVal, function() {
+                    locInput.value = "";
+                    locInput.dispatchEvent(new Event("input"));
+                    locInput.dispatchEvent(new Event("change"));
+                }));
+            }
+
+            if (radVal) {
+                activeFiltersContainer.appendChild(createTag('Radius: ' + radVal + ' km', function() {
+                    radSelect.value = "";
+                    radSelect.dispatchEvent(new Event("change"));
+                }));
+            }
+
+            if (catSelect) {
+                Array.from(catSelect.selectedOptions).forEach(function(option) {
+                    activeFiltersContainer.appendChild(createTag('Category: ' + option.text, function() {
+                        option.selected = false;
+                        catSelect.dispatchEvent(new Event("change"));
+                    }));
+                });
+            }
+        }
+
+        if (form) {
+            form.addEventListener("input", updateFilterTags);
+            form.addEventListener("change", updateFilterTags);
+            setTimeout(updateFilterTags, 150);
+        }
+    });
+  </script>
 {% endblock %}

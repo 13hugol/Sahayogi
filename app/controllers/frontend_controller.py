@@ -2,12 +2,26 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+<<<<<<<<< Temporary merge branch 1
 from flask import abort, flash, jsonify, redirect, request, session, url_for
+=========
+from flask import abort, current_app, flash, jsonify, redirect, render_template, request, session, url_for
+>>>>>>>>> Temporary merge branch 2
 from flask_login import current_user, login_required
 from markupsafe import Markup, escape
 
 from app.exceptions import ProfileNotFoundError
-from app.services import ProfileService
+from app.models import Profile, ProfileCertificate, ProfileReview, ProfileSkill, User
+from app.models.notification import Notification
+from app.repositories import ExchangeRequestRepository, ExchangeRepository, SkillRepository
+from app.services import (
+    MatchService,
+    MessageService,
+    NotificationService,
+    ProfileService,
+    SkillService,
+    SkillSearchService,
+)
 from app.services.listing_catalog import (
     all_listings,
     categories,
@@ -21,24 +35,99 @@ from .base_controller import BaseController
 
 
 class FrontendController(BaseController):
-    def __init__(self, profile_service: ProfileService):
+    def __init__(
+        self,
+        profile_service: ProfileService,
+        skill_service: SkillService,
+        skill_search_service: SkillSearchService,
+        message_service: MessageService,
+        notification_service: NotificationService | None = None,
+        match_service: MatchService | None = None,
+    ):
         self._profile_service = profile_service
+        self._skill_service = skill_service
+        self._skill_search_service = skill_search_service
+        self._message_service = message_service
+        self._notification_service = notification_service or NotificationService()
+        self._match_service = match_service
+
+    def _get_filtered_listings(self):
+        q = request.args.get("q", "").strip()
+        listings = self._skill_service.search_listings(query=q if q else None, status="approved")
+        for l in listings:
+            l.distance = None
+        
+        category_ids = []
+        raw_cats = request.args.getlist("category") + request.args.getlist("category[]")
+        for cid in raw_cats:
+            if "," in cid:
+                for part in cid.split(","):
+                    part = part.strip()
+                    if part.isdigit():
+                        category_ids.append(int(part))
+            else:
+                cid = cid.strip()
+                if cid.isdigit():
+                    category_ids.append(int(cid))
+        if category_ids:
+            listings = [l for l in listings if l.category_id in category_ids]
+            
+        location_query = request.args.get("location", "").strip()
+        radius_query = request.args.get("radius", "").strip()
+        if location_query:
+            from app.utils.distance import parse_coordinates, haversine_distance
+            search_coords = parse_coordinates(location_query)
+            radius_km = None
+            if radius_query:
+                try:
+                    radius_km = float(radius_query)
+                except ValueError:
+                    pass
+            filtered_listings = []
+            for l in listings:
+                l_loc_str = l.location_text.strip() if l.location_text else None
+                if not l_loc_str and l.user and l.user.profile and l.user.profile.location:
+                    l_loc_str = l.user.profile.location.strip()
+                l_coords = parse_coordinates(l_loc_str) if l_loc_str else None
+                if search_coords and l_coords:
+                    dist = haversine_distance(search_coords, l_coords)
+                    l.distance = dist
+                    if radius_km is None or dist <= radius_km:
+                        filtered_listings.append(l)
+                elif not search_coords and l_loc_str and location_query.lower() in l_loc_str.lower():
+                    l.distance = None
+                    filtered_listings.append(l)
+            listings = filtered_listings
+        return listings
 
     def _categories(self):
-        return categories()
+        return self._skill_service.get_all_categories()
 
     def marketplace(self):
-        page_data = self._browse_page()
+        listings = self._get_filtered_listings()
+        categories = self._categories()
+        
+        page = request.args.get("page", 1, type=int)
+        per_page = 6
+        total_results = len(listings)
+        total_pages = max(1, (total_results + per_page - 1) // per_page)
+        
+        start = (page - 1) * per_page
+        end = start + per_page
+        paginated_listings = listings[start:end]
+        
+        catalog_total = len(self._skill_service.search_listings(status="approved"))
+        
         return self.render(
             "listings/index.html",
-            listings=page_data.listings,
-            categories=self._categories(),
-            page=page_data.page,
-            total_pages=page_data.total_pages,
-            total_results=page_data.total_results,
+            listings=paginated_listings,
+            categories=categories,
+            page=page,
+            total_pages=total_pages,
+            total_results=total_results,
             saved_listing_ids=self._saved_listing_ids(),
             active_filters=self._active_filters(),
-            catalog_total=len(all_listings()),
+            catalog_total=catalog_total,
         )
 
     def category_overview(self):
@@ -50,19 +139,26 @@ class FrontendController(BaseController):
 
     @login_required
     def post_listing(self):
-        return self.render(
-            "listings/form.html",
-            form=ListingShellForm(categories=self._categories()),
-            title="Create listing",
-        )
+        return self.render("listings/form.html", form=ListingShellForm(), title="Create listing")
 
     @login_required
     def my_listings(self):
-        return self.render("listings/mine.html", listings=[])
+        listings = self._skill_service.get_listings_by_user(current_user.id)
+        return self.render("listings/mine.html", listings=listings)
+
+    def categories_overview(self):
+        from app.repositories import CategoryRepository
+
+        categories = CategoryRepository().all_with_counts()
+        return self.render("listings/categories.html", categories=categories)
 
     def saved_listings(self):
         saved_ids = self._saved_listing_ids()
-        listings = [listing for listing in all_listings() if listing.id in saved_ids]
+        listings = []
+        for lid in saved_ids:
+            l = self._skill_service.get_listing_by_id(lid)
+            if l:
+                listings.append(l)
         return self.render(
             "listings/saved.html",
             listings=listings,
@@ -71,27 +167,50 @@ class FrontendController(BaseController):
         )
 
     def listing_detail(self, listing_id: int):
-        listing = find_listing(listing_id)
-        if listing is None:
+        listing = self._skill_service.get_listing_by_id(listing_id)
+        if not listing:
             abort(404)
+        form = RequestShellForm()
+        if current_user.is_authenticated:
+            form.offered_skill_id.choices = [
+                (skill.id, skill.skill_name) for skill in current_user.offered_skills
+            ]
         return self.render(
             "listings/detail.html",
             listing=listing,
-            request_form=RequestShellForm(),
+            request_form=form,
             saved_listing_ids=self._saved_listing_ids(),
         )
 
     def api_search(self):
-        page_data = self._browse_page(page=1)
+        listings = self._get_filtered_listings()
+        page = request.args.get("page", 1, type=int)
+        per_page = 6
+        total_results = len(listings)
+        start = (page - 1) * per_page
+        end = start + per_page
+        paginated_listings = listings[start:end]
+        
         html = self.render(
             "partials/listing_cards.html",
-            listings=page_data.listings,
+            listings=paginated_listings,
             saved_listing_ids=self._saved_listing_ids(),
         )
-        return jsonify({"count": page_data.total_results, "html": html})
+        return jsonify({"count": total_results, "html": html})
+
+    @login_required
+    def delete_listing(self, listing_id: int):
+        listing = self._skill_service.get_listing_by_id(listing_id)
+        if not listing:
+            abort(404)
+        if listing.user_id != current_user.id:
+            abort(403)
+        self._skill_service.delete_listing(listing_id)
+        flash("Listing deleted successfully.", "success")
+        return redirect(url_for("listings.mine"))
 
     def save_listing(self, listing_id: int):
-        if find_listing(listing_id) is None:
+        if self._skill_service.get_listing_by_id(listing_id) is None:
             abort(404)
         saved_ids = self._saved_listing_ids()
         saved_ids.add(listing_id)
@@ -112,36 +231,77 @@ class FrontendController(BaseController):
 
     @login_required
     def matches(self):
-        return self.render("matches/index.html", matches=[])
+        from app.repositories import (
+            NotificationRepository,
+            ProfileRepository,
+            ProfileSkillRepository,
+            RoleRepository,
+            UserRepository,
+        )
+
+        if self._match_service is None:
+            role_repo = RoleRepository()
+            profile_repo = ProfileRepository()
+            user_repo = UserRepository(role_repository=role_repo, profile_repository=profile_repo)
+            self._match_service = MatchService(
+                user_repository=user_repo,
+                profile_skill_repository=ProfileSkillRepository(),
+                notification_repository=NotificationRepository(),
+            )
+
+        try:
+            matches = self._match_service.mutual_matches_for_user(current_user, notify=True)
+        except Exception:
+            matches = []
+        return self.render(
+            "matches/index.html",
+            matches=matches,
+            empty_state_reason=self._matches_empty_reason(current_user),
+        )
+
+    @staticmethod
+    def _matches_empty_reason(user) -> str | None:
+        if not user.offered_skills and not user.wanted_skills:
+            return "Add offered and wanted skills to your profile to generate mutual matches."
+        if not user.offered_skills:
+            return "Add at least one offered skill so others can find you as a match."
+        if not user.wanted_skills:
+            return "Add at least one wanted skill to discover people who can help."
+        return None
 
     @login_required
     def requests(self):
-        return self.render("requests/inbox.html", requests=[])
+        pending = ExchangeRequestRepository().list_incoming_pending(current_user.id)
+        history = ExchangeRequestRepository().list_incoming_history(current_user.id)
+        return self.render(
+            "requests/inbox.html",
+            pending_requests=pending,
+            history=history,
+        )
 
     @login_required
     def sent_requests(self):
-        return self.render("requests/sent.html", requests=[])
+        sent = ExchangeRequestRepository().list_sent(current_user.id)
+        return self.render("requests/sent.html", requests=sent)
 
     @login_required
     def exchanges(self):
-        return self.render("exchanges/index.html", exchanges=[])
+        exchanges_list = ExchangeRepository().list_for_user(current_user.id)
+        return self.render("exchanges/index.html", exchanges=exchanges_list)
 
     @login_required
     def exchange_detail(self, exchange_id: int):
-        exchange = SimpleNamespace(
-            id=exchange_id,
-            status="frontend-only",
-            exchange_type="credit",
-            created_at=None,
-            completed_at=None,
-            request=SimpleNamespace(credits_reserved=0),
-            barter_skill=None,
-            listing=SimpleNamespace(title="Exchange preview"),
-            teacher=SimpleNamespace(full_name="Teacher"),
-            learner=SimpleNamespace(full_name="Learner"),
-            conversation=None,
-            completion_marks=[],
-        )
+        exchange = ExchangeRepository().find_by_id(exchange_id)
+        if not exchange:
+            abort(404)
+        request_obj = exchange.request
+        if not request_obj:
+            abort(404)
+        listing = request_obj.listing
+        if not listing:
+            abort(404)
+        if current_user.id not in [request_obj.learner_id, listing.user_id]:
+            abort(403)
         return self.render(
             "exchanges/detail.html",
             exchange=exchange,
@@ -151,18 +311,167 @@ class FrontendController(BaseController):
         )
 
     @login_required
+    def create_request(self, listing_id: int):
+        listing = SkillRepository().find_by_id(listing_id)
+        if not listing:
+            abort(404)
+        if current_user.id == listing.user_id:
+            flash("You cannot request your own listing.", "danger")
+            return redirect(url_for("listings.detail", listing_id=listing_id))
+        
+        if listing.exchange_type == "credit":
+            if current_user.available_credit_balance < listing.credit_cost:
+                flash("Your available credit balance is insufficient to request this skill.", "danger")
+                return redirect(url_for("listings.detail", listing_id=listing_id))
+        
+        offered_skill_id = request.form.get("offered_skill_id")
+        if offered_skill_id:
+            offered_skill_id = int(offered_skill_id)
+        else:
+            offered_skill_id = None
+            
+        requested_message = request.form.get("requested_message", "").strip() or None
+        
+        ExchangeRequestRepository().create(
+            listing_id=listing_id,
+            learner_id=current_user.id,
+            offered_skill_id=offered_skill_id,
+            requested_message=requested_message,
+        )
+        self._notification_service.notify_exchange_request(
+            user_id=listing.user_id,
+            requester_name=current_user.full_name,
+            skill_title=listing.title,
+            target_url="/requests/inbox",
+        )
+        flash("Your request has been submitted.", "success")
+        return redirect(url_for("requests_bp.sent"))
+
+    @login_required
+    def accept_request(self, request_id: int):
+        request_obj = ExchangeRequestRepository().find_by_id(request_id)
+        if not request_obj:
+            abort(404)
+        listing = request_obj.listing
+        if not listing:
+            abort(404)
+        if current_user.id != listing.user_id:
+            abort(403)
+        if request_obj.status != "pending":
+            return redirect(url_for("requests_bp.inbox"))
+            
+        ExchangeRequestRepository().update_status(request_id, "accepted")
+        ExchangeRepository().create(request_id=request_id)
+        
+        self._message_service.create_conversation(
+            subject=f"Exchange: {listing.title}",
+            permission_source="accepted_exchange",
+            participant_ids=[listing.user_id, request_obj.learner_id],
+        )
+
+        self._notification_service.notify_request_accepted(
+            user_id=request_obj.learner_id,
+            skill_title=listing.title,
+            target_url="/requests/inbox",
+        )
+
+        flash("Request accepted and exchange created.", "success")
+        return redirect(url_for("requests_bp.inbox"))
+
+    @login_required
+    def decline_request(self, request_id: int):
+        request_obj = ExchangeRequestRepository().find_by_id(request_id)
+        if not request_obj:
+            abort(404)
+        listing = request_obj.listing
+        if not listing:
+            abort(404)
+        if current_user.id != listing.user_id:
+            abort(403)
+        if request_obj.status != "pending":
+            return redirect(url_for("requests_bp.inbox"))
+            
+        decline_reason = request.form.get("decline_reason", "").strip() or None
+        ExchangeRequestRepository().update_status(request_id, "declined", decline_reason=decline_reason)
+
+        self._notification_service.notify_request_declined(
+            user_id=request_obj.learner_id,
+            skill_title=listing.title,
+            reason=decline_reason,
+            target_url="/requests/inbox",
+        )
+
+        flash("Request declined.", "warning")
+        return redirect(url_for("requests_bp.inbox"))
+
+    @login_required
+    def cancel_request(self, request_id: int):
+        request_obj = ExchangeRequestRepository().find_by_id(request_id)
+        if not request_obj:
+            abort(404)
+        if current_user.id != request_obj.learner_id:
+            abort(403)
+        if request_obj.status != "pending":
+            return redirect(url_for("requests_bp.sent"))
+            
+        ExchangeRequestRepository().update_status(request_id, "cancelled")
+        
+        flash("Request cancelled.", "info")
+        return redirect(url_for("requests_bp.sent"))
+
+    @login_required
     def messages(self):
-        return self.render("messages/index.html", conversations=[])
+        conversations = self._message_service.list_conversations(current_user.id)
+        active_conversation = conversations[0] if conversations else None
+        ordered_messages = []
+        if active_conversation:
+            active_conversation = self._message_service.get_conversation(active_conversation.id, current_user.id)
+            if active_conversation:
+                self._message_service.mark_read(
+                    conversation_id=active_conversation.id,
+                    user_id=current_user.id,
+                )
+                conversations = self._message_service.list_conversations(current_user.id)
+                ordered_messages = active_conversation.messages
+        return self.render(
+            "messages/index.html",
+            conversations=conversations,
+            conversation=active_conversation,
+            ordered_messages=ordered_messages,
+            form=MessageShellForm(),
+        )
 
     @login_required
     def conversation(self, conversation_id: int):
-        conversation = SimpleNamespace(
-            id=conversation_id,
-            subject="Conversation preview",
-            messages=[],
-            other_participant=lambda _user_id: SimpleNamespace(full_name="Exchange partner"),
+        conversation = self._message_service.get_conversation(conversation_id, current_user.id)
+        if not conversation:
+            abort(404)
+        if request.method == "POST":
+            body = request.form.get("body", "")
+            try:
+                self._message_service.send_message(
+                    conversation_id=conversation_id,
+                    sender_id=current_user.id,
+                    body=body,
+                )
+            except ValueError as exc:
+                flash(str(exc), "danger")
+            except PermissionError:
+                abort(403)
+            else:
+                flash("Message sent.", "success")
+                return redirect(url_for("messages.detail", conversation_id=conversation_id))
+
+        self._message_service.mark_read(conversation_id=conversation_id, user_id=current_user.id)
+        conversation = self._message_service.get_conversation(conversation_id, current_user.id)
+        conversations = self._message_service.list_conversations(current_user.id)
+        return self.render(
+            "messages/detail.html",
+            conversation=conversation,
+            conversations=conversations,
+            ordered_messages=conversation.messages,
+            form=MessageShellForm(),
         )
-        return self.render("messages/detail.html", conversation=conversation, form=MessageShellForm())
 
     @login_required
     def notifications(self):
@@ -170,7 +479,32 @@ class FrontendController(BaseController):
 
     @login_required
     def notification_counts(self):
-        return jsonify({"messages": 0, "notifications": 0})
+        return jsonify(
+            {
+                "messages": 0,
+                "notifications": self._notification_service.unread_count(current_user.id),
+            }
+        )
+
+    @login_required
+    def mark_all_notifications_read(self):
+        updated = self._notification_service.mark_all_read(current_user.id)
+        if updated:
+            flash(f"{updated} notification{'s' if updated != 1 else ''} marked as read.", "success")
+        else:
+            flash("No unread notifications to mark.", "info")
+        return redirect(url_for("notifications.index"))
+
+    @login_required
+    def open_notification(self, notification_id: int):
+        notification = self._notification_service.mark_read(current_user.id, notification_id)
+        if not notification:
+            flash("Notification not found.", "warning")
+            return redirect(url_for("notifications.index"))
+        target_url = notification.target_url or url_for("notifications.index")
+        if not target_url.startswith("/") or target_url.startswith("//"):
+            target_url = url_for("notifications.index")
+        return redirect(target_url)
 
     @login_required
     def profile_me(self):
@@ -178,7 +512,127 @@ class FrontendController(BaseController):
 
     @login_required
     def profile_edit(self):
+<<<<<<<<< Temporary merge branch 1
         return self.render("profile/edit.html", form=ProfileShellForm())
+=========
+        user = User.find_by_id(current_user.id)
+        if not user or not user.profile:
+            abort(404)
+
+        errors: dict[str, str] = {}
+        values = self._profile_edit_values(user)
+
+        if request.method == "POST":
+            values = self._submitted_profile_values()
+            errors = self._validate_profile_edit(values)
+            avatar = request.files.get("avatar")
+            avatar_extension = None
+
+            if avatar and avatar.filename:
+                avatar_extension, avatar_error = self._validate_avatar_upload(avatar)
+                if avatar_error:
+                    errors["avatar"] = avatar_error
+
+            if not errors:
+                avatar_path = None
+                if avatar and avatar.filename and avatar_extension:
+                    avatar_path = self._save_avatar_upload(avatar, avatar_extension)
+
+                User.update_full_name(user.id, values["full_name"])
+                Profile.update_details(
+                    user.id,
+                    location=values["location"],
+                    bio=values["bio"],
+                    avatar_path=avatar_path,
+                )
+                ProfileSkill.sync_for_user(user.id, "offered", values["offered_skills"])
+                ProfileSkill.sync_for_user(user.id, "wanted", values["wanted_skills"])
+                flash("Profile updated successfully.", "success")
+                return redirect(url_for("profile.edit"))
+
+        return render_template(
+            "profile/edit.html",
+            errors=errors,
+            max_avatar_mb=5,
+            user=user,
+            values=values,
+        )
+
+    def _profile_edit_values(self, user: User) -> dict:
+        return {
+            "full_name": user.full_name,
+            "bio": user.profile.bio or "",
+            "location": user.profile.location or "",
+            "offered_skills": [skill.skill_name for skill in user.offered_skills],
+            "wanted_skills": [skill.skill_name for skill in user.wanted_skills],
+        }
+
+    def _submitted_profile_values(self) -> dict:
+        return {
+            "full_name": request.form.get("full_name", "").strip(),
+            "bio": request.form.get("bio", "").strip(),
+            "location": request.form.get("location", "").strip(),
+            "offered_skills": ProfileSkill.clean_skill_names(request.form.getlist("offered_skills")),
+            "wanted_skills": ProfileSkill.clean_skill_names(request.form.getlist("wanted_skills")),
+        }
+
+    def _validate_profile_edit(self, values: dict) -> dict[str, str]:
+        errors: dict[str, str] = {}
+        if not values["full_name"]:
+            errors["full_name"] = "Full name is required."
+        elif len(values["full_name"]) > 120:
+            errors["full_name"] = "Full name must be 120 characters or fewer."
+
+        if not values["location"]:
+            errors["location"] = "Location is required."
+        elif len(values["location"]) > 160:
+            errors["location"] = "Location must be 160 characters or fewer."
+
+        if len(values["bio"]) > 1000:
+            errors["bio"] = "Bio must be 1000 characters or fewer."
+
+        for field_name in ("offered_skills", "wanted_skills"):
+            if any(len(skill_name) > 120 for skill_name in values[field_name]):
+                errors[field_name] = "Each skill must be 120 characters or fewer."
+
+        return errors
+
+    def _validate_avatar_upload(self, avatar) -> tuple[str | None, str | None]:
+        filename = secure_filename(avatar.filename or "")
+        extension = Path(filename).suffix.lower()
+        if extension not in ALLOWED_AVATAR_EXTENSIONS:
+            return None, "Avatar must be a JPG or PNG file."
+        if avatar.mimetype not in ALLOWED_AVATAR_MIMETYPES:
+            return None, "Avatar must be uploaded as a JPG or PNG image."
+
+        try:
+            avatar.stream.seek(0, os.SEEK_END)
+            size = avatar.stream.tell()
+            avatar.stream.seek(0)
+            header = avatar.stream.read(16)
+            avatar.stream.seek(0)
+        except OSError:
+            return None, "Avatar could not be read. Please choose another file."
+
+        if size <= 0:
+            return None, "Avatar file is empty."
+        if size > MAX_AVATAR_BYTES:
+            return None, "Avatar must be under 5MB."
+        if extension == ".png" and not header.startswith(b"\x89PNG\r\n\x1a\n"):
+            return None, "Avatar file content must match the PNG format."
+        if extension in {".jpg", ".jpeg"} and not header.startswith(b"\xff\xd8\xff"):
+            return None, "Avatar file content must match the JPG format."
+
+        return extension, None
+
+    def _save_avatar_upload(self, avatar, extension: str) -> str:
+        avatar_dir = Path(current_app.config["UPLOAD_FOLDER"]) / "avatars"
+        avatar_dir.mkdir(parents=True, exist_ok=True)
+        filename = f"user-{current_user.id}-{uuid4().hex}{extension}"
+        avatar.stream.seek(0)
+        avatar.save(avatar_dir / filename)
+        return f"avatars/{filename}"
+>>>>>>>>> Temporary merge branch 2
 
     @login_required
     def certificates(self):
@@ -198,8 +652,47 @@ class FrontendController(BaseController):
             report_form=ReportShellForm(),
         )
 
+    @login_required
     def report_user(self, user_id: int):
-        return self.profile_view(user_id)
+        target_user = User.find_by_id(user_id)
+        if not target_user:
+            abort(404)
+        if target_user.id == current_user.id:
+            flash("You cannot report yourself.", "danger")
+            return redirect(url_for("profile.view", user_id=user_id))
+
+        if request.method == "POST":
+            from app.repositories import ReportRepository
+            report_repo = ReportRepository()
+            if report_repo.has_recent_report(current_user.id, target_user.id, within_days=7):
+                flash("You cannot submit duplicate reports against the same user within a 7-day window.", "danger")
+                return redirect(url_for("profile.view", user_id=user_id))
+
+            reason = request.form.get("reason", "").strip()
+            description = request.form.get("description", "").strip() or None
+
+            valid_reasons = {"spam", "harassment", "fake_profile", "fraud", "other"}
+            if not reason or reason not in valid_reasons:
+                flash("Invalid report reason selected.", "danger")
+                return redirect(url_for("profile.view", user_id=user_id))
+
+            report_repo.create(
+                reporter_id=current_user.id,
+                reported_user_id=target_user.id,
+                reason=reason,
+                description=description,
+            )
+
+            self._notification_service.notify_report_received(
+                user_id=current_user.id,
+                reported_name=target_user.full_name,
+                target_url=url_for("profile.view", user_id=user_id),
+            )
+
+            flash("Your report has been submitted to the admin review team.", "success")
+            return redirect(url_for("profile.view", user_id=user_id))
+
+        return redirect(url_for("profile.view", user_id=user_id))
 
     def top_rated(self):
         return self.render("reviews/top_rated.html", profiles=self._profile_service.get_top_rated_profiles())
@@ -293,16 +786,15 @@ class FrontendController(BaseController):
 class ShellForm:
     fields: dict[str, str] = {}
 
-    def __init__(self, *, choices: dict[str, list[tuple[str, str]]] | None = None):
-        self.choices = choices or {}
-
     def hidden_tag(self):
         token = session.get("csrf_token", "")
         return Markup(f'<input type="hidden" name="csrf_token" value="{escape(token)}">')
 
     def __getattr__(self, name: str):
+        if name in self._fields_cache:
+            return self._fields_cache[name]
         field_type = self.fields.get(name, "text")
-        return ShellField(name, field_type, choices=self.choices.get(name, []))
+        return ShellField(name, field_type)
 
 
 class ShellField:
@@ -312,36 +804,41 @@ class ShellField:
         self.choices = choices or []
         self.errors = []
         self.label = ShellLabel(name)
+        self.choices = []
+        self.data = None
 
     def __call__(self, *args, **kwargs):
+        if self.data is not None and "value" not in kwargs and self.field_type not in ["select", "textarea", "submit"]:
+            kwargs["value"] = self.data
         attrs = html_attrs(kwargs)
         if self.field_type == "textarea":
-            return Markup(f'<textarea name="{self.name}" {attrs}></textarea>')
+            val = escape(str(self.data)) if self.data is not None else ""
+            return Markup(f'<textarea name="{self.name}" {attrs}>{val}</textarea>')
         if self.field_type == "select":
-            options = []
-            if self.name == "category_id":
-                options.append('<option value="">Choose one category</option>')
-            for value, label in self.choices:
-                options.append(f'<option value="{escape(value)}">{escape(label)}</option>')
-            return Markup(f'<select name="{self.name}" {attrs}>{"".join(options)}</select>')
+            return Markup(f'<select name="{self.name}" {attrs}></select>')
         if self.field_type == "submit":
             return Markup(f'<button type="submit" {attrs}>Save</button>')
         return Markup(f'<input type="{self.field_type}" name="{self.name}" {attrs}>')
 
     def __iter__(self):
         if self.name == "exchange_type":
-            yield ShellRadioField(self.name, "credit", "Credit")
-            yield ShellRadioField(self.name, "teach", "Teach")
+            checked_credit = (self.data == "credit") or (self.data is None)
+            checked_teach = (self.data == "teach")
+            yield ShellRadioField(self.name, "credit", "Credit", checked=checked_credit)
+            yield ShellRadioField(self.name, "teach", "Teach", checked=checked_teach)
         return
 
 
 class ShellRadioField:
-    def __init__(self, name: str, value: str, label: str):
+    def __init__(self, name: str, value: str, label: str, checked: bool = False):
         self.name = name
         self.value = value
         self.label = ShellTextLabel(label)
+        self.checked = checked
 
     def __call__(self, *args, **kwargs):
+        if self.checked:
+            kwargs["checked"] = True
         attrs = html_attrs(kwargs)
         return Markup(f'<input type="radio" name="{self.name}" value="{self.value}" {attrs}>')
 
@@ -364,11 +861,15 @@ class ShellTextLabel:
 
 class ListingShellForm(ShellForm):
     fields = {
+        "title": "text",
         "description": "textarea",
         "availability_labels": "textarea",
         "exchange_type": "select",
         "skill_id": "select",
         "category_id": "select",
+        "min_credits": "text",
+        "location_text": "text",
+        "contact_method": "text",
         "submit": "submit",
     }
 
@@ -413,6 +914,16 @@ class MessageShellForm(ShellForm):
 
 class ReportShellForm(ShellForm):
     fields = {"reason": "select", "description": "textarea", "submit": "submit"}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.reason.choices = [
+            ("spam", "Spam"),
+            ("harassment", "Harassment"),
+            ("fake_profile", "Fake Profile"),
+            ("fraud", "Fraud"),
+            ("other", "Other"),
+        ]
 
 
 class ReviewShellForm(ShellForm):

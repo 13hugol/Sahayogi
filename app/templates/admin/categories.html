@@ -11,25 +11,20 @@
           <form method="post">
             {{ form.hidden_tag() }}
             <div class="mb-3">
-              {{ form.name.label(class="form-label") }}
-              {{ form.name(class="form-control", required=True) }}
-              {% for error in form.name.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              <label class="form-label" for="new_name">Name</label>
+              <input class="form-control" type="text" id="new_name" name="name" maxlength="80" required>
             </div>
             <div class="mb-3">
-              {{ form.slug.label(class="form-label") }}
-              {{ form.slug(class="form-control", placeholder="Auto-generated from the name") }}
-              {% for error in form.slug.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              <label class="form-label" for="new_icon">Icon (2-3 letters)</label>
+              <input class="form-control" type="text" id="new_icon" name="icon" value="CAT" maxlength="8" required>
             </div>
             <div class="mb-3">
-              {{ form.icon.label(class="form-label") }}
-              {{ form.icon(class="form-control", placeholder="TECH") }}
-              <div class="form-text">Example: TECH</div>
-              {% for error in form.icon.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              <label class="form-label" for="new_description">Description</label>
+              <textarea class="form-control" id="new_description" name="description" rows="3" maxlength="255"></textarea>
             </div>
             <div class="mb-3">
-              {{ form.description.label(class="form-label") }}
-              {{ form.description(class="form-control", rows="4") }}
-              {% for error in form.description.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              <label class="form-label" for="new_sort_order">Sort order</label>
+              <input class="form-control" type="number" id="new_sort_order" name="sort_order" value="0">
             </div>
             {{ form.submit(class="btn btn-accent") }}
           </form>
@@ -39,21 +34,27 @@
     <div class="col-lg-7">
       <div class="card card-shell">
         <div class="card-body">
-          <h2 class="h5 mb-3">Existing categories</h2>
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h5 mb-0">Existing categories</h2>
+            <span class="badge text-bg-light">{{ categories|length }} total</span>
+          </div>
           <div class="list-group list-group-flush">
             {% for category in categories %}
               <div class="list-group-item d-flex justify-content-between align-items-center">
-                <div>
-                  <div class="d-flex align-items-center gap-2">
-                    <span class="category-label">{{ category.icon }}</span>
+                <div class="d-flex align-items-center gap-3">
+                  <span class="category-icon" aria-hidden="true">{{ category.icon or 'CAT' }}</span>
+                  <div>
                     <strong>{{ category.name }}</strong>
+                    <div class="small text-muted">{{ category.slug }} &middot; {{ category.description or 'No description' }}</div>
                   </div>
-                  <div class="small text-muted">{{ category.slug }} &middot; {{ category.description }}</div>
                 </div>
-                <a class="btn btn-outline-primary btn-sm" href="{{ url_for('admin.edit_category', category_id=category.id) }}">Edit</a>
+                <div class="d-flex align-items-center gap-2">
+                  <span class="badge text-bg-light">{{ category.listing_count or 0 }} listings</span>
+                  <a class="btn btn-outline-primary btn-sm" href="{{ url_for('admin.edit_category', category_id=category.id) }}">Edit</a>
+                </div>
               </div>
             {% else %}
-              <div class="list-group-item text-muted">No categories have been created yet.</div>
+              <div class="text-muted small">No categories yet. Add the first one on the left.</div>
             {% endfor %}
           </div>
         </div>

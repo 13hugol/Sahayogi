@@ -58,6 +58,24 @@
               </div>
             </form>
           </div>
+
+          <div class="modal fade" id="unsaved-profile-modal" tabindex="-1" aria-labelledby="unsaved-profile-title" aria-hidden="true" data-unsaved-modal>
+            <div class="modal-dialog modal-dialog-centered">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h2 class="modal-title h5" id="unsaved-profile-title">Unsaved changes</h2>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" data-stay-on-profile></button>
+                </div>
+                <div class="modal-body">
+                  Leave this page without saving your profile changes?
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-outline-secondary" data-stay-on-profile>Keep editing</button>
+                  <button type="button" class="btn btn-danger" data-leave-profile>Leave without saving</button>
+                </div>
+              </div>
+            </div>
+          </div>
           <div class="danger-zone mt-4">
             <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-3">
               <div>

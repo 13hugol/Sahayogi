@@ -1291,3 +1291,66 @@ h6,
     border-radius: var(--radius-sm) !important;
   }
 }
+
+.category-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--blue-soft);
+  color: var(--navy);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.category-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.category-pill .category-icon {
+  width: 22px;
+  height: 22px;
+  font-size: 0.62rem;
+  border-radius: 6px;
+}
+
+.match-card {
+  position: relative;
+}
+
+.match-card .badge-relevance {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: var(--orange);
+  color: white;
+  font-weight: 700;
+}
+
+.empty-state {
+  background: var(--surface-soft);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 1rem;
+  flex-wrap: wrap;
+}

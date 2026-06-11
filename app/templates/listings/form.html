@@ -14,6 +14,14 @@
       <div class="card card-shell">
         <div class="card-body">
           <h1 class="h3 mb-4">{{ title }}</h1>
+          {% if not current_user.offered_skills %}
+            <div class="alert alert-warning mb-4">
+              <strong>No offered skills listed on your profile.</strong> You must add at least one offered skill to your profile before you can post a skill offer.
+              <div class="mt-2">
+                <a class="btn btn-sm btn-outline-warning" href="{{ url_for('profile.edit') }}">Edit Profile to Add Skills</a>
+              </div>
+            </div>
+          {% endif %}
           <form method="post">
             {{ form.hidden_tag() }}
             <div class="row g-3">

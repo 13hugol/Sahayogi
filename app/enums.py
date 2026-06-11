@@ -22,6 +22,9 @@ class UserRole(str, Enum):
 
 class AccountStatus(str, Enum):
     ACTIVE = "active"
+    SUSPENDED = "suspended"
+    BANNED = "banned"
+    DELETED = "deleted"
 
 
 class SkillType(str, Enum):

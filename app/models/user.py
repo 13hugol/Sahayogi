@@ -112,6 +112,8 @@ class Profile(BaseModel):
             params.append(avatar_path)
         params.append(user_id)
 
+        from app.database import Database
+
         db = Database()
         try:
             db.execute(
@@ -140,6 +142,8 @@ class User(UserMixin, BaseModel):
         created_at: datetime | None = None,
         role: Role | None = None,
         profile: Profile | None = None,
+        suspended_until: datetime | None = None,
+        suspension_reason: str | None = None,
     ):
         self.id = id
         self.full_name = full_name
@@ -155,6 +159,8 @@ class User(UserMixin, BaseModel):
         self.created_at = created_at
         self.role = role
         self.profile = profile
+        self.suspended_until = suspended_until
+        self.suspension_reason = suspension_reason
 
     @classmethod
     def from_row(cls, row: dict | None) -> "User | None":
@@ -177,6 +183,8 @@ class User(UserMixin, BaseModel):
             created_at=row.get("created_at"),
             role=role,
             profile=profile,
+            suspended_until=row.get("suspended_until"),
+            suspension_reason=row.get("suspension_reason"),
         )
 
     @classmethod
@@ -199,6 +207,8 @@ class User(UserMixin, BaseModel):
 
     @classmethod
     def update_full_name(cls, user_id: int, full_name: str) -> None:
+        from app.database import Database
+
         db = Database()
         try:
             db.execute("UPDATE users SET full_name = %s WHERE id = %s", (full_name.strip(), user_id))
@@ -316,7 +326,7 @@ class User(UserMixin, BaseModel):
 
     @property
     def available_credit_balance(self) -> int:
-        return 0
+        return 100
 
     @property
     def offered_skills(self) -> list:

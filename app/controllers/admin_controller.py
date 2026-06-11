@@ -2,12 +2,19 @@ from __future__ import annotations
 
 import re
 
-from flask import flash, redirect, request, session, url_for
+from flask import abort, flash, redirect, request, session, url_for
 from flask_login import current_user
 from markupsafe import Markup, escape
 
 from app.auth import admin_required
-from app.exceptions import CategoryNotFoundError, InvalidRoleError, SelfRoleChangeError, UserNotFoundError
+from app.exceptions import (
+    CategoryInUseError,
+    CategoryNotFoundError,
+    DuplicateCategoryError,
+    InvalidRoleError,
+    SelfRoleChangeError,
+    UserNotFoundError,
+)
 from app.services import AdminService
 from app.validators import RoleAssignmentValidator
 
@@ -59,7 +66,61 @@ class AdminController(BaseController):
 
     @admin_required
     def listings(self):
-        return self.render("admin/listings.html", listings=[])
+        from app.models.skill import Category
+        category_id = request.args.get("category_id", type=int)
+        username = request.args.get("username", "").strip() or None
+        sort_order = request.args.get("sort_order", "desc")
+        
+        listings = self._admin_service.get_pending_listings(
+            category_id=category_id,
+            username=username,
+            sort_order=sort_order
+        )
+        categories = Category.all()
+        return self.render(
+            "admin/listings.html",
+            listings=listings,
+            categories=categories,
+            category_id=category_id,
+            username=username,
+            sort_order=sort_order
+        )
+
+    @admin_required
+    def approve_listing(self, listing_id: int):
+        listing = self._admin_service.approve_listing(current_user, listing_id)
+        if not listing:
+            flash("Listing not found.", "danger")
+            return redirect(url_for("admin.listings"))
+        self._admin_service._notification_service.notify_listing_approved(
+            user_id=listing.user_id,
+            skill_title=listing.title,
+            target_url="/listings/mine",
+        )
+        flash(f"Listing '{listing.title}' approved successfully.", "success")
+        return redirect(url_for("admin.listings"))
+
+    @admin_required
+    def reject_listing(self, listing_id: int):
+        reason = request.form.get("reason", "").strip()
+        if not reason:
+            flash("Rejection reason is required.", "danger")
+            return redirect(url_for("admin.listings"))
+
+        listing = self._admin_service.reject_listing(current_user, listing_id, reason)
+        if not listing:
+            flash("Listing not found.", "danger")
+            return redirect(url_for("admin.listings"))
+
+        self._admin_service._notification_service.notify_listing_rejected(
+            user_id=listing.user_id,
+            skill_title=listing.title,
+            reason=reason,
+            target_url="/listings/mine",
+        )
+
+        flash(f"Listing '{listing.title}' rejected.", "success")
+        return redirect(url_for("admin.listings"))
 
     @admin_required
     def certificates(self):
@@ -67,7 +128,23 @@ class AdminController(BaseController):
 
     @admin_required
     def reports(self):
-        return self.render("admin/reports.html", reports=[])
+        reports_list = self._admin_service.list_reports()
+        return self.render("admin/reports.html", reports=reports_list)
+
+    @admin_required
+    def resolve_report(self, report_id: int):
+        decision = request.args.get("decision", "").strip()
+        if decision not in {"resolved", "dismissed"}:
+            flash("Invalid decision.", "danger")
+            return redirect(url_for("admin.reports"))
+
+        report = self._admin_service.resolve_report(current_user, report_id, decision)
+        if not report:
+            flash("Report not found.", "danger")
+            return redirect(url_for("admin.reports"))
+
+        flash(f"Report has been {decision}.", "success")
+        return redirect(url_for("admin.reports"))
 
     @admin_required
     def reviews(self):
@@ -77,6 +154,7 @@ class AdminController(BaseController):
     def categories(self):
         form = CategoryForm(submit_label="Create category")
         if request.method == "POST":
+<<<<<<< HEAD
             form = CategoryForm(request.form, submit_label="Create category")
             if form.validate(self._admin_service):
                 category = self._admin_service.create_category(
@@ -86,11 +164,39 @@ class AdminController(BaseController):
                 flash(f"Category {category.name} created.", "success")
                 return redirect(url_for("admin.categories"))
         return self.render("admin/categories.html", categories=self._admin_service.list_categories(), form=form)
+=======
+            name = request.form.get("name", "").strip()
+            description = request.form.get("description", "").strip() or None
+            icon = (request.form.get("icon", "CAT") or "CAT").strip().upper()[:8] or "CAT"
+            try:
+                sort_order = int(request.form.get("sort_order", "0") or 0)
+            except ValueError:
+                sort_order = 0
+            try:
+                self._admin_service.create_category(
+                    admin_user=current_user,
+                    name=name,
+                    description=description,
+                    icon=icon,
+                    sort_order=sort_order,
+                )
+            except DuplicateCategoryError as exc:
+                flash(str(exc), "danger")
+            except ValueError as exc:
+                flash(str(exc), "danger")
+            else:
+                flash(f"Category '{name}' created.", "success")
+            return redirect(url_for("admin.categories"))
+
+        categories = self._admin_service.list_categories()
+        return self.render("admin/categories.html", categories=categories, form=EmptyForm())
+>>>>>>> e38cbda6645fa3211fdeb0889beaec2fe1e0012a
 
     @admin_required
     def edit_category(self, category_id: int):
         category = self._admin_service.find_category(category_id)
         if not category:
+<<<<<<< HEAD
             flash("Category not found.", "danger")
             return redirect(url_for("admin.categories"))
 
@@ -110,12 +216,105 @@ class AdminController(BaseController):
                 flash(f"Category {category.name} updated.", "success")
                 return redirect(url_for("admin.categories"))
         return self.render("admin/category_form.html", form=form, category=category)
+=======
+            abort(404)
+        if request.method == "POST":
+            name = request.form.get("name", "").strip() or category.name
+            description = request.form.get("description", "").strip() or None
+            icon_raw = request.form.get("icon", category.icon or "CAT").strip().upper()[:8]
+            icon = icon_raw or "CAT"
+            try:
+                sort_order = int(request.form.get("sort_order", str(category.sort_order)) or 0)
+            except ValueError:
+                sort_order = category.sort_order
+            is_active = request.form.get("is_active") == "on"
+            try:
+                self._admin_service.update_category(
+                    admin_user=current_user,
+                    category_id=category_id,
+                    name=name,
+                    description=description,
+                    icon=icon,
+                    sort_order=sort_order,
+                    is_active=is_active,
+                )
+            except CategoryNotFoundError:
+                abort(404)
+            flash(f"Category '{name}' updated.", "success")
+            return redirect(url_for("admin.categories"))
+
+        return self.render("admin/category_form.html", form=EmptyForm(), category=category)
+
+    @admin_required
+    def delete_category(self, category_id: int):
+        try:
+            self._admin_service.delete_category(current_user, category_id)
+        except CategoryNotFoundError:
+            abort(404)
+        except CategoryInUseError as exc:
+            flash(str(exc), "danger")
+            return redirect(url_for("admin.categories"))
+        flash("Category removed.", "success")
+        return redirect(url_for("admin.categories"))
+>>>>>>> e38cbda6645fa3211fdeb0889beaec2fe1e0012a
 
     @admin_required
     def skills(self):
         if request.method == "POST":
             flash("Skill management is frontend-only in the current project scope.", "info")
         return self.render("admin/skills.html", skills=[], form=EmptyForm())
+
+    @admin_required
+    def suspend_user(self, user_id: int):
+        try:
+            days = int(request.form.get("days", "0"))
+            reason = request.form.get("reason", "").strip()
+            self._admin_service.suspend_user(
+                admin_user=current_user,
+                target_user_id=user_id,
+                days=days,
+                reason=reason,
+            )
+            flash("User has been temporarily suspended.", "success")
+        except ValueError as exc:
+            flash(str(exc), "danger")
+        except UserNotFoundError as exc:
+            flash(str(exc), "danger")
+            return redirect(url_for("admin.users"))
+            
+        return redirect(url_for("admin.users", user_id=user_id))
+
+    @admin_required
+    def ban_user(self, user_id: int):
+        try:
+            reason = request.form.get("reason", "").strip()
+            self._admin_service.ban_user(
+                admin_user=current_user,
+                target_user_id=user_id,
+                reason=reason,
+            )
+            flash("User has been permanently banned and their active listings deactivated.", "success")
+        except ValueError as exc:
+            flash(str(exc), "danger")
+        except UserNotFoundError as exc:
+            flash(str(exc), "danger")
+            return redirect(url_for("admin.users"))
+            
+        return redirect(url_for("admin.users", user_id=user_id))
+
+    @admin_required
+    def unsuspend_user(self, user_id: int):
+        try:
+            self._admin_service.unsuspend_user(
+                admin_user=current_user,
+                target_user_id=user_id,
+            )
+            flash("User restriction has been lifted.", "success")
+        except UserNotFoundError as exc:
+            flash(str(exc), "danger")
+            return redirect(url_for("admin.users"))
+            
+        return redirect(url_for("admin.users", user_id=user_id))
 
 
 class CategoryForm:

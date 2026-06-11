@@ -67,10 +67,20 @@ def _clear_database() -> None:
     try:
         db.execute("SET FOREIGN_KEY_CHECKS = 0")
         for table in (
+            "reports",
+            "exchanges",
+            "exchange_requests",
+            "message_posts",
+            "message_participants",
+            "message_conversations",
+            "notifications",
+            "skills",
+            "categories",
             "admin_audit_logs",
             "profile_reviews",
             "profile_certificates",
             "profile_skills",
+            "skill_search_listings",
             "password_reset_tokens",
             "categories",
             "profiles",

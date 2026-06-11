@@ -1,31 +1,35 @@
 {% set active_nav = 'listings' %}
 {% extends "base.html" %}
-{% block title %}Skill Categories | Sahayogi{% endblock %}
+{% block title %}Skill categories | Sahayogi{% endblock %}
 {% block content %}
-  <header class="page-header">
+  <div class="section-head mb-4">
     <div>
-      <span class="eyebrow">Discovery</span>
+      <span class="eyebrow">Browse by topic</span>
       <h1 class="h2 mb-0">Skill categories</h1>
-      <p class="page-subtitle">{{ catalog_total }} approved listings organized by primary category.</p>
     </div>
-    <a class="btn btn-outline-primary" href="{{ url_for('listings.index') }}">Browse listings</a>
-  </header>
+    <a class="btn btn-outline-primary" href="{{ url_for('listings.index') }}">Back to listings</a>
+  </div>
 
-  <section class="category-overview-grid" aria-label="Skill category overview">
-    {% for item in category_overview %}
-      <article class="category-overview-card">
-        <div class="category-overview-head">
-          <span class="category-label">{{ item.category.icon }}</span>
-          <span class="badge text-bg-light">{{ item.active_listing_count }} active</span>
-        </div>
-        <h2 class="h4 mb-2">{{ item.category.name }}</h2>
-        <p class="text-muted">{{ item.category.description or "Community skill category." }}</p>
-        <a class="btn btn-outline-primary mt-auto" href="{{ url_for('listings.index', category=item.category.id) }}">
-          Browse {{ item.category.name }}
+  <div class="row g-4">
+    {% for category in categories %}
+      <div class="col-md-6 col-lg-4">
+        <a class="card card-shell text-decoration-none h-100" href="{{ url_for('listings.index', category=category.id) }}">
+          <div class="card-body d-flex flex-column gap-3">
+            <div class="d-flex align-items-center gap-3">
+              <span class="category-icon">{{ category.icon or 'CAT' }}</span>
+              <div>
+                <h2 class="h5 mb-0">{{ category.name }}</h2>
+                <div class="small text-muted">{{ category.listing_count or 0 }} active listing{{ '' if (category.listing_count or 0) == 1 else 's' }}</div>
+              </div>
+            </div>
+            <p class="mb-0 text-muted">{{ category.description or 'No description provided yet.' }}</p>
+          </div>
         </a>
-      </article>
+      </div>
     {% else %}
-      <div class="empty-state">No categories are available yet.</div>
+      <div class="col-12">
+        <div class="card card-shell"><div class="card-body text-muted">No active categories yet.</div></div>
+      </div>
     {% endfor %}
-  </section>
+  </div>
 {% endblock %}
