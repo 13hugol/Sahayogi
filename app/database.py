@@ -210,12 +210,15 @@ class Database:
             """
             CREATE TABLE IF NOT EXISTS profile_reviews (
                 id INT AUTO_INCREMENT PRIMARY KEY,
+                exchange_id INT,
                 reviewee_user_id INT NOT NULL,
                 reviewer_id INT,
                 reviewer_name VARCHAR(120) NOT NULL,
                 rating TINYINT NOT NULL,
                 comment TEXT,
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_profile_reviews_exchange_reviewer (exchange_id, reviewer_id),
+                INDEX ix_profile_reviews_exchange (exchange_id),
                 INDEX ix_profile_reviews_reviewee_created (reviewee_user_id, created_at),
                 CONSTRAINT fk_profile_reviews_reviewee FOREIGN KEY (reviewee_user_id) REFERENCES users(id) ON DELETE CASCADE,
                 CONSTRAINT fk_profile_reviews_reviewer FOREIGN KEY (reviewer_id) REFERENCES users(id) ON DELETE SET NULL
@@ -346,6 +349,18 @@ class Database:
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """,
             """
+            CREATE TABLE IF NOT EXISTS exchange_completion_marks (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                exchange_id INT NOT NULL,
+                user_id INT NOT NULL,
+                completed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_exchange_completion_user (exchange_id, user_id),
+                INDEX ix_exchange_completion_exchange (exchange_id),
+                CONSTRAINT fk_exchange_completion_exchange FOREIGN KEY (exchange_id) REFERENCES exchanges(id) ON DELETE CASCADE,
+                CONSTRAINT fk_exchange_completion_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """,
+            """
             CREATE TABLE IF NOT EXISTS reports (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 reporter_id INT NOT NULL,
@@ -363,7 +378,25 @@ class Database:
         try:
             for statement in statements:
                 db.execute(statement)
-<<<<<<< HEAD
+            for statement, duplicate_codes in (
+                ("ALTER TABLE profile_reviews ADD COLUMN exchange_id INT NULL AFTER id", {1060}),
+                (
+                    "ALTER TABLE profile_reviews ADD UNIQUE KEY uq_profile_reviews_exchange_reviewer (exchange_id, reviewer_id)",
+                    {1061},
+                ),
+                ("ALTER TABLE profile_reviews ADD INDEX ix_profile_reviews_exchange (exchange_id)", {1061}),
+                (
+                    "ALTER TABLE profile_reviews ADD CONSTRAINT fk_profile_reviews_exchange "
+                    "FOREIGN KEY (exchange_id) REFERENCES exchanges(id) ON DELETE CASCADE",
+                    {1061, 1826},
+                ),
+            ):
+                try:
+                    db.execute(statement)
+                except pymysql.err.OperationalError as exc:
+                    if exc.args and exc.args[0] in duplicate_codes:
+                        continue
+                    raise
             for statement, duplicate_code in (
                 ("ALTER TABLE categories ADD COLUMN slug VARCHAR(100)", 1060),
                 ("ALTER TABLE categories ADD COLUMN icon VARCHAR(16) NOT NULL DEFAULT 'CAT'", 1060),
