@@ -211,6 +211,8 @@ class UserRepository(BaseRepository):
             created_at=row.get("created_at"),
             role=role,
             profile=profile,
+            suspended_until=row.get("suspended_until"),
+            suspension_reason=row.get("suspension_reason"),
         )
 
     def _persist_login_security(self, user: User) -> None:
@@ -218,4 +220,17 @@ class UserRepository(BaseRepository):
             db.execute(
                 "UPDATE users SET failed_login_count = %s, locked_until = %s WHERE id = %s",
                 (user.failed_login_count, user.locked_until, user.id),
+            )
+
+    def update_status(self, user_id: int, status: str, suspended_until: datetime | None = None, suspension_reason: str | None = None) -> None:
+        with self._db() as db:
+            db.execute(
+                """
+                UPDATE users
+                SET status = %s,
+                    suspended_until = %s,
+                    suspension_reason = %s
+                WHERE id = %s
+                """,
+                (status, suspended_until, suspension_reason, user_id),
             )
