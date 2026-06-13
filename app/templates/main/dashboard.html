@@ -15,7 +15,7 @@
   </header>
 
   <div class="row g-4 mb-4">
-    {% for label, value in [('Listings', my_listings|length), ('Pending requests', pending_requests|length), ('Active exchanges', exchanges|length), ('Unread notices', notifications|length)] %}
+    {% for label, value in [('Listings', my_listings|length), ('Pending requests', pending_requests|length), ('Active exchanges', exchanges|length), ('Unread notices', unread_notification_count|default(notifications|length))] %}
       <div class="col-md-6 col-xl-3">
         <section class="metric-card">
           <div class="stat-value">{{ value }}</div>

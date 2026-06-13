@@ -435,8 +435,38 @@ class FrontendController(BaseController):
 
     @login_required
     def exchanges(self):
-        exchanges_list = ExchangeRepository().list_for_user(current_user.id)
-        return self.render("exchanges/index.html", exchanges=exchanges_list)
+        selected_status = request.args.get("status", "").strip()
+        date_from = self._parse_filter_date(request.args.get("date_from", ""))
+        date_to = self._parse_filter_date(request.args.get("date_to", ""))
+        exchanges_list = ExchangeRepository().list_for_user(
+            current_user.id,
+            status=selected_status or None,
+            date_from=date_from,
+            date_to=date_to,
+        )
+        from app.repositories import ProfileReviewRepository
+        reviewed_exchange_ids = ProfileReviewRepository().reviewed_exchange_ids(current_user.id)
+        return self.render(
+            "exchanges/index.html",
+            exchanges=exchanges_list,
+            selected_status=selected_status,
+            date_from=date_from or "",
+            date_to=date_to or "",
+            reviewed_exchange_ids=reviewed_exchange_ids,
+        )
+
+    @staticmethod
+    def _parse_filter_date(raw: str) -> str | None:
+        from datetime import datetime
+
+        raw = (raw or "").strip()
+        if not raw:
+            return None
+        try:
+            datetime.strptime(raw, "%Y-%m-%d")
+        except ValueError:
+            return None
+        return raw
 
     @login_required
     def exchange_detail(self, exchange_id: int):
@@ -451,14 +481,20 @@ class FrontendController(BaseController):
             abort(404)
         if current_user.id not in [request_obj.learner_id, listing.user_id]:
             abort(403)
-        can_mark_complete = (exchange.status == "active")
-        can_review = (exchange.status == "completed")
+        from app.repositories import ProfileReviewRepository
+        review_repo = ProfileReviewRepository()
+        can_mark_complete = (
+            exchange.status == "active"
+            and not exchange.completed_by(current_user.id)
+        )
+        already_reviewed = review_repo.find_by_exchange_and_reviewer(exchange.id, current_user.id) is not None
+        can_review = exchange.status == "completed" and not already_reviewed
         return self.render(
             "exchanges/detail.html",
             exchange=exchange,
             can_mark_complete=can_mark_complete,
             can_review=can_review,
-            reviews=[],
+            reviews=review_repo.for_exchange(exchange.id),
         )
 
     @login_required
@@ -478,58 +514,85 @@ class FrontendController(BaseController):
             flash("This exchange is not active.", "warning")
             return redirect(url_for("exchanges.detail", exchange_id=exchange_id))
 
+        is_learner = current_user.id == request_obj.learner_id
+        if exchange.completed_by(current_user.id):
+            flash("You have already confirmed completion. Waiting for the other participant.", "info")
+            return redirect(url_for("exchanges.detail", exchange_id=exchange_id))
+
         from datetime import datetime
         completed_at = datetime.utcnow()
         from app.database import Database
+
+        mark_column = "learner_completed_at" if is_learner else "teacher_completed_at"
+        other_already_marked = (
+            exchange.teacher_completed_at if is_learner else exchange.learner_completed_at
+        ) is not None
 
         db = Database()
         try:
             with db.transaction():
                 db.execute(
-                    "UPDATE exchanges SET status = 'completed', completed_at = %s WHERE id = %s",
+                    f"UPDATE exchanges SET {mark_column} = %s WHERE id = %s",
                     (completed_at, exchange_id),
                 )
-                if listing.exchange_type == "credit":
+                if other_already_marked:
                     db.execute(
-                        "UPDATE credit_holds SET status = 'cleared' WHERE request_id = %s AND status = 'active'",
-                        (request_obj.id,),
+                        "UPDATE exchanges SET status = 'completed', completed_at = %s WHERE id = %s",
+                        (completed_at, exchange_id),
                     )
-                    # Deduct from learner
+                    if listing.exchange_type == "credit":
+                        db.execute(
+                            "UPDATE credit_holds SET status = 'cleared' WHERE request_id = %s AND status = 'active'",
+                            (request_obj.id,),
+                        )
+                        # Deduct from learner
+                        db.execute(
+                            """
+                            INSERT INTO credit_transactions (user_id, amount_delta, entry_type, description, skill_id, exchange_id)
+                            VALUES (%s, %s, %s, %s, %s, %s)
+                            """,
+                            (request_obj.learner_id, -listing.credit_cost, "deduction", f"Spent on learning '{listing.title}'", listing.id, exchange.id),
+                        )
+                        db.execute(
+                            "UPDATE users SET credit_balance = credit_balance - %s WHERE id = %s",
+                            (listing.credit_cost, request_obj.learner_id),
+                        )
+                        # Credit to teacher
+                        db.execute(
+                            """
+                            INSERT INTO credit_transactions (user_id, amount_delta, entry_type, description, skill_id, exchange_id)
+                            VALUES (%s, %s, %s, %s, %s, %s)
+                            """,
+                            (listing.user_id, listing.credit_cost, "earning", f"Earned from teaching '{listing.title}'", listing.id, exchange.id),
+                        )
+                        db.execute(
+                            "UPDATE users SET credit_balance = credit_balance + %s WHERE id = %s",
+                            (listing.credit_cost, listing.user_id),
+                        )
                     db.execute(
-                        """
-                        INSERT INTO credit_transactions (user_id, amount_delta, entry_type, description, skill_id, exchange_id)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                        """,
-                        (request_obj.learner_id, -listing.credit_cost, "deduction", f"Spent on learning '{listing.title}'", listing.id, exchange.id),
-                    )
-                    db.execute(
-                        "UPDATE users SET credit_balance = credit_balance - %s WHERE id = %s",
-                        (listing.credit_cost, request_obj.learner_id),
-                    )
-                    # Credit to teacher
-                    db.execute(
-                        """
-                        INSERT INTO credit_transactions (user_id, amount_delta, entry_type, description, skill_id, exchange_id)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                        """,
-                        (listing.user_id, listing.credit_cost, "earning", f"Earned from teaching '{listing.title}'", listing.id, exchange.id),
-                    )
-                    db.execute(
-                        "UPDATE users SET credit_balance = credit_balance + %s WHERE id = %s",
-                        (listing.credit_cost, listing.user_id),
+                        "UPDATE profiles SET completed_exchange_count = completed_exchange_count + 1 WHERE user_id IN (%s, %s)",
+                        (request_obj.learner_id, listing.user_id),
                     )
         finally:
             db.close()
 
-        other_user_id = listing.user_id if current_user.id == request_obj.learner_id else request_obj.learner_id
-        self._notification_service.create_notification(
-            user_id=other_user_id,
-            title="Exchange Completed",
-            body=f"Your exchange for '{listing.title}' has been marked completed.",
-            target_url=f"/exchanges/{exchange.id}",
-        )
-
-        flash("Exchange marked completed successfully.", "success")
+        other_user_id = listing.user_id if is_learner else request_obj.learner_id
+        if other_already_marked:
+            self._notification_service.create_notification(
+                user_id=other_user_id,
+                title="Exchange Completed",
+                body=f"Your exchange for '{listing.title}' has been marked completed.",
+                target_url=f"/exchanges/{exchange.id}",
+            )
+            flash("Exchange marked completed successfully.", "success")
+        else:
+            self._notification_service.create_notification(
+                user_id=other_user_id,
+                title="Completion confirmation needed",
+                body=f"{current_user.full_name} marked '{listing.title}' as complete. Confirm to finish the exchange.",
+                target_url=f"/exchanges/{exchange.id}",
+            )
+            flash("Completion recorded. Waiting for the other participant to confirm.", "success")
         return redirect(url_for("exchanges.detail", exchange_id=exchange_id))
 
     @login_required
@@ -706,13 +769,16 @@ class FrontendController(BaseController):
 
     @login_required
     def notifications(self):
-        return self.render("notifications/index.html", notifications=[])
+        items = self._notification_service.list_for_user(current_user.id, limit=50)
+        return self.render("notifications/index.html", notifications=items)
 
     @login_required
     def notification_counts(self):
+        from app.repositories import MessageRepository
+
         return jsonify(
             {
-                "messages": 0,
+                "messages": MessageRepository().count_unread(current_user.id),
                 "notifications": self._notification_service.unread_count(current_user.id),
             }
         )
@@ -924,18 +990,84 @@ class FrontendController(BaseController):
     def top_rated(self):
         return self.render("reviews/top_rated.html", profiles=self._profile_service.get_top_rated_profiles())
 
+    REVIEWS_PER_PAGE = 10
+
     def user_reviews(self, user_id: int):
+        page = request.args.get("page", 1, type=int) or 1
+        page = max(page, 1)
         try:
-            review_user, reviews = self._profile_service.get_review_history(user_id)
+            review_user, reviews, total = self._profile_service.get_review_history(
+                user_id, page=page, per_page=self.REVIEWS_PER_PAGE
+            )
         except ProfileNotFoundError:
             abort(404)
-        return self.render("reviews/user_reviews.html", review_user=review_user, reviews=reviews)
+        total_pages = max(1, -(-total // self.REVIEWS_PER_PAGE))
+        return self.render(
+            "reviews/user_reviews.html",
+            review_user=review_user,
+            reviews=reviews,
+            page=page,
+            total_pages=total_pages,
+            total_reviews=total,
+        )
 
     @login_required
     def review_form(self, exchange_id: int):
-        exchange = SimpleNamespace(id=exchange_id, listing=SimpleNamespace(title="Exchange preview"))
-        reviewee = SimpleNamespace(full_name="Exchange partner")
-        return self.render("reviews/form.html", form=ReviewShellForm(), exchange=exchange, reviewee=reviewee)
+        from app.repositories import ProfileReviewRepository
+
+        exchange = ExchangeRepository().find_by_id(exchange_id)
+        if not exchange:
+            abort(404)
+        request_obj = exchange.request
+        listing = request_obj.listing if request_obj else None
+        if not request_obj or not listing:
+            abort(404)
+        if current_user.id not in [request_obj.learner_id, listing.user_id]:
+            abort(403)
+        if exchange.status != "completed":
+            flash("Reviews unlock after both parties mark the exchange complete.", "warning")
+            return redirect(url_for("exchanges.detail", exchange_id=exchange_id))
+
+        review_repo = ProfileReviewRepository()
+        if review_repo.find_by_exchange_and_reviewer(exchange.id, current_user.id):
+            flash("You have already reviewed this exchange.", "info")
+            return redirect(url_for("exchanges.detail", exchange_id=exchange_id))
+
+        reviewee_id = listing.user_id if current_user.id == request_obj.learner_id else request_obj.learner_id
+        reviewee = User.find_by_id(reviewee_id)
+        if not reviewee:
+            abort(404)
+
+        form = ReviewShellForm()
+        if request.method == "POST":
+            rating_raw = request.form.get("rating", "").strip()
+            comment = request.form.get("comment", "").strip()
+            error = None
+            if not rating_raw.isdigit() or not 1 <= int(rating_raw) <= 5:
+                error = "Please choose a star rating between 1 and 5."
+            elif len(comment) > 500:
+                error = "Review comments are limited to 500 characters."
+            if error:
+                flash(error, "danger")
+                form = ReviewShellForm(rating=rating_raw, comment=comment)
+            else:
+                review_repo.create(
+                    reviewee_user_id=reviewee_id,
+                    reviewer_id=current_user.id,
+                    reviewer_name=current_user.full_name,
+                    rating=int(rating_raw),
+                    comment=comment or None,
+                    exchange_id=exchange.id,
+                )
+                self._notification_service.notify_new_review(
+                    user_id=reviewee_id,
+                    reviewer_name=current_user.full_name,
+                    target_url=url_for("reviews.user_reviews", user_id=reviewee_id),
+                )
+                flash("Your review has been published.", "success")
+                return redirect(url_for("exchanges.detail", exchange_id=exchange_id))
+
+        return self.render("reviews/form.html", form=form, exchange=exchange, reviewee=reviewee)
 
     def frontend_only_action(self, *args, **kwargs):
         flash("This action is frontend-only in the current project scope.", "info")
@@ -1162,6 +1294,16 @@ class ReportShellForm(ShellForm):
 
 class ReviewShellForm(ShellForm):
     fields = {"rating": "select", "comment": "textarea", "submit": "submit"}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.rating.choices = [
+            ("5", "5 - Excellent"),
+            ("4", "4 - Good"),
+            ("3", "3 - Okay"),
+            ("2", "2 - Poor"),
+            ("1", "1 - Very poor"),
+        ]
 
 
 def html_attrs(attrs: dict) -> str:

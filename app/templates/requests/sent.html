@@ -16,7 +16,10 @@
               <div class="small text-muted">{{ item.status|title }} &middot; {{ item.request_type|title }}</div>
             </div>
             {% if item.status == 'pending' %}
-              <form method="post" action="{{ url_for('requests_bp.cancel', request_id=item.id) }}"><button class="btn btn-outline-danger btn-sm">Cancel</button></form>
+              <form method="post" action="{{ url_for('requests_bp.cancel', request_id=item.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-outline-danger btn-sm">Cancel</button>
+              </form>
             {% endif %}
           </div>
           {% if item.requested_message %}<p class="mt-2 mb-0">{{ item.requested_message }}</p>{% endif %}

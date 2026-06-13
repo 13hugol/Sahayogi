@@ -177,11 +177,21 @@ class ProfileReview(BaseModel):
     reviewer_name: str
     rating: int
     comment: str | None = None
+    exchange_id: int | None = None
     created_at: datetime | None = None
 
     @property
     def reviewer(self):
         return SimpleNamespace(id=self.reviewer_id, full_name=self.reviewer_name)
+
+    @property
+    def reviewee(self):
+        from app.models.user import User
+
+        user = User.find_by_id(self.reviewee_user_id)
+        if user:
+            return user
+        return SimpleNamespace(id=self.reviewee_user_id, full_name="Deleted User")
 
     @classmethod
     def from_row(cls, row: dict | None) -> "ProfileReview | None":
@@ -194,6 +204,7 @@ class ProfileReview(BaseModel):
             reviewer_name=row["reviewer_name"],
             rating=int(row.get("rating") or 0),
             comment=row.get("comment"),
+            exchange_id=row.get("exchange_id"),
             created_at=row.get("created_at"),
         )
 
@@ -218,6 +229,7 @@ class ProfileReview(BaseModel):
         rating: int,
         reviewer_id: int | None = None,
         comment: str | None = None,
+        exchange_id: int | None = None,
     ) -> "ProfileReview":
         from app.repositories import ProfileReviewRepository
 
@@ -227,4 +239,5 @@ class ProfileReview(BaseModel):
             rating=rating,
             reviewer_id=reviewer_id,
             comment=comment,
+            exchange_id=exchange_id,
         )

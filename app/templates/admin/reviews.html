@@ -38,6 +38,7 @@
               </div>
               <div>
                 <form method="post" action="{{ url_for('admin.reject_review', review_id=review.id) }}" onsubmit="return confirm('Are you sure you want to reject and delete this review? This action will permanently remove the review and recalculate the recipient\'s reputation.');">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill px-3 py-1.5" style="font-weight: 500; font-size: 0.85rem;">
                     Reject & Delete
                   </button>
@@ -61,9 +62,13 @@
             
             <div class="d-flex align-items-center gap-2 pt-2" style="font-size: 0.85rem;">
               <span class="text-muted">Associated Exchange:</span>
-              <a href="{{ url_for('exchanges.detail', exchange_id=review.exchange_id) }}" class="text-decoration-none" style="color: #4f46e5; font-weight: 500;">
-                Exchange #{{ review.exchange_id }} &rarr;
-              </a>
+              {% if review.exchange_id %}
+                <a href="{{ url_for('exchanges.detail', exchange_id=review.exchange_id) }}" class="text-decoration-none" style="color: #4f46e5; font-weight: 500;">
+                  Exchange #{{ review.exchange_id }} &rarr;
+                </a>
+              {% else %}
+                <span class="text-muted">Not linked</span>
+              {% endif %}
             </div>
           </div>
         </div>

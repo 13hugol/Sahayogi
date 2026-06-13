@@ -25,6 +25,13 @@ def test_guest_profile_page_shows_profile_story_details(app, client, user_factor
             skill_name=offered.skill_name,
             status="approved",
         )
+        # Four earlier reviews so the recalculated average lands on 4.8 (24 / 5).
+        for rating in (5, 5, 5, 4):
+            ProfileReview.create(
+                reviewee_user_id=member.id,
+                reviewer_name="Past Learner",
+                rating=rating,
+            )
         ProfileReview.create(
             reviewee_user_id=member.id,
             reviewer_name="Priya Reviewer",
@@ -43,7 +50,9 @@ def test_guest_profile_page_shows_profile_story_details(app, client, user_factor
     assert "Python mentoring" in html
     assert "Guitar basics" in html
     assert "Verified certificate" in html
-    assert "Reputation: 4.8 / 5" in html
+    assert "Reputation:" in html
+    assert "4.8 / 5" in html
+    assert "New Member" not in html
     assert "Completed exchanges: 7" in html
     assert "Priya Reviewer" in html
     assert "Patient and clear in every session." in html

@@ -166,6 +166,28 @@ class AdminService:
         )
         return report
 
+    def list_reviews(self):
+        from app.repositories import ProfileReviewRepository
+        return ProfileReviewRepository().list_all()
+
+    def reject_review(self, admin_user, review_id: int):
+        from app.repositories import ProfileReviewRepository
+        review = ProfileReviewRepository().delete(review_id)
+        if not review:
+            return None
+
+        self._audit_repository.create(
+            admin_id=admin_user.id,
+            action="reject_review",
+            target_type="ProfileReview",
+            target_id=review_id,
+            detail=(
+                f"Review by {review.reviewer_name} ({review.rating}/5) against user "
+                f"#{review.reviewee_user_id} deleted by admin {admin_user.email}"
+            ),
+        )
+        return review
+
     def list_categories(self):
         return self._category_repository.all_with_counts()
 

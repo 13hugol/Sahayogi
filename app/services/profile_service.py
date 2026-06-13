@@ -34,11 +34,13 @@ class ProfileService:
             approved_listings=[],
         )
 
-    def get_review_history(self, user_id: int):
+    def get_review_history(self, user_id: int, *, page: int = 1, per_page: int = 10):
         user = self._user_repository.find_by_id(user_id)
         if not user or not user.profile:
             raise ProfileNotFoundError(user_id)
-        return user, self._review_repository.for_user(user.id)
+        reviews = self._review_repository.for_user(user.id, page=page, per_page=per_page)
+        total = self._review_repository.count_for_user(user.id)
+        return user, reviews, total
 
     def get_top_rated_profiles(self, limit: int = 12):
         return self._profile_repository.top_rated(limit)

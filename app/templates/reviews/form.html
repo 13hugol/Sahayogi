@@ -11,7 +11,10 @@
           <form method="post">
             {{ form.hidden_tag() }}
             <div class="mb-3">{{ form.rating.label(class="form-label") }}{{ form.rating(class="form-select") }}</div>
-            <div class="mb-3">{{ form.comment.label(class="form-label") }}{{ form.comment(class="form-control", rows="5") }}</div>
+            <div class="mb-3">
+              {{ form.comment.label(class="form-label") }}{{ form.comment(class="form-control", rows="5", maxlength="500", placeholder="Optional comment (max 500 characters)") }}
+              <div class="form-text">Optional, up to 500 characters. Published reviews cannot be deleted.</div>
+            </div>
             {{ form.submit(class="btn btn-accent") }}
           </form>
         </div>

@@ -17,8 +17,14 @@
         <p>{{ report.description or "No extra detail supplied." }}</p>
         {% if report.status == 'open' %}
           <div class="d-flex gap-2">
-            <form method="post" action="{{ url_for('admin.resolve_report', report_id=report.id, decision='resolved') }}"><button class="btn btn-accent btn-sm">Resolve</button></form>
-            <form method="post" action="{{ url_for('admin.resolve_report', report_id=report.id, decision='dismissed') }}"><button class="btn btn-outline-secondary btn-sm">Dismiss</button></form>
+            <form method="post" action="{{ url_for('admin.resolve_report', report_id=report.id, decision='resolved') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-accent btn-sm">Resolve</button>
+            </form>
+            <form method="post" action="{{ url_for('admin.resolve_report', report_id=report.id, decision='dismissed') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-outline-secondary btn-sm">Dismiss</button>
+            </form>
           </div>
         {% endif %}
       </div>

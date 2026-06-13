@@ -16,7 +16,13 @@
           <p>{{ user.profile.headline or "Skill exchange member" }}</p>
           <div class="small text-muted mb-3">
             <div>Location: {{ user.profile.location or "Not provided" }}</div>
-            <div>Reputation: {{ user.profile.reputation_score }} / 5</div>
+            <div>Reputation:
+              {% if user.profile.review_count < 3 %}
+                <span class="badge text-bg-secondary">New Member</span>
+              {% else %}
+                {{ user.profile.reputation_score }} / 5
+              {% endif %}
+            </div>
             <div>Completed exchanges: {{ user.profile.completed_exchange_count }}</div>
           </div>
           <p>{{ user.profile.bio or "No bio yet." }}</p>

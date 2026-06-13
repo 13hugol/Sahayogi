@@ -47,7 +47,7 @@
           <div class="row g-3 mb-4">
             <div class="col-md-4"><strong>Location</strong><div class="text-muted">{{ listing.location_text or listing.user.profile.location or "Flexible" }}</div></div>
             <div class="col-md-4"><strong>Contact</strong><div class="text-muted">{{ listing.contact_method or listing.user.profile.contact_email or "In-app messaging" }}</div></div>
-            <div class="col-md-4"><strong>Reputation</strong><div class="text-muted">{{ listing.user.profile.reputation_score }} / 5</div></div>
+            <div class="col-md-4"><strong>Reputation</strong><div class="text-muted">{% if listing.user.profile.review_count >= 3 %}{{ listing.user.profile.reputation_score }} / 5{% else %}New Member{% endif %}</div></div>
           </div>
           <div>
             <h2 class="h5">Availability</h2>

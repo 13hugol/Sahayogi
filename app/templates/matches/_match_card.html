@@ -11,6 +11,14 @@
         <div>
           <h2 class="h5 mb-0">{{ member.full_name }}</h2>
           <div class="small text-muted">{{ member.profile.location if member.profile and member.profile.location else "Location not set" }}</div>
+          <div class="small">
+            Reputation:
+            {% if member.profile and member.profile.review_count >= 3 %}
+              {{ member.profile.reputation_score }}/5
+            {% else %}
+              New Member
+            {% endif %}
+          </div>
         </div>
       </div>
       {% if match.is_new %}<span class="badge badge-relevance">New</span>{% endif %}

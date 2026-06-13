@@ -21,8 +21,15 @@
               </div>
               {% if item.requested_message %}<p class="mt-2 mb-3">{{ item.requested_message }}</p>{% endif %}
               <div class="d-flex flex-wrap gap-2">
-                <form method="post" action="{{ url_for('requests_bp.accept', request_id=item.id) }}"><button class="btn btn-accent btn-sm">Accept</button></form>
-                <form method="post" action="{{ url_for('requests_bp.decline', request_id=item.id) }}"><button class="btn btn-outline-danger btn-sm">Decline</button></form>
+                <form method="post" action="{{ url_for('requests_bp.accept', request_id=item.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-accent btn-sm">Accept</button>
+                </form>
+                <form method="post" action="{{ url_for('requests_bp.decline', request_id=item.id) }}" class="d-flex gap-2">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input class="form-control form-control-sm" name="decline_reason" placeholder="Optional decline reason">
+                  <button class="btn btn-outline-danger btn-sm">Decline</button>
+                </form>
               </div>
             </article>
           {% else %}

@@ -21,6 +21,7 @@
               <a class="btn btn-outline-primary btn-sm" href="{{ url_for('listings.detail', listing_id=listing.id) }}">View</a>
               <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('listings.edit', listing_id=listing.id) }}">Edit</a>
               <form method="post" action="{{ url_for('listings.delete', listing_id=listing.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button class="btn btn-outline-danger btn-sm" type="submit">Delete</button>
               </form>
             </div>

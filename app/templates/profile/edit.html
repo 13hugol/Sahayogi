@@ -199,6 +199,7 @@
               </div>
             </div>
             <form method="post" action="{{ url_for('profile.delete_account') }}" class="row g-3">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <div class="col-md-8">
                 <label class="form-label" for="delete-password">Confirm password to schedule deletion</label>
                 <input class="form-control" type="password" id="delete-password" name="password" required>

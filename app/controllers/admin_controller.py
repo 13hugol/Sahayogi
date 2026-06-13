@@ -146,7 +146,16 @@ class AdminController(BaseController):
 
     @admin_required
     def reviews(self):
-        return self.render("admin/reviews.html", reviews=[])
+        return self.render("admin/reviews.html", reviews=self._admin_service.list_reviews())
+
+    @admin_required
+    def reject_review(self, review_id: int):
+        review = self._admin_service.reject_review(current_user, review_id)
+        if not review:
+            flash("Review not found.", "danger")
+        else:
+            flash("Review deleted and reputation recalculated.", "success")
+        return redirect(url_for("admin.reviews"))
 
     @admin_required
     def categories(self):

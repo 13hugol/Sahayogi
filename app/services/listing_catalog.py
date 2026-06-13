@@ -30,6 +30,7 @@ class ListingProfile:
     location: str
     reputation_score: float
     contact_email: str | None = None
+    review_count: int = 3
 
 
 @dataclass(frozen=True)

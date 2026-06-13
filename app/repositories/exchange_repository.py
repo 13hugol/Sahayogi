@@ -22,20 +22,40 @@ class ExchangeRepository(BaseRepository):
             row = db.fetch_one("SELECT * FROM exchanges WHERE id = %s", (exchange_id,))
         return Exchange.from_row(row)
 
-    def list_for_user(self, user_id: int) -> list[Exchange]:
+    def list_for_user(
+        self,
+        user_id: int,
+        *,
+        status: str | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
+    ) -> list[Exchange]:
+        query = """
+            SELECT e.*
+            FROM exchanges e
+            JOIN exchange_requests er ON er.id = e.request_id
+            JOIN skills s ON s.id = er.listing_id
+            WHERE (er.learner_id = %s OR s.user_id = %s)
+        """
+        params: list = [user_id, user_id]
+        if status:
+            query += " AND e.status = %s"
+            params.append(status)
+        if date_from:
+            query += " AND e.created_at >= %s"
+            params.append(date_from)
+        if date_to:
+            query += " AND e.created_at < DATE_ADD(%s, INTERVAL 1 DAY)"
+            params.append(date_to)
+        query += " ORDER BY e.created_at DESC"
         with self._db() as db:
-            rows = db.fetch_all(
-                """
-                SELECT e.*
-                FROM exchanges e
-                JOIN exchange_requests er ON er.id = e.request_id
-                JOIN skills s ON s.id = er.listing_id
-                WHERE er.learner_id = %s OR s.user_id = %s
-                ORDER BY e.created_at DESC
-                """,
-                (user_id, user_id),
-            )
+            rows = db.fetch_all(query, params)
         return [Exchange.from_row(row) for row in rows if row]
+
+    def count(self) -> int:
+        with self._db() as db:
+            row = db.fetch_one("SELECT COUNT(*) AS count FROM exchanges")
+        return int((row or {}).get("count") or 0)
 
     def find_by_request_id(self, request_id: int) -> Exchange | None:
         with self._db() as db:

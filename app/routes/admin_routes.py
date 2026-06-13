@@ -36,6 +36,7 @@ class AdminRoutes:
         self.bp.route("/reports")(self.controller.reports)
         self.bp.route("/reports/<int:report_id>/resolve", methods=["POST"])(self.controller.resolve_report)
         self.bp.route("/reviews")(self.controller.reviews)
+        self.bp.route("/reviews/<int:review_id>/reject", methods=["POST"])(self.controller.reject_review)
         self.bp.route("/categories", methods=["GET", "POST"])(self.controller.categories)
         self.bp.route(
             "/categories/<int:category_id>/edit",

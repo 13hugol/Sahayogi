@@ -7,16 +7,25 @@
   </div>
   <form class="mb-4">
     <div class="row g-3 align-items-end">
-      <div class="col-md-4">
+      <div class="col-md-3">
         <label class="form-label" for="status">Filter by status</label>
         <select class="form-select" id="status" name="status">
           <option value="">All</option>
-          {% for value in ['active', 'completed', 'declined', 'cancelled'] %}
+          {% for value in ['active', 'completed', 'cancelled'] %}
             <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ value|title }}</option>
           {% endfor %}
         </select>
       </div>
+      <div class="col-md-3">
+        <label class="form-label" for="date_from">From date</label>
+        <input class="form-control" type="date" id="date_from" name="date_from" value="{{ date_from }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" for="date_to">To date</label>
+        <input class="form-control" type="date" id="date_to" name="date_to" value="{{ date_to }}">
+      </div>
       <div class="col-md-2"><button class="btn btn-accent w-100" type="submit">Apply</button></div>
+      <div class="col-md-1"><a class="btn btn-outline-secondary w-100" href="{{ url_for('exchanges.index') }}">Clear</a></div>
     </div>
   </form>
   <div class="row g-4">
@@ -29,13 +38,25 @@
               <span class="badge text-bg-light">{{ exchange.status }}</span>
             </div>
             <div class="small text-muted mb-3">
-              {{ exchange.exchange_type|title }} &middot; Created {{ exchange.created_at.strftime('%Y-%m-%d') }}
+              {{ exchange.exchange_type|title }} &middot; Created {{ exchange.created_at.strftime('%Y-%m-%d %H:%M') }}
+              {% if exchange.completed_at %}
+                &middot; Completed {{ exchange.completed_at.strftime('%Y-%m-%d %H:%M') }}
+              {% endif %}
             </div>
             <div class="mb-3">
               <div>Teacher: {{ exchange.teacher.full_name }}</div>
               <div>Learner: {{ exchange.learner.full_name }}</div>
             </div>
-            <a class="btn btn-outline-primary" href="{{ url_for('exchanges.detail', exchange_id=exchange.id) }}">Open exchange</a>
+            <div class="d-flex flex-wrap gap-2">
+              <a class="btn btn-outline-primary btn-sm" href="{{ url_for('exchanges.detail', exchange_id=exchange.id) }}">Open exchange</a>
+              <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('listings.detail', listing_id=exchange.listing.id) }}">View listing</a>
+              {% if exchange.conversation %}
+                <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('messages.detail', conversation_id=exchange.conversation.id) }}">Open chat</a>
+              {% endif %}
+              {% if exchange.status == 'completed' and exchange.id not in reviewed_exchange_ids %}
+                <a class="btn btn-accent btn-sm" href="{{ url_for('reviews.create', exchange_id=exchange.id) }}">Leave a review</a>
+              {% endif %}
+            </div>
           </div>
         </div>
       </div>

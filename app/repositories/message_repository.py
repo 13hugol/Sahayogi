@@ -69,6 +69,21 @@ class MessageRepository(BaseRepository):
             self._hydrate_summary(conversation, user_id)
         return conversation
 
+    def find_between_users(self, user_a_id: int, user_b_id: int) -> MessageConversation | None:
+        with self._db() as db:
+            row = db.fetch_one(
+                """
+                SELECT c.*
+                FROM message_conversations c
+                JOIN message_participants pa ON pa.conversation_id = c.id AND pa.user_id = %s
+                JOIN message_participants pb ON pb.conversation_id = c.id AND pb.user_id = %s
+                ORDER BY c.updated_at DESC, c.id DESC
+                LIMIT 1
+                """,
+                (user_a_id, user_b_id),
+            )
+        return MessageConversation.from_row(row)
+
     def list_messages(self, conversation_id: int) -> list[MessagePost]:
         with self._db() as db:
             rows = db.fetch_all(

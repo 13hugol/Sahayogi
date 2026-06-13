@@ -12,6 +12,8 @@ class Exchange(BaseModel):
     status: str
     created_at: datetime | None = None
     completed_at: datetime | None = None
+    learner_completed_at: datetime | None = None
+    teacher_completed_at: datetime | None = None
     video_session_summary: str | None = None
 
     @classmethod
@@ -24,6 +26,8 @@ class Exchange(BaseModel):
             status=row["status"],
             created_at=row.get("created_at"),
             completed_at=row.get("completed_at"),
+            learner_completed_at=row.get("learner_completed_at"),
+            teacher_completed_at=row.get("teacher_completed_at"),
             video_session_summary=row.get("video_session_summary"),
         )
 
@@ -61,9 +65,33 @@ class Exchange(BaseModel):
         return req.offered_skill if req else None
 
     @property
+    def conversation(self):
+        request = self.request
+        listing = self.listing
+        if not request or not listing:
+            return None
+        from app.repositories.message_repository import MessageRepository
+        return MessageRepository().find_between_users(request.learner_id, listing.user_id)
+
+    def completed_by(self, user_id: int) -> datetime | None:
+        request = self.request
+        if request and user_id == request.learner_id:
+            return self.learner_completed_at
+        listing = self.listing
+        if listing and user_id == listing.user_id:
+            return self.teacher_completed_at
+        return None
+
+    @property
     def completion_marks(self) -> list:
-        if self.status == "completed" and self.completed_at:
-            from types import SimpleNamespace
+        from types import SimpleNamespace
+
+        marks = []
+        if self.learner_completed_at:
+            marks.append(SimpleNamespace(user=self.learner, completed_at=self.learner_completed_at))
+        if self.teacher_completed_at:
+            marks.append(SimpleNamespace(user=self.teacher, completed_at=self.teacher_completed_at))
+        if not marks and self.status == "completed" and self.completed_at:
             user_obj = self.teacher or self.learner
-            return [SimpleNamespace(user=user_obj, completed_at=self.completed_at)]
-        return []
+            marks.append(SimpleNamespace(user=user_obj, completed_at=self.completed_at))
+        return marks

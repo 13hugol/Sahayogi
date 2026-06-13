@@ -3,7 +3,11 @@
 {% block title %}Reviews for {{ review_user.full_name }} | Sahayogi{% endblock %}
 {% block content %}
   <div class="section-head mb-4">
-    <div><span class="eyebrow">Trust history</span><h1 class="h2 mb-0">Reviews for {{ review_user.full_name }}</h1></div>
+    <div>
+      <span class="eyebrow">Trust history</span>
+      <h1 class="h2 mb-0">Reviews for {{ review_user.full_name }}</h1>
+      <p class="text-muted small mb-0">{{ total_reviews }} review{{ '' if total_reviews == 1 else 's' }} received</p>
+    </div>
   </div>
   <div class="card card-shell">
     <div class="card-body">
@@ -21,4 +25,21 @@
       {% endfor %}
     </div>
   </div>
+  {% if total_pages > 1 %}
+    <nav aria-label="Review pages" class="mt-4">
+      <ul class="pagination justify-content-center">
+        <li class="page-item {% if page <= 1 %}disabled{% endif %}">
+          <a class="page-link" href="{{ url_for('reviews.user_reviews', user_id=review_user.id, page=page-1) }}">Previous</a>
+        </li>
+        {% for page_number in range(1, total_pages + 1) %}
+          <li class="page-item {% if page_number == page %}active{% endif %}">
+            <a class="page-link" href="{{ url_for('reviews.user_reviews', user_id=review_user.id, page=page_number) }}">{{ page_number }}</a>
+          </li>
+        {% endfor %}
+        <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
+          <a class="page-link" href="{{ url_for('reviews.user_reviews', user_id=review_user.id, page=page+1) }}">Next</a>
+        </li>
+      </ul>
+    </nav>
+  {% endif %}
 {% endblock %}

@@ -202,8 +202,10 @@ class Database:
                 reviewer_name VARCHAR(120) NOT NULL,
                 rating TINYINT NOT NULL,
                 comment TEXT,
+                exchange_id INT DEFAULT NULL,
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 INDEX ix_profile_reviews_reviewee_created (reviewee_user_id, created_at),
+                UNIQUE KEY uq_profile_reviews_exchange_reviewer (exchange_id, reviewer_id),
                 CONSTRAINT fk_profile_reviews_reviewee FOREIGN KEY (reviewee_user_id) REFERENCES users(id) ON DELETE CASCADE,
                 CONSTRAINT fk_profile_reviews_reviewer FOREIGN KEY (reviewer_id) REFERENCES users(id) ON DELETE SET NULL
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
@@ -328,6 +330,8 @@ class Database:
                 status VARCHAR(32) NOT NULL DEFAULT 'active',
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 completed_at DATETIME DEFAULT NULL,
+                learner_completed_at DATETIME DEFAULT NULL,
+                teacher_completed_at DATETIME DEFAULT NULL,
                 video_session_summary TEXT DEFAULT NULL,
                 CONSTRAINT fk_exchanges_request FOREIGN KEY (request_id) REFERENCES exchange_requests(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
@@ -396,6 +400,10 @@ class Database:
                 "ALTER TABLE users ADD COLUMN suspended_until DATETIME",
                 "ALTER TABLE users ADD COLUMN suspension_reason TEXT",
                 "ALTER TABLE users ADD COLUMN credit_balance INT NOT NULL DEFAULT 100",
+                "ALTER TABLE exchanges ADD COLUMN learner_completed_at DATETIME DEFAULT NULL",
+                "ALTER TABLE exchanges ADD COLUMN teacher_completed_at DATETIME DEFAULT NULL",
+                "ALTER TABLE profile_reviews ADD COLUMN exchange_id INT DEFAULT NULL",
+                "ALTER TABLE profile_reviews ADD UNIQUE KEY uq_profile_reviews_exchange_reviewer (exchange_id, reviewer_id)",
             ):
                 try:
                     db.execute(statement)

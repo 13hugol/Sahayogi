@@ -153,6 +153,20 @@ def test_exchange_completion_credit_transfer(app, client, login, setup_credit_li
         assert exchange is not None
         assert exchange.status == "active"
 
+    # Teacher confirms first: exchange stays active until both parties confirm.
+    res = client.post(f"/exchanges/{exchange.id}/complete", follow_redirects=True)
+    assert res.status_code == 200
+    assert b"waiting for the other participant" in res.data.lower()
+
+    with app.app_context():
+        pending_exchange = ExchangeRepository().find_by_id(exchange.id)
+        assert pending_exchange.status == "active"
+        assert pending_exchange.teacher_completed_at is not None
+        learner = UserRepository().find_by_id(setup_credit_listing["learner"].id)
+        assert learner.credit_balance == 100
+
+    client.get("/auth/logout", follow_redirects=True)
+    login("learner@example.com")
     res = client.post(f"/exchanges/{exchange.id}/complete", follow_redirects=True)
     assert res.status_code == 200
     assert b"completed successfully" in res.data.lower()
@@ -160,6 +174,7 @@ def test_exchange_completion_credit_transfer(app, client, login, setup_credit_li
     with app.app_context():
         updated_exchange = ExchangeRepository().find_by_id(exchange.id)
         assert updated_exchange.status == "completed"
+        assert updated_exchange.learner_completed_at is not None
 
         learner = UserRepository().find_by_id(setup_credit_listing["learner"].id)
         assert learner.credit_balance == 80

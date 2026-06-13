@@ -172,18 +172,72 @@ class ProfileReviewRepository(BaseRepository):
             )
         return [review for row in rows if (review := ProfileReview.from_row(row))]
 
-    def for_user(self, user_id: int) -> list[ProfileReview]:
+    def for_user(self, user_id: int, *, page: int | None = None, per_page: int = 10) -> list[ProfileReview]:
+        query = """
+            SELECT *
+            FROM profile_reviews
+            WHERE reviewee_user_id = %s
+            ORDER BY created_at DESC, id DESC
+        """
+        params: list = [user_id]
+        if page is not None:
+            query += " LIMIT %s OFFSET %s"
+            params.extend([per_page, (max(page, 1) - 1) * per_page])
+        with self._db() as db:
+            rows = db.fetch_all(query, params)
+        return [review for row in rows if (review := ProfileReview.from_row(row))]
+
+    def count_for_user(self, user_id: int) -> int:
+        with self._db() as db:
+            row = db.fetch_one(
+                "SELECT COUNT(*) AS count FROM profile_reviews WHERE reviewee_user_id = %s",
+                (user_id,),
+            )
+        return int((row or {}).get("count") or 0)
+
+    def for_exchange(self, exchange_id: int) -> list[ProfileReview]:
         with self._db() as db:
             rows = db.fetch_all(
                 """
                 SELECT *
                 FROM profile_reviews
-                WHERE reviewee_user_id = %s
+                WHERE exchange_id = %s
                 ORDER BY created_at DESC, id DESC
                 """,
-                (user_id,),
+                (exchange_id,),
             )
         return [review for row in rows if (review := ProfileReview.from_row(row))]
+
+    def find_by_exchange_and_reviewer(self, exchange_id: int, reviewer_id: int) -> ProfileReview | None:
+        with self._db() as db:
+            row = db.fetch_one(
+                "SELECT * FROM profile_reviews WHERE exchange_id = %s AND reviewer_id = %s",
+                (exchange_id, reviewer_id),
+            )
+        return ProfileReview.from_row(row)
+
+    def reviewed_exchange_ids(self, reviewer_id: int) -> set[int]:
+        with self._db() as db:
+            rows = db.fetch_all(
+                "SELECT exchange_id FROM profile_reviews WHERE reviewer_id = %s AND exchange_id IS NOT NULL",
+                (reviewer_id,),
+            )
+        return {int(row["exchange_id"]) for row in rows}
+
+    def count_all(self) -> int:
+        with self._db() as db:
+            row = db.fetch_one("SELECT COUNT(*) AS count FROM profile_reviews")
+        return int((row or {}).get("count") or 0)
+
+    def list_all(self) -> list[ProfileReview]:
+        with self._db() as db:
+            rows = db.fetch_all("SELECT * FROM profile_reviews ORDER BY created_at DESC, id DESC")
+        return [review for row in rows if (review := ProfileReview.from_row(row))]
+
+    def find_by_id(self, review_id: int) -> ProfileReview | None:
+        with self._db() as db:
+            row = db.fetch_one("SELECT * FROM profile_reviews WHERE id = %s", (review_id,))
+        return ProfileReview.from_row(row)
 
     def create(
         self,
@@ -193,16 +247,46 @@ class ProfileReviewRepository(BaseRepository):
         rating: int,
         reviewer_id: int | None = None,
         comment: str | None = None,
+        exchange_id: int | None = None,
     ) -> ProfileReview:
         with self._db() as db:
-            review_id = db.execute(
-                """
-                INSERT INTO profile_reviews
-                    (reviewee_user_id, reviewer_id, reviewer_name, rating, comment)
-                VALUES (%s, %s, %s, %s, %s)
-                """,
-                (reviewee_user_id, reviewer_id, reviewer_name.strip(), rating, comment),
-            )
+            with db.transaction():
+                review_id = db.execute(
+                    """
+                    INSERT INTO profile_reviews
+                        (reviewee_user_id, reviewer_id, reviewer_name, rating, comment, exchange_id)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    """,
+                    (reviewee_user_id, reviewer_id, reviewer_name.strip(), rating, comment, exchange_id),
+                )
+                self._recalculate_reputation(db, reviewee_user_id)
             row = db.fetch_one("SELECT * FROM profile_reviews WHERE id = %s", (review_id,))
         return ProfileReview.from_row(row)
+
+    def delete(self, review_id: int) -> ProfileReview | None:
+        review = self.find_by_id(review_id)
+        if not review:
+            return None
+        with self._db() as db:
+            with db.transaction():
+                db.execute("DELETE FROM profile_reviews WHERE id = %s", (review_id,))
+                self._recalculate_reputation(db, review.reviewee_user_id)
+        return review
+
+    @staticmethod
+    def _recalculate_reputation(db, reviewee_user_id: int) -> None:
+        db.execute(
+            """
+            UPDATE profiles
+            SET review_count = (
+                    SELECT COUNT(*) FROM profile_reviews WHERE reviewee_user_id = %s
+                ),
+                reputation_score = COALESCE(
+                    (SELECT ROUND(AVG(rating), 1) FROM profile_reviews WHERE reviewee_user_id = %s),
+                    0
+                )
+            WHERE user_id = %s
+            """,
+            (reviewee_user_id, reviewee_user_id, reviewee_user_id),
+        )
 
