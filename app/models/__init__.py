@@ -1,5 +1,6 @@
 from .admin_audit import AdminAuditLog
 from .base_model import BaseModel
+from .notification import Notification
 from .profile import ProfileCertificate, ProfileReview, ProfileSkill
 from .skill_search import SkillSearchListing
 from .user import Profile, Role, User
@@ -14,6 +15,7 @@ from .credit_transaction import CreditTransaction, CreditHold
 __all__ = [
     "AdminAuditLog",
     "BaseModel",
+    "Notification",
     "Profile",
     "ProfileCertificate",
     "ProfileReview",

@@ -77,6 +77,7 @@ def _clear_database() -> None:
             "skills",
             "categories",
             "admin_audit_logs",
+            "notifications",
             "profile_reviews",
             "profile_certificates",
             "profile_skills",

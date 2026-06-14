@@ -1,5 +1,6 @@
 from .admin_audit_repository import AdminAuditRepository
 from .base_repository import BaseRepository
+from .notification_repository import NotificationRepository
 from .profile_repository import (
     ProfileCertificateRepository,
     ProfileRepository,
@@ -20,6 +21,7 @@ from .credit_repository import CreditRepository
 __all__ = [
     "AdminAuditRepository",
     "BaseRepository",
+    "NotificationRepository",
     "ProfileCertificateRepository",
     "ProfileRepository",
     "ProfileReviewRepository",
