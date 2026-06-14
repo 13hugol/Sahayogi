@@ -964,6 +964,7 @@ class FrontendController(BaseController):
             "count": score_data["count"],
             "tier": tier,
         })
+    @login_required
     def report_user(self, user_id: int):
         target_user = User.find_by_id(user_id)
         if not target_user:
