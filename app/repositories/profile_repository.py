@@ -15,6 +15,50 @@ class ProfileRepository(BaseRepository):
             row = db.fetch_one("SELECT * FROM profiles WHERE user_id = %s", (user_id,))
         return Profile.from_row(row)
 
+    def get_mutual_matches(self, user_id: int) -> list[dict]:
+        with self._db() as db:
+            my_offered_rows = db.fetch_all("SELECT skill_name FROM profile_skills WHERE user_id = %s AND skill_type = 'offered'", (user_id,))
+            my_wanted_rows = db.fetch_all("SELECT skill_name FROM profile_skills WHERE user_id = %s AND skill_type = 'wanted'", (user_id,))
+
+            my_offered = {r["skill_name"].strip().lower() for r in my_offered_rows if r["skill_name"]}
+            my_wanted = {r["skill_name"].strip().lower() for r in my_wanted_rows if r["skill_name"]}
+
+            rows = db.fetch_all(
+                """
+                SELECT
+                    u.id AS matched_user_id,
+                    u.full_name AS name,
+                    p.avatar_path AS avatar,
+                    p.location,
+                    p.reputation_score,
+                    p.review_count
+                FROM users u
+                JOIN profiles p ON u.id = p.user_id
+                WHERE u.id != %s AND u.status = 'active'
+                """,
+                (user_id,)
+            )
+
+            matches = []
+            for row in rows:
+                their_id = row["matched_user_id"]
+                their_offered_rows = db.fetch_all("SELECT skill_name FROM profile_skills WHERE user_id = %s AND skill_type = 'offered'", (their_id,))
+                their_wanted_rows = db.fetch_all("SELECT skill_name FROM profile_skills WHERE user_id = %s AND skill_type = 'wanted'", (their_id,))
+
+                their_offered = {r["skill_name"].strip().lower() for r in their_offered_rows if r["skill_name"]}
+                their_wanted = {r["skill_name"].strip().lower() for r in their_wanted_rows if r["skill_name"]}
+
+                they_want_mine = my_offered & their_wanted
+                i_want_theirs = my_wanted & their_offered
+
+                if they_want_mine and i_want_theirs:
+                    row["overlapping_skills"] = list(they_want_mine | i_want_theirs)
+                    row["match_score"] = len(they_want_mine) + len(i_want_theirs)
+                    matches.append(row)
+
+            matches.sort(key=lambda x: (x["match_score"], x["reputation_score"] or 0), reverse=True)
+            return matches
+
     def create(self, user_id: int, username: str, location: str, contact_email: str) -> None:
         with self._db() as db:
             db.execute(
@@ -259,8 +303,8 @@ class ProfileReviewRepository(BaseRepository):
                     """,
                     (reviewee_user_id, reviewer_id, reviewer_name.strip(), rating, comment, exchange_id),
                 )
-                self._recalculate_reputation(db, reviewee_user_id)
             row = db.fetch_one("SELECT * FROM profile_reviews WHERE id = %s", (review_id,))
+        self.update_cached_score(reviewee_user_id)
         return ProfileReview.from_row(row)
 
     def delete(self, review_id: int) -> ProfileReview | None:
@@ -270,23 +314,36 @@ class ProfileReviewRepository(BaseRepository):
         with self._db() as db:
             with db.transaction():
                 db.execute("DELETE FROM profile_reviews WHERE id = %s", (review_id,))
-                self._recalculate_reputation(db, review.reviewee_user_id)
+        self.update_cached_score(review.reviewee_user_id)
         return review
 
-    @staticmethod
-    def _recalculate_reputation(db, reviewee_user_id: int) -> None:
-        db.execute(
-            """
-            UPDATE profiles
-            SET review_count = (
-                    SELECT COUNT(*) FROM profile_reviews WHERE reviewee_user_id = %s
-                ),
-                reputation_score = COALESCE(
-                    (SELECT ROUND(AVG(rating), 1) FROM profile_reviews WHERE reviewee_user_id = %s),
-                    0
-                )
-            WHERE user_id = %s
-            """,
-            (reviewee_user_id, reviewee_user_id, reviewee_user_id),
-        )
+    def get_reputation_score(self, user_id: int) -> dict:
+        with self._db() as db:
+            row = db.fetch_one(
+                """
+                SELECT
+                    COUNT(*)                      AS review_count,
+                    ROUND(AVG(rating), 1)         AS avg_score
+                FROM profile_reviews
+                WHERE reviewee_user_id = %s
+                """,
+                (user_id,)
+            )
+        count = row["review_count"] if row else 0
+        score = float(row["avg_score"]) if row and row["avg_score"] and count >= 3 else None
+        return {"score": score, "count": count}
+
+    def update_cached_score(self, user_id: int) -> None:
+        data = self.get_reputation_score(user_id)
+        with self._db() as db:
+            db.execute(
+                """
+                UPDATE profiles
+                SET reputation_score  = %s,
+                    review_count      = %s,
+                    score_updated_at  = NOW()
+                WHERE user_id = %s
+                """,
+                (data["score"], data["count"], user_id)
+            )
 

@@ -841,6 +841,7 @@ class FrontendController(BaseController):
                 )
                 ProfileSkill.sync_for_user(user.id, "offered", values["offered_skills"])
                 ProfileSkill.sync_for_user(user.id, "wanted", values["wanted_skills"])
+                self._notify_new_matches(user.id)
                 flash("Profile updated successfully.", "success")
                 return redirect(url_for("profile.edit"))
 
@@ -936,6 +937,11 @@ class FrontendController(BaseController):
             page_data = self._profile_service.get_profile_page_data(user_id)
         except ProfileNotFoundError:
             abort(404)
+            
+        score_data = ProfileReview.get_reputation_score(user_id)
+        from app.models.profile import get_score_tier
+        tier = get_score_tier(score_data['score'], score_data['count'])
+            
         return self.render(
             "profile/view.html",
             user=page_data.user,
@@ -943,9 +949,21 @@ class FrontendController(BaseController):
             approved_certificates=page_data.approved_certificates,
             recent_reviews=page_data.recent_reviews,
             report_form=ReportShellForm(),
+            score=score_data['score'],
+            count=score_data['count'],
+            tier=tier,
         )
 
     @login_required
+    def get_reputation_json(self, user_id: int):
+        score_data = ProfileReview.get_reputation_score(user_id)
+        from app.models.profile import get_score_tier
+        tier = get_score_tier(score_data["score"], score_data["count"])
+        return jsonify({
+            "score": score_data["score"],
+            "count": score_data["count"],
+            "tier": tier,
+        })
     def report_user(self, user_id: int):
         target_user = User.find_by_id(user_id)
         if not target_user:

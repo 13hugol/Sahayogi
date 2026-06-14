@@ -90,4 +90,3 @@ class MutualSkillMatch:
     @property
     def overlap_count(self) -> int:
         return len(self.my_offers_they_want) + len(self.their_offers_i_want)
-

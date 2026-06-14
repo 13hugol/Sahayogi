@@ -245,3 +245,26 @@ class ProfileReview(BaseModel):
             comment=comment,
             exchange_id=exchange_id,
         )
+
+    @classmethod
+    def get_reputation_score(cls, user_id: int) -> dict:
+        from app.repositories import ProfileReviewRepository
+        return ProfileReviewRepository().get_reputation_score(user_id)
+
+    @classmethod
+    def update_cached_score(cls, user_id: int) -> None:
+        from app.repositories import ProfileReviewRepository
+        ProfileReviewRepository().update_cached_score(user_id)
+
+def get_score_tier(score: float | None, count: int) -> str:
+    """
+    Returns a plain-English tier label for UI display.
+    Consistent with Top-Rated Users logic (US-22).
+    """
+    if count < 3 or score is None:
+        return 'New Member'
+    if score >= 4.5 and count >= 10:
+        return 'Top Rated'
+    if score >= 3.5:
+        return 'Trusted'
+    return 'Member'

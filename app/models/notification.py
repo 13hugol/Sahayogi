@@ -95,7 +95,6 @@ class Notification(BaseModel):
     @classmethod
     def get_notified_match_ids(cls, user_id: int) -> list[int]:
         from app.repositories import NotificationRepository
-
         return NotificationRepository().get_notified_match_ids(user_id)
 
     @classmethod

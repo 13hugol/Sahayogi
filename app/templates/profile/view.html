@@ -16,11 +16,20 @@
           <p>{{ user.profile.headline or "Skill exchange member" }}</p>
           <div class="small text-muted mb-3">
             <div>Location: {{ user.profile.location or "Not provided" }}</div>
-            <div>Reputation:
-              {% if user.profile.review_count < 3 %}
-                <span class="badge text-bg-secondary">New Member</span>
+            <div class="reputation-block mt-2 mb-2" data-user-id="{{ user.id }}">
+              {% if score %}
+                <div class="star-display d-inline-block">
+                  {% for i in range(1, 6) %}
+                    <span class="star {% if i <= score|round %}filled{% endif %}">★</span>
+                  {% endfor %}
+                </div>
+                <span class="score-value fw-bold">{{ score }}</span>
+                <span class="review-count text-muted">({{ count }} review{{ 's' if count != 1 }})</span>
+                <span class="tier-badge tier-{{ tier|lower|replace(' ', '-') }}">{{ tier }}</span>
+                <span class="score-tooltip" aria-label="Reputation breakdown" title="Score: {{ score }} from {{ count }} reviews">ⓘ</span>
               {% else %}
-                {{ user.profile.reputation_score }} / 5
+                <span class="new-member-label badge text-bg-secondary">New Member</span>
+                <small class="new-member-sub d-block text-muted mt-1">Reviews appear after 3 completed exchanges</small>
               {% endif %}
             </div>
             <div>Completed exchanges: {{ user.profile.completed_exchange_count }}</div>

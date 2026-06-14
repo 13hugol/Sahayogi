@@ -85,6 +85,11 @@ class Profile(BaseModel):
         return ProfileRepository().find_by_user_id(user_id)
 
     @classmethod
+    def get_mutual_matches(cls, user_id: int) -> list[dict]:
+        from app.repositories import ProfileRepository
+        return ProfileRepository().get_mutual_matches(user_id)
+
+    @classmethod
     def create(cls, user_id: int, username: str, location: str, contact_email: str) -> None:
         from app.repositories import ProfileRepository
 

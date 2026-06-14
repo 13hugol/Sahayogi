@@ -125,8 +125,9 @@ class Database:
                 avatar_path VARCHAR(255),
                 headline VARCHAR(160),
                 bio TEXT,
-                reputation_score FLOAT NOT NULL DEFAULT 0,
+                reputation_score DECIMAL(3,1) DEFAULT NULL,
                 review_count INT NOT NULL DEFAULT 0,
+                score_updated_at DATETIME DEFAULT NULL,
                 completed_exchange_count INT NOT NULL DEFAULT 0,
                 CONSTRAINT fk_profiles_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
@@ -522,6 +523,8 @@ class Database:
             for statement in (
                 "ALTER TABLE profiles ADD COLUMN headline VARCHAR(160)",
                 "ALTER TABLE profiles ADD COLUMN bio TEXT",
+                "ALTER TABLE profiles MODIFY COLUMN reputation_score DECIMAL(3,1) DEFAULT NULL",
+                "ALTER TABLE profiles ADD COLUMN score_updated_at DATETIME DEFAULT NULL",
                 "ALTER TABLE notifications ADD COLUMN event_type VARCHAR(40) NOT NULL DEFAULT 'general'",
                 "ALTER TABLE notifications ADD COLUMN title VARCHAR(160) NOT NULL DEFAULT ''",
                 "ALTER TABLE notifications ADD COLUMN body TEXT",
