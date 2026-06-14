@@ -333,4 +333,3 @@ class AdminService:
             detail=f"Unsuspended / unbanned by admin {admin_user.email}",
         )
         return target_user
-

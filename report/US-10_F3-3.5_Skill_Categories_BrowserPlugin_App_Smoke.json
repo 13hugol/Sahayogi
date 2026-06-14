@@ -1,0 +1,210 @@
+{
+  "story": "US-10 / F3-3.5 - Skill Categories",
+  "checkedAt": "2026-06-03T14:53:14.634Z",
+  "total": 25,
+  "passed": 25,
+  "failed": 0,
+  "note": "Direct Browser navigation to /listings/api/search was skipped after ERR_BLOCKED_BY_CLIENT; user-facing filtered listings were verified through /listings/?category=1&q=Python.",
+  "results": [
+    {
+      "bodyStart": "S\nSahayogi\nSkill Bartering\nExplore\nCategories\nTop Rated\nDashboard\nPost a Skill\nLog out\nSKILL BARTERING PLATFORM\nTrade skills, build trust, and manage the full e",
+      "failed": false,
+      "hasBody": true,
+      "path": "/",
+      "title": "Sahayogi | Skill Bartering Platform",
+      "url": "http://127.0.0.1:5000/"
+    },
+    {
+      "bodyStart": "S\nSahayogi\nSkill Bartering\nD\nDashboard\nM\nMarketplace\nW\nWallet\nF\nMatches\nR\nRequests\nE\nExchanges\nC\nMessages\n0\nN\nNotifications\n0\nP\nProfile\nA\nAdmin\n+ Post a Skill\n0",
+      "failed": false,
+      "hasBody": true,
+      "path": "/dashboard",
+      "title": "Dashboard | Sahayogi",
+      "url": "http://127.0.0.1:5000/dashboard"
+    },
+    {
+      "bodyStart": "S\nSahayogi\nSkill Bartering\nD\nDashboard\nM\nMarketplace\nW\nWallet\nF\nMatches\nR\nRequests\nE\nExchanges\nC\nMessages\n0\nN\nNotifications\n0\nP\nProfile\nA\nAdmin\n+ Post a Skill\n0",
+      "failed": false,
+      "hasBody": true,
+      "path": "/listings/",
+      "title": "Browse Listings | Sahayogi",
+      "url": "http://127.0.0.1:5000/listings/"
+    },
+    {
+      "bodyStart": "S\nSahayogi\nSkill Bartering\nD\nDashboard\nM\nMarketplace\nW\nWallet\nF\nMatches\nR\nRequests\nE\nExchanges\nC\nMessages\n0\nN\nNotifications\n0\nP\nProfile\nA\nAdmin\n+ Post a Skill\n0",
+      "failed": false,
+      "hasBody": true,
+      "path": "/listings/categories",
+      "title": "Skill Categories | Sahayogi",
+      "url": "http://127.0.0.1:5000/listings/categories"
+    },
+    {
+      "bodyStart": "S\nSahayogi\nSkill Bartering\nD\nDashboard\nM\nMarketplace\nW\nWallet\nF\nMatches\nR\nRequests\nE\nExchanges\nC\nMessages\n0\nN\nNotifications\n0\nP\nProfile\nA\nAdmin\n+ Post a Skill\n0",
+      "failed": false,
+      "hasBody": true,
+      "path": "/listings/?category=1&q=Python",
+      "title": "Browse Listings | Sahayogi",
+      "url": "http://127.0.0.1:5000/listings/?category=1&q=Python"
+    },
+    {
+      "bodyStart": "S\nSahayogi\nSkill Bartering\nD\nDashboard\nM\nMarketplace\nW\nWallet\nF\nMatches\nR\nRequests\nE\nExchanges\nC\nMessages\n0\nN\nNotifications\n0\nP\nProfile\nA\nAdmin\n+ Post a Skill\n0",
+      "failed": false,
+      "hasBody": true,
+      "path": "/listings/create",
+      "title": "Create listing | Sahayogi",
+      "url": "http://127.0.0.1:5000/listings/create"
+    },
+    {
+      "bodyStart": "S\nSahayogi\nSkill Bartering\nD\nDashboard\nM\nMarketplace\nW\nWallet\nF\nMatches\nR\nRequests\nE\nExchanges\nC\nMessages\n0\nN\nNotifications\n0\nP\nProfile\nA\nAdmin\n+ Post a Skill\n0",
+      "failed": false,
+      "hasBody": true,
+      "path": "/listings/mine",
+      "title": "My Listings | Sahayogi",
+      "url": "http://127.0.0.1:5000/listings/mine"
+    },
+    {
+      "bodyStart": "S\nSahayogi\nSkill Bartering\nD\nDashboard\nM\nMarketplace\nW\nWallet\nF\nMatches\nR\nRequests\nE\nExchanges\nC\nMessages\n0\nN\nNotifications\n0\nP\nProfile\nA\nAdmin\n+ Post a Skill\n0",
+      "failed": false,
+      "hasBody": true,
+      "path": "/listings/saved",
+      "title": "Saved Listings | Sahayogi",
+      "url": "http://127.0.0.1:5000/listings/saved"
+    },
+    {
+      "bodyStart": "S\nSahayogi\nSkill Bartering\nD\nDashboard\nM\nMarketplace\nW\nWallet\nF\nMatches\nR\nRequests\nE\nExchanges\nC\nMessages\n0\nN\nNotifications\n0\nP\nProfile\nA\nAdmin\n+ Post a Skill\n0",
+      "failed": false,
+      "hasBody": true,
+      "path": "/listings/1",
+      "title": "Python Automation Basics | Sahayogi",
+      "url": "http://127.0.0.1:5000/listings/1"
+    },
+    {
+      "bodyStart": "S\nSahayogi\nSkill Bartering\nD\nDashboard\nM\nMarketplace\nW\nWallet\nF\nMatches\nR\nRequests\nE\nExchanges\nC\nMessages\n0\nN\nNotifications\n0\nP\nProfile\nA\nAdmin\n+ Post a Skill\n0",
+      "failed": false,
+      "hasBody": true,
+      "path": "/credits/ledger",
+      "title": "Wallet | Sahayogi",
+      "url": "http://127.0.0.1:5000/credits/ledger"
+    },
+    {
+      "bodyStart": "S\nSahayogi\nSkill Bartering\nD\nDashboard\nM\nMarketplace\nW\nWallet\nF\nMatches\nR\nRequests\nE\nExchanges\nC\nMessages\n0\nN\nNotifications\n0\nP\nProfile\nA\nAdmin\n+ Post a Skill\n0",
+      "failed": false,
+      "hasBody": true,
+      "path": "/matches/",
+      "title": "Matches | Sahayogi",
+      "url": "http://127.0.0.1:5000/matches/"
+    },
+    {
+      "bodyStart": "S\nSahayogi\nSkill Bartering\nD\nDashboard\nM\nMarketplace\nW\nWallet\nF\nMatches\nR\nRequests\nE\nExchanges\nC\nMessages\n0\nN\nNotifications\n0\nP\nProfile\nA\nAdmin\n+ Post a Skill\n0",
+      "failed": false,
+      "hasBody": true,
+      "path": "/requests/inbox",
+      "title": "Request Inbox | Sahayogi",
+      "url": "http://127.0.0.1:5000/requests/inbox"
+    },
+    {
+      "bodyStart": "S\nSahayogi\nSkill Bartering\nD\nDashboard\nM\nMarketplace\nW\nWallet\nF\nMatches\nR\nRequests\nE\nExchanges\nC\nMessages\n0\nN\nNotifications\n0\nP\nProfile\nA\nAdmin\n+ Post a Skill\n0",
+      "failed": false,
+      "hasBody": true,
+      "path": "/requests/sent",
+      "title": "Sent Requests | Sahayogi",
+      "url": "http://127.0.0.1:5000/requests/sent"
+    },
+    {
+      "bodyStart": "S\nSahayogi\nSkill Bartering\nD\nDashboard\nM\nMarketplace\nW\nWallet\nF\nMatches\nR\nRequests\nE\nExchanges\nC\nMessages\n0\nN\nNotifications\n0\nP\nProfile\nA\nAdmin\n+ Post a Skill\n0",
+      "failed": false,
+      "hasBody": true,
+      "path": "/exchanges/",
+      "title": "Exchanges | Sahayogi",
+      "url": "http://127.0.0.1:5000/exchanges/"
+    },
+    {
+      "bodyStart": "S\nSahayogi\nSkill Bartering\nD\nDashboard\nM\nMarketplace\nW\nWallet\nF\nMatches\nR\nRequests\nE\nExchanges\nC\nMessages\n0\nN\nNotifications\n0\nP\nProfile\nA\nAdmin\n+ Post a Skill\n0",
+      "failed": false,
+      "hasBody": true,
+      "path": "/exchanges/1",
+      "title": "Exchange #1 | Sahayogi",
+      "url": "http://127.0.0.1:5000/exchanges/1"
+    },
+    {
+      "bodyStart": "S\nSahayogi\nSkill Bartering\nD\nDashboard\nM\nMarketplace\nW\nWallet\nF\nMatches\nR\nRequests\nE\nExchanges\nC\nMessages\n0\nN\nNotifications\n0\nP\nProfile\nA\nAdmin\n+ Post a Skill\n0",
+      "failed": false,
+      "hasBody": true,
+      "path": "/messages/",
+      "title": "Messages | Sahayogi",
+      "url": "http://127.0.0.1:5000/messages/"
+    },
+    {
+      "bodyStart": "S\nSahayogi\nSkill Bartering\nD\nDashboard\nM\nMarketplace\nW\nWallet\nF\nMatches\nR\nRequests\nE\nExchanges\nC\nMessages\n0\nN\nNotifications\n0\nP\nProfile\nA\nAdmin\n+ Post a Skill\n0",
+      "failed": false,
+      "hasBody": true,
+      "path": "/messages/1",
+      "title": "Conversation | Sahayogi",
+      "url": "http://127.0.0.1:5000/messages/1"
+    },
+    {
+      "bodyStart": "S\nSahayogi\nSkill Bartering\nD\nDashboard\nM\nMarketplace\nW\nWallet\nF\nMatches\nR\nRequests\nE\nExchanges\nC\nMessages\nN\nNotifications\nP\nProfile\nA\nAdmin\n+ Post a Skill\n0 Cre",
+      "failed": false,
+      "hasBody": true,
+      "path": "/notifications/",
+      "title": "Notifications | Sahayogi",
+      "url": "http://127.0.0.1:5000/notifications/"
+    },
+    {
+      "bodyStart": "S\nSahayogi\nSkill Bartering\nD\nDashboard\nM\nMarketplace\nW\nWallet\nF\nMatches\nR\nRequests\nE\nExchanges\nC\nMessages\n0\nN\nNotifications\n0\nP\nProfile\nA\nAdmin\n+ Post a Skill\n0",
+      "failed": false,
+      "hasBody": true,
+      "path": "/profile/me",
+      "title": "Sahayogi Admin | Sahayogi",
+      "url": "http://127.0.0.1:5000/profile/me"
+    },
+    {
+      "bodyStart": "S\nSahayogi\nSkill Bartering\nD\nDashboard\nM\nMarketplace\nW\nWallet\nF\nMatches\nR\nRequests\nE\nExchanges\nC\nMessages\n0\nN\nNotifications\n0\nP\nProfile\nA\nAdmin\n+ Post a Skill\n0",
+      "failed": false,
+      "hasBody": true,
+      "path": "/profile/edit",
+      "title": "Edit Profile | Sahayogi",
+      "url": "http://127.0.0.1:5000/profile/edit"
+    },
+    {
+      "bodyStart": "S\nSahayogi\nSkill Bartering\nD\nDashboard\nM\nMarketplace\nW\nWallet\nF\nMatches\nR\nRequests\nE\nExchanges\nC\nMessages\n0\nN\nNotifications\n0\nP\nProfile\nA\nAdmin\n+ Post a Skill\n0",
+      "failed": false,
+      "hasBody": true,
+      "path": "/profile/certificates",
+      "title": "Certificates | Sahayogi",
+      "url": "http://127.0.0.1:5000/profile/certificates"
+    },
+    {
+      "bodyStart": "S\nSahayogi\nSkill Bartering\nD\nDashboard\nM\nMarketplace\nW\nWallet\nF\nMatches\nR\nRequests\nE\nExchanges\nC\nMessages\n0\nN\nNotifications\n0\nP\nProfile\nA\nAdmin\n+ Post a Skill\n0",
+      "failed": false,
+      "hasBody": true,
+      "path": "/reviews/top-rated",
+      "title": "Top Rated Members | Sahayogi",
+      "url": "http://127.0.0.1:5000/reviews/top-rated"
+    },
+    {
+      "bodyStart": "S\nSahayogi\nSkill Bartering\nD\nDashboard\nM\nMarketplace\nW\nWallet\nF\nMatches\nR\nRequests\nE\nExchanges\nC\nMessages\n0\nN\nNotifications\n0\nP\nProfile\nA\nAdmin\n+ Post a Skill\n0",
+      "failed": false,
+      "hasBody": true,
+      "path": "/admin/",
+      "title": "Admin Dashboard | Sahayogi",
+      "url": "http://127.0.0.1:5000/admin/"
+    },
+    {
+      "bodyStart": "S\nSahayogi\nSkill Bartering\nD\nDashboard\nM\nMarketplace\nW\nWallet\nF\nMatches\nR\nRequests\nE\nExchanges\nC\nMessages\n0\nN\nNotifications\n0\nP\nProfile\nA\nAdmin\n+ Post a Skill\n0",
+      "failed": false,
+      "hasBody": true,
+      "path": "/admin/categories",
+      "title": "Categories | Sahayogi",
+      "url": "http://127.0.0.1:5000/admin/categories"
+    },
+    {
+      "bodyStart": "S\nSahayogi\nSkill Bartering\nD\nDashboard\nM\nMarketplace\nW\nWallet\nF\nMatches\nR\nRequests\nE\nExchanges\nC\nMessages\n0\nN\nNotifications\n0\nP\nProfile\nA\nAdmin\n+ Post a Skill\n0",
+      "failed": false,
+      "hasBody": true,
+      "path": "/admin/categories/1/edit",
+      "title": "Edit Category | Sahayogi",
+      "url": "http://127.0.0.1:5000/admin/categories/1/edit"
+    }
+  ]
+}

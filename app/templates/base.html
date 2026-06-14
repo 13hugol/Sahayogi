@@ -110,6 +110,7 @@
           </a>
           <div class="public-nav-links">
             <a href="{{ url_for('listings.index') }}">Explore</a>
+            <a href="{{ url_for('listings.categories') }}">Categories</a>
             <a href="{{ url_for('reviews.top_rated') }}">Top Rated</a>
             {% if current_user.is_authenticated %}
               <a href="{{ url_for('main.dashboard') }}">Dashboard</a>

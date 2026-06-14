@@ -11,140 +11,25 @@
               <span class="eyebrow">Profile management</span>
               <h1 class="h3 mb-0">Edit profile</h1>
             </div>
-            <a class="btn btn-outline-primary btn-sm" href="{{ url_for('profile.me') }}">View profile</a>
           </div>
-
-          <form id="profile-edit-form" method="post" enctype="multipart/form-data" data-profile-edit-form>
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-
-            <div class="row g-4">
-              <div class="col-lg-4">
-                <div class="profile-edit-avatar">
-                  {% if user.profile.avatar_path %}
-                    <img data-avatar-preview src="{{ url_for('main.media', filename=user.profile.avatar_path) }}" alt="{{ user.full_name }}">
-                    <div class="profile-avatar-placeholder d-none" data-avatar-placeholder>{{ values.full_name[:1] or "S" }}</div>
-                  {% else %}
-                    <img class="d-none" data-avatar-preview alt="{{ user.full_name }}">
-                    <div class="profile-avatar-placeholder" data-avatar-placeholder>{{ values.full_name[:1] or "S" }}</div>
-                  {% endif %}
-                </div>
-                <label class="form-label mt-3" for="avatar">Avatar</label>
-                <input
-                  class="form-control{% if errors.avatar %} is-invalid{% endif %}"
-                  id="avatar"
-                  name="avatar"
-                  type="file"
-                  accept=".jpg,.jpeg,.png,image/jpeg,image/png"
-                  data-avatar-input
-                >
-                <div class="form-text">JPG or PNG under {{ max_avatar_mb }}MB. The preview is cropped to match your profile avatar.</div>
-                <div class="invalid-feedback{% if errors.avatar %} d-block{% endif %}" data-avatar-error>
-                  {{ errors.avatar or "" }}
-                </div>
-              </div>
-
-              <div class="col-lg-8">
-                <div class="row g-3">
-                  <div class="col-md-6">
-                    <label class="form-label" for="full_name">Full name</label>
-                    <input
-                      class="form-control{% if errors.full_name %} is-invalid{% endif %}"
-                      id="full_name"
-                      name="full_name"
-                      type="text"
-                      maxlength="120"
-                      value="{{ values.full_name }}"
-                      required
-                    >
-                    {% if errors.full_name %}
-                      <div class="invalid-feedback d-block">{{ errors.full_name }}</div>
-                    {% endif %}
-                  </div>
-                  <div class="col-md-6">
-                    <label class="form-label" for="location">Location</label>
-                    <input
-                      class="form-control{% if errors.location %} is-invalid{% endif %}"
-                      id="location"
-                      name="location"
-                      type="text"
-                      maxlength="160"
-                      value="{{ values.location }}"
-                      required
-                    >
-                    {% if errors.location %}
-                      <div class="invalid-feedback d-block">{{ errors.location }}</div>
-                    {% endif %}
-                  </div>
-                  <div class="col-12">
-                    <label class="form-label" for="bio">Bio</label>
-                    <textarea
-                      class="form-control{% if errors.bio %} is-invalid{% endif %}"
-                      id="bio"
-                      name="bio"
-                      rows="5"
-                      maxlength="1000"
-                    >{{ values.bio }}</textarea>
-                    {% if errors.bio %}
-                      <div class="invalid-feedback d-block">{{ errors.bio }}</div>
-                    {% endif %}
-                  </div>
-                </div>
-              </div>
+          <form method="post" enctype="multipart/form-data">
+            {{ form.hidden_tag() }}
+            <div class="row g-3">
+              <div class="col-md-6">{{ form.username.label(class="form-label") }}{{ form.username(class="form-control") }}</div>
+              <div class="col-md-6">{{ form.headline.label(class="form-label") }}{{ form.headline(class="form-control") }}</div>
+              <div class="col-12">{{ form.bio.label(class="form-label") }}{{ form.bio(class="form-control", rows="4") }}</div>
+              <div class="col-md-4">{{ form.location.label(class="form-label") }}{{ form.location(class="form-control") }}</div>
+              <div class="col-md-4">{{ form.city.label(class="form-label") }}{{ form.city(class="form-control") }}</div>
+              <div class="col-md-4">{{ form.country.label(class="form-label") }}{{ form.country(class="form-control") }}</div>
+              <div class="col-md-6">{{ form.contact_email.label(class="form-label") }}{{ form.contact_email(class="form-control") }}</div>
+              <div class="col-md-3">{{ form.latitude.label(class="form-label") }}{{ form.latitude(class="form-control") }}</div>
+              <div class="col-md-3">{{ form.longitude.label(class="form-label") }}{{ form.longitude(class="form-control") }}</div>
+              <div class="col-md-6">{{ form.offered_skills.label(class="form-label") }}{{ form.offered_skills(class="form-select", size="8") }}</div>
+              <div class="col-md-6">{{ form.wanted_skills.label(class="form-label") }}{{ form.wanted_skills(class="form-select", size="8") }}</div>
+              <div class="col-md-6">{{ form.avatar.label(class="form-label") }}{{ form.avatar(class="form-control") }}</div>
             </div>
-
-            <hr class="my-4">
-
-            <div class="row g-4">
-              <div class="col-lg-6">
-                <div class="skill-editor" data-skill-editor data-skill-field="offered_skills">
-                  <label class="form-label" for="new-offered-skill">Skills offered</label>
-                  <div class="skill-list" data-skill-list>
-                    {% for skill_name in values.offered_skills %}
-                      <div class="input-group skill-row" data-skill-row>
-                        <input class="form-control" name="offered_skills" type="text" maxlength="120" value="{{ skill_name }}" aria-label="Offered skill {{ loop.index }}">
-                        <button class="btn btn-outline-danger" type="button" data-remove-skill>Remove</button>
-                      </div>
-                    {% endfor %}
-                  </div>
-                  <div class="text-muted small{% if values.offered_skills %} d-none{% endif %}" data-empty-skills>No offered skills yet.</div>
-                  <div class="input-group mt-2">
-                    <input class="form-control" id="new-offered-skill" type="text" maxlength="120" placeholder="Add a skill you can teach" data-new-skill>
-                    <button class="btn btn-outline-primary" type="button" data-add-skill>Add</button>
-                  </div>
-                  <div class="form-text">Add or remove one offered skill at a time.</div>
-                  {% if errors.offered_skills %}
-                    <div class="text-danger small mt-1">{{ errors.offered_skills }}</div>
-                  {% endif %}
-                </div>
-              </div>
-
-              <div class="col-lg-6">
-                <div class="skill-editor" data-skill-editor data-skill-field="wanted_skills">
-                  <label class="form-label" for="new-wanted-skill">Skills wanted</label>
-                  <div class="skill-list" data-skill-list>
-                    {% for skill_name in values.wanted_skills %}
-                      <div class="input-group skill-row" data-skill-row>
-                        <input class="form-control" name="wanted_skills" type="text" maxlength="120" value="{{ skill_name }}" aria-label="Wanted skill {{ loop.index }}">
-                        <button class="btn btn-outline-danger" type="button" data-remove-skill>Remove</button>
-                      </div>
-                    {% endfor %}
-                  </div>
-                  <div class="text-muted small{% if values.wanted_skills %} d-none{% endif %}" data-empty-skills>No wanted skills yet.</div>
-                  <div class="input-group mt-2">
-                    <input class="form-control" id="new-wanted-skill" type="text" maxlength="120" placeholder="Add a skill you want to learn" data-new-skill>
-                    <button class="btn btn-outline-primary" type="button" data-add-skill>Add</button>
-                  </div>
-                  <div class="form-text">Add or remove one learning goal at a time.</div>
-                  {% if errors.wanted_skills %}
-                    <div class="text-danger small mt-1">{{ errors.wanted_skills }}</div>
-                  {% endif %}
-                </div>
-              </div>
-            </div>
-
             <div class="d-flex flex-wrap gap-3 mt-4">
-              <button class="btn btn-accent" type="submit">Save profile</button>
-              <a class="btn btn-outline-secondary" href="{{ url_for('profile.me') }}">Cancel</a>
+              {{ form.submit(class="btn btn-accent") }}
             </div>
           </form>
           <div class="border rounded-3 mt-4 p-3">

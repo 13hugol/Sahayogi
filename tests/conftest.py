@@ -5,6 +5,7 @@ import pytest
 from app import create_app
 from app.database import Database
 from app.models import Role, User
+from app.repositories import CategoryRepository
 from config import TestConfig
 
 
@@ -13,6 +14,7 @@ def app():
     flask_app = create_app(TestConfig)
     with flask_app.app_context():
         _clear_database()
+        CategoryRepository().seed_defaults()
         Role.ensure("admin", "Administrator")
         Role.ensure("user", "Platform member")
     yield flask_app
@@ -68,6 +70,7 @@ def _clear_database() -> None:
             "credit_transactions",
             "credit_holds",
             "reports",
+            "exchange_completion_marks",
             "exchanges",
             "exchange_requests",
             "message_posts",
@@ -83,6 +86,7 @@ def _clear_database() -> None:
             "profile_skills",
             "skill_search_listings",
             "password_reset_tokens",
+            "categories",
             "profiles",
             "users",
             "roles",

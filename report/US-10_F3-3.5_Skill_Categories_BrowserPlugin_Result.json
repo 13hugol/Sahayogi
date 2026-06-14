@@ -1,0 +1,120 @@
+{
+  "story": "US-10 / F3-3.5 - Skill Categories",
+  "checkedAt": "2026-06-03T14:53:34.845Z",
+  "browserTarget": "http://127.0.0.1:5000",
+  "createdCategory": {
+    "initialName": "Browser Story QA 20260603121004",
+    "renamedName": "Browser Story QA Renamed 20260603121004",
+    "renamedSlug": "browser-story-qa-renamed-20260603121004",
+    "renamedIcon": "BSQR"
+  },
+  "checks": {
+    "overview": {
+      "activeCountText": 4,
+      "cards": [
+        {
+          "href": "/listings/?category=5",
+          "text": "BQAR\n0 active\nBrowser QA Renamed 162929\n\nRenamed by Browser verification data entry.\n\nBrowse Browser QA Renamed 162929"
+        },
+        {
+          "href": "/listings/?category=1",
+          "text": "TECH\n9 active\nTech\n\nTechnical skills and programming\n\nBrowse Tech"
+        },
+        {
+          "href": "/listings/?category=2",
+          "text": "MUS\n9 active\nMusic\n\nInstrument learning and music theory\n\nBrowse Music"
+        },
+        {
+          "href": "/listings/?category=3",
+          "text": "LANG\n9 active\nLanguage\n\nForeign languages and linguistics\n\nBrowse Language"
+        },
+        {
+          "href": "/listings/?category=4",
+          "text": "KIT\n9 active\nKitchen\n\nCooking, baking, food planning, and practical home skills.\n\nBrowse Kitchen"
+        },
+        {
+          "href": "/listings/?category=6",
+          "text": "BPQR\n0 active\nBrowser Plugin QA Renamed 20260603114926\n\nRenamed through the in-app Browser plugin workflow.\n\nBrowse Browser Plugin QA Renamed 20260603114926"
+        }
+      ],
+      "hasHeading": true,
+      "hasRequiredCategories": true,
+      "hasRequiredLabels": true,
+      "horizontalOverflow": false,
+      "innerWidth": 599,
+      "scrollWidth": 591,
+      "title": "Skill Categories | Sahayogi",
+      "url": "http://127.0.0.1:5000/listings/categories"
+    },
+    "filteredListings": {
+      "cards": [
+        "TECH Tech Credit\nVerified\nPython Automation Basics\n\nPython scripting by Aarav Shrestha\n\nBuild small scripts for files, spreadsheets, and repeatable admin work.\n\nLocation: Kathmandu or remote\nReputation: 4.9 / 5\nStatus: Approved\nCredits: 12\nView listing\nSave"
+      ],
+      "hasActiveFilter": true,
+      "hasCategoryLabel": true,
+      "hasExpectedListing": true,
+      "horizontalOverflow": false,
+      "url": "http://127.0.0.1:5000/listings/?category=1&q=Python"
+    },
+    "adminCreate": {
+      "createdBlock": "BSQA\nBrowser Story QA 20260603121004\nbrowser-story-qa-20260603121004 · Created during Browser verification for US-10 Skill Categories.\nEdit",
+      "hasFlash": true,
+      "title": "Categories | Sahayogi",
+      "url": "http://127.0.0.1:5000/admin/categories"
+    },
+    "overviewAfterRename": {
+      "card": "BSQR\n0 active\nBrowser Story QA Renamed 20260603121004\n\nRenamed during Browser verification for US-10 Skill Categories.\n\nBrowse Browser Story QA Renamed 20260603121004",
+      "hasRenamedCategory": true,
+      "hasRenamedIcon": true,
+      "horizontalOverflow": false,
+      "innerWidth": 599,
+      "scrollWidth": 591,
+      "url": "http://127.0.0.1:5000/listings/categories"
+    },
+    "createListingForm": {
+      "categoryMultiple": false,
+      "categoryRequired": true,
+      "hasDefaultOptions": true,
+      "hasRenamedOption": true,
+      "hasSingleCategorySelect": true,
+      "horizontalOverflow": false,
+      "optionTexts": [
+        "Choose one category",
+        "BQAR - Browser QA Renamed 162929",
+        "TECH - Tech",
+        "MUS - Music",
+        "LANG - Language",
+        "KIT - Kitchen",
+        "BPQR - Browser Plugin QA Renamed 20260603114926",
+        "BSQR - Browser Story QA Renamed 20260603121004"
+      ],
+      "title": "Create listing | Sahayogi",
+      "url": "http://127.0.0.1:5000/listings/create"
+    },
+    "mobileOverview": {
+      "cardCount": 7,
+      "hasHeading": true,
+      "hasLabels": true,
+      "hasRequiredCategories": true,
+      "horizontalOverflow": false,
+      "innerWidth": 390,
+      "scrollWidth": 382,
+      "url": "http://127.0.0.1:5000/listings/categories"
+    },
+    "smoke": {
+      "total": 25,
+      "passed": 25,
+      "failed": 0,
+      "note": "Direct Browser navigation to /listings/api/search was skipped after ERR_BLOCKED_BY_CLIENT; user-facing filtered listings were verified through /listings/?category=1&q=Python."
+    }
+  },
+  "screenshots": [
+    "US-10_F3-3.5_Skill_Categories_BrowserPlugin_Overview.png",
+    "US-10_F3-3.5_Skill_Categories_BrowserPlugin_Filtered_Listings.png",
+    "US-10_F3-3.5_Skill_Categories_BrowserPlugin_Admin_Create.png",
+    "US-10_F3-3.5_Skill_Categories_BrowserPlugin_Admin_Rename.png",
+    "US-10_F3-3.5_Skill_Categories_BrowserPlugin_Overview_After_Rename.png",
+    "US-10_F3-3.5_Skill_Categories_BrowserPlugin_Create_Form.png",
+    "US-10_F3-3.5_Skill_Categories_BrowserPlugin_Mobile_Overview.png"
+  ]
+}

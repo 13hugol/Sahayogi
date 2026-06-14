@@ -24,6 +24,12 @@ class ProfileNotFoundError(SahayogiException):
         self.user_id = user_id
 
 
+class CategoryNotFoundError(SahayogiException):
+    def __init__(self, category_id: int):
+        super().__init__(f"Category {category_id} was not found.")
+        self.category_id = category_id
+
+
 class DuplicateEmailError(SahayogiException):
     def __init__(self, email: str):
         super().__init__(f"An account with email '{email}' already exists.")
