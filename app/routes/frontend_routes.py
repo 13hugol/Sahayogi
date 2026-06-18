@@ -106,7 +106,7 @@ class FrontendRoutes:
         profile.route("/profile/me", endpoint="me")(self.controller.profile_me)
         profile.route("/profile/edit", methods=["GET", "POST"], endpoint="edit")(self.controller.profile_edit)
         profile.route("/profile/certificates", endpoint="certificates")(self.controller.certificates)
-        profile.route("/profile/delete", methods=["POST"], endpoint="delete_account")(self.controller.frontend_only_action)
+        profile.route("/profile/delete", methods=["POST"], endpoint="delete_account")(self.controller.delete_account)
         profile.route("/users/<int:user_id>", endpoint="view")(self.controller.profile_view)
         profile.route("/users/<int:user_id>/report", methods=["GET", "POST"], endpoint="report")(self.controller.report_user)
 
