@@ -267,6 +267,10 @@ class Database:
             for statement in (
                 "ALTER TABLE profiles ADD COLUMN headline VARCHAR(160)",
                 "ALTER TABLE profiles ADD COLUMN bio TEXT",
+                "ALTER TABLE profiles ADD COLUMN latitude DECIMAL(9, 6) NULL",
+                "ALTER TABLE profiles ADD COLUMN longitude DECIMAL(9, 6) NULL",
+                "ALTER TABLE profiles ADD COLUMN location_label VARCHAR(255) NULL",
+                "CREATE INDEX idx_profiles_lat_lng ON profiles (latitude, longitude)",
                 "ALTER TABLE notifications ADD COLUMN type VARCHAR(50) DEFAULT 'general'",
                 "ALTER TABLE notifications ADD COLUMN target_url VARCHAR(255)",
                 "ALTER TABLE profiles MODIFY COLUMN reputation_score DECIMAL(3,1) DEFAULT NULL",
@@ -275,7 +279,7 @@ class Database:
                 try:
                     db.execute(statement)
                 except pymysql.err.OperationalError as exc:
-                    if exc.args and exc.args[0] == 1060:
+                    if exc.args and exc.args[0] in (1060, 1061):
                         continue
                     raise
         finally:
