@@ -70,7 +70,7 @@ def register_csrf(app: Flask) -> None:
         if not app.config.get("WTF_CSRF_ENABLED", True):
             return None
         if request.method == "POST":
-            token = request.form.get("csrf_token")
+            token = request.form.get("csrf_token") or request.headers.get("X-CSRFToken")
             if not token or token != session.get("csrf_token"):
                 abort(403)
         return None

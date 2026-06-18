@@ -29,8 +29,9 @@
           <input class="form-control" id="q" name="q" value="{{ request.args.get('q', '') }}" placeholder="Search by skill, title, or topic">
         </div>
         <div class="col-lg-3">
-          <label class="form-label" for="category">Categories</label>
-          <select class="form-select" id="category" name="category" multiple size="4">
+          <label class="form-label" for="category">Category</label>
+          <select class="form-select" id="category" name="category">
+            <option value="">Any</option>
             {% for category in categories %}
               <option value="{{ category.id }}" {% if category.id|string in request.args.getlist('category') %}selected{% endif %}>{{ category.name }}</option>
             {% endfor %}
@@ -59,18 +60,10 @@
           <button class="btn btn-accent w-100" type="submit">Search</button>
         </div>
       </form>
-      {% if active_filters %}
-        <div class="filter-tags" aria-label="Active filters">
-          {% for filter in active_filters %}
-            <a class="filter-tag" href="{{ filter.remove_url }}">{{ filter.label }} <span aria-hidden="true">&times;</span></a>
-          {% endfor %}
-          <a class="filter-clear" href="{{ url_for('listings.index') }}">Clear all</a>
-        </div>
-      {% endif %}
     </div>
   </section>
 
-  <div id="activeFilters" class="mb-3 d-flex flex-wrap gap-2"></div>
+  <div id="activeFilters" class="filter-tags mb-3" aria-label="Active filters"></div>
 
   <div class="d-flex justify-content-between align-items-center mb-3">
     <div class="text-muted"><span id="resultCount">{{ total_results }}</span> result(s)</div>
@@ -146,11 +139,11 @@
             const radVal = radSelect ? radSelect.value : "";
 
             function createTag(label, onRemove) {
-                const tag = document.createElement("span");
-                tag.className = "badge bg-light text-dark border d-inline-flex align-items-center gap-1 p-2 me-2 mb-2";
-                tag.style.cursor = "default";
-                tag.innerHTML = label + ' <span class="ms-1 fw-bold text-danger" style="cursor:pointer;" role="button">&times;</span>';
-                tag.querySelector("span").addEventListener("click", function(e) {
+                const tag = document.createElement("a");
+                tag.className = "filter-tag";
+                tag.href = "#";
+                tag.innerHTML = label + ' <span aria-hidden="true">&times;</span>';
+                tag.addEventListener("click", function(e) {
                     e.preventDefault();
                     onRemove();
                 });
@@ -182,11 +175,22 @@
 
             if (catSelect) {
                 Array.from(catSelect.selectedOptions).forEach(function(option) {
-                    activeFiltersContainer.appendChild(createTag('Category: ' + option.text, function() {
-                        option.selected = false;
-                        catSelect.dispatchEvent(new Event("change"));
-                    }));
+                    if (option.value) {
+                        activeFiltersContainer.appendChild(createTag('Category: ' + option.text, function() {
+                            option.selected = false;
+                            catSelect.value = "";
+                            catSelect.dispatchEvent(new Event("change"));
+                        }));
+                    }
                 });
+            }
+
+            if (activeFiltersContainer.children.length > 0) {
+                const clearAll = document.createElement("a");
+                clearAll.className = "filter-clear";
+                clearAll.href = "{{ url_for('listings.index') }}";
+                clearAll.textContent = "Clear all";
+                activeFiltersContainer.appendChild(clearAll);
             }
         }
 

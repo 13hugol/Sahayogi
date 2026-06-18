@@ -41,7 +41,7 @@
   .remote-video-feed {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: fill;
   }
 
   .local-video-wrapper {
@@ -67,7 +67,7 @@
   .local-video-feed {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: fill;
     transform: scaleX(-1); /* Mirror local feed */
   }
 
@@ -142,7 +142,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 18px;
+    font-size: 0;
     cursor: pointer;
     transition: all 0.2s ease;
   }
@@ -170,6 +170,11 @@
   .control-btn.btn-end:hover {
     background: #bd2130;
     transform: scale(1.1);
+  }
+
+  .control-btn .svg-icon {
+    width: 20px;
+    height: 20px;
   }
 
   .status-overlay {
@@ -225,43 +230,6 @@
     display: none;
     z-index: 30;
   }
-
-  .control-btn {
-    font-size: 0;
-  }
-
-  .control-btn .svg-icon {
-    width: 20px;
-    height: 20px;
-    font-size: 20px;
-  }
-
-  .connection-banner .text-warning {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    font-size: 0;
-  }
-
-  .connection-banner .text-warning::before,
-  .connection-banner .text-warning::after {
-    font-size: 1.25rem;
-  }
-
-  .connection-banner .text-warning::before {
-    display: inline-block;
-    width: 1em;
-    height: 1em;
-    background-color: currentColor;
-    -webkit-mask: url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/icons/camera-video-off.svg") center / contain no-repeat;
-    mask: url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/icons/camera-video-off.svg") center / contain no-repeat;
-    content: "";
-  }
-
-  .connection-banner .text-warning::after {
-    content: "Connection Lost";
-  }
 </style>
 {% endblock %}
 
@@ -278,7 +246,7 @@
   <div class="video-call-container">
     <!-- Status Indicator Overlay -->
     <div class="status-overlay">
-      <div id="call-status-dot" class="status-dot"></div>
+      <div id="call-status-dot" class="status-dot offline"></div>
       <span id="call-status-text">Connecting...</span>
     </div>
 
@@ -299,11 +267,9 @@
           </h3>
           <p class="text-muted small mb-0" id="remote-sub-text">Waiting for user to connect...</p>
         </div>
-        
-        <!-- Mock video element for remote participant screen share / mock camera -->
-        <video id="remote-video" class="remote-video-feed d-none" autoplay playsinline loop muted>
-          <source src="" type="video/mp4">
-        </video>
+
+        <!-- Remote participant media stream rendered here by RTCPeerConnection.ontrack -->
+        <video id="remote-video" class="remote-video-feed d-none" autoplay playsinline></video>
       </div>
 
       <!-- Local Participant Stream (PIP overlay) -->
@@ -327,7 +293,7 @@
       <button id="btn-screen" class="control-btn" title="Share Screen" onclick="toggleScreenShare()">
         <span class="svg-icon svg-icon-screen" aria-hidden="true"></span>
       </button>
-      
+
       <!-- End Call Form -->
       <form id="end-call-form" method="post" action="{{ url_for('exchanges.end_video_call', exchange_id=exchange.id) }}" class="d-inline">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -350,24 +316,43 @@
 </div>
 
 <script>
+  // ---- Sahayogi in-app video call: real WebRTC peer connection ----
+  //
+  // Media flows peer-to-peer through RTCPeerConnection; signaling (offer,
+  // answer, ICE candidates, and a leave notice) is exchanged through the
+  // MySQL-backed /exchanges/<id>/video/signals endpoints via short polling.
+  // Exactly one peer (the "offerer") creates the offer to avoid glare.
+
+  const EXCHANGE_ID = {{ exchange.id }};
+  const I_AM_OFFERER = {{ i_am_offerer | tojson }};
+  const ICE_SERVERS = {{ ice_servers | tojson }};
+  const CSRF_TOKEN = "{{ csrf_token() }}";
+
+  const SIGNALS_URL = `{{ url_for('exchanges.video_call_signals', exchange_id=exchange.id) }}`;
+  const HEARTBEAT_URL = `{{ url_for('exchanges.video_call_heartbeat', exchange_id=exchange.id) }}`;
+
   let localStream = null;
   let screenStream = null;
-  
+  let pc = null;            // RTCPeerConnection
+  let senderVideoTrack = null;  // tracks the video sender for screen-share swap
+
   let isVideoOn = false;
   let isAudioOn = true;
   let isScreenSharing = false;
 
   let heartbeatInterval = null;
+  let signalInterval = null;
   let reconnectTimer = null;
   let reconnectSecondsRemaining = 120;
   let wasConnected = false;
+  let negotiationDone = false;
 
   const localVideo = document.getElementById("local-video");
   const localPlaceholder = document.getElementById("local-placeholder");
   const remoteVideo = document.getElementById("remote-video");
   const remotePlaceholder = document.getElementById("remote-placeholder");
   const remoteSubText = document.getElementById("remote-sub-text");
-  
+
   const callStatusDot = document.getElementById("call-status-dot");
   const callStatusText = document.getElementById("call-status-text");
   const reconnectBanner = document.getElementById("reconnect-banner");
@@ -377,37 +362,166 @@
   const btnVideo = document.getElementById("btn-video");
   const btnScreen = document.getElementById("btn-screen");
 
-  // Attempt to initialize webcam automatically
+  const RTC_CONFIG = ICE_SERVERS && ICE_SERVERS.length ? { iceServers: ICE_SERVERS } : {};
+
   window.addEventListener("DOMContentLoaded", () => {
     updateControlButtons();
-    initLocalWebcam();
-    startPresenceHeartbeats();
+    startCall();
   });
+
+  async function startCall() {
+    await initLocalWebcam();
+    createPeerConnection();
+    startPresenceHeartbeats();
+    startSignalPolling();
+    // The offerer kicks off negotiation; the other peer waits passively.
+    if (I_AM_OFFERER) {
+      try {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        sendSignal("offer", offer);
+      } catch (err) {
+        console.error("Failed to create/send offer:", err);
+      }
+    }
+  }
 
   async function initLocalWebcam() {
     try {
       localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      localVideo.srcObject = localStream;
-      localVideo.classList.remove("d-none");
-      localPlaceholder.classList.add("d-none");
-      
+      attachLocalStream(localStream);
       isVideoOn = true;
       isAudioOn = true;
       updateControlButtons();
     } catch (err) {
-      console.warn("Could not access camera/mic: ", err);
-      // Fallback: Try audio only
+      console.warn("Could not access camera/mic, falling back to audio only:", err);
       try {
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        attachLocalStream(localStream);
+        isVideoOn = false;
         isAudioOn = true;
         updateControlButtons();
       } catch (audioErr) {
-        console.error("No media devices accessible: ", audioErr);
+        console.error("No media devices accessible:", audioErr);
         isAudioOn = false;
+        isVideoOn = false;
         updateControlButtons();
       }
     }
   }
+
+  function attachLocalStream(stream) {
+    localVideo.srcObject = stream;
+    localVideo.classList.remove("d-none");
+    localPlaceholder.classList.add("d-none");
+  }
+
+  function createPeerConnection() {
+    pc = new RTCPeerConnection(RTC_CONFIG);
+
+    // Push local tracks into the connection and remember the video sender so
+    // screen-share can replace just the video track later.
+    if (localStream) {
+      localStream.getTracks().forEach((track) => {
+        const sender = pc.addTrack(track, localStream);
+        if (track.kind === "video") senderVideoTrack = sender;
+      });
+    }
+
+    // Render the remote peer's media when it arrives.
+    pc.ontrack = (event) => {
+      remoteVideo.srcObject = event.streams[0];
+      remoteVideo.classList.remove("d-none");
+      remotePlaceholder.classList.add("d-none");
+      handleUserJoined();
+    };
+
+    // Forward ICE candidates to the other participant through signaling.
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        sendSignal("ice", event.candidate);
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      if (!pc) return;
+      const state = pc.connectionState;
+      if (state === "connected") {
+        wasConnected = true;
+        clearReconnectTimer();
+      } else if (state === "disconnected" || state === "failed") {
+        handleUserLeft();
+      }
+    };
+  }
+
+  // ---- Signaling (HTTP polling against MySQL-backed store) ----
+
+  function startSignalPolling() {
+    pollSignals(); // immediate
+    signalInterval = setInterval(pollSignals, 1500);
+  }
+
+  async function pollSignals() {
+    try {
+      const res = await fetch(SIGNALS_URL, { method: "GET" });
+      if (!res.ok) return;
+      const data = await res.json();
+      handleRemoteLeave(data);
+      if (!Array.isArray(data.signals)) return;
+      for (const signal of data.signals) {
+        await handleSignal(signal);
+      }
+    } catch (err) {
+      console.warn("Signal poll failed:", err);
+    }
+  }
+
+  async function handleSignal(signal) {
+    if (!pc || negotiationDone) return;
+    try {
+      const payload = JSON.parse(signal.payload || "{}");
+      if (signal.signal_type === "answer") {
+        await pc.setRemoteDescription(new RTCSessionDescription(payload));
+      } else if (signal.signal_type === "offer") {
+        await pc.setRemoteDescription(new RTCSessionDescription(payload));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        sendSignal("answer", answer);
+        negotiationDone = true;
+      } else if (signal.signal_type === "ice") {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(payload));
+        } catch (e) {
+          // Late candidates before remote description are tolerated.
+        }
+      }
+    } catch (err) {
+      console.error("Failed to handle signal:", signal.signal_type, err);
+    }
+  }
+
+  function handleRemoteLeave(data) {
+    // If the call was ended server-side or a peer posted a leave signal, exit.
+    const left = data.video_call_active === false && wasConnected;
+    const gotLeave = Array.isArray(data.signals) && data.signals.some((s) => s.signal_type === "leave");
+    if (left || gotLeave) {
+      endCallLocally();
+    }
+  }
+
+  function sendSignal(signalType, payload) {
+    return fetch(SIGNALS_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": CSRF_TOKEN,
+      },
+      body: JSON.stringify({ signal_type: signalType, payload: payload }),
+    }).catch((err) => console.warn("Signal send failed:", signalType, err));
+  }
+
+  // ---- Media toggles ----
 
   function toggleAudio() {
     if (!localStream) return;
@@ -439,32 +553,37 @@
   async function toggleScreenShare() {
     if (!isScreenSharing) {
       try {
-        screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+        const screenTrack = screenStream.getVideoTracks()[0];
+        // Replace the camera track in the peer connection with the screen track.
+        if (senderVideoTrack) {
+          await senderVideoTrack.replaceTrack(screenTrack);
+        }
         localVideo.srcObject = screenStream;
         localVideo.classList.remove("d-none");
         localPlaceholder.classList.add("d-none");
-        
         isScreenSharing = true;
-        
-        // When user stops screen sharing from browser bar
-        screenStream.getVideoTracks()[0].onended = () => {
-          stopScreenSharing();
-        };
+        screenTrack.onended = () => stopScreenSharing();
         updateControlButtons();
       } catch (err) {
-        console.warn("Screen share cancelled/failed: ", err);
+        console.warn("Screen share cancelled/failed:", err);
       }
     } else {
       stopScreenSharing();
     }
   }
 
-  function stopScreenSharing() {
+  async function stopScreenSharing() {
     if (screenStream) {
-      screenStream.getTracks().forEach(t => t.stop());
+      screenStream.getTracks().forEach((t) => t.stop());
       screenStream = null;
     }
     isScreenSharing = false;
+    // Restore the camera track into the peer connection.
+    if (senderVideoTrack && localStream) {
+      const camTrack = localStream.getVideoTracks()[0];
+      if (camTrack) await senderVideoTrack.replaceTrack(camTrack);
+    }
     if (localStream && isVideoOn) {
       localVideo.srcObject = localStream;
     } else {
@@ -497,7 +616,6 @@
     }
 
     if (isScreenSharing) {
-      btnScreen.classList.remove("active-off");
       btnScreen.classList.add("btn-warning");
     } else {
       btnScreen.classList.remove("btn-warning");
@@ -506,64 +624,56 @@
     setControlIcon(document.querySelector(".btn-end"), "svg-icon-end-call");
   }
 
-  // Heartbeat Presence Verification
+  // ---- Presence + reconnect (rejoin within 2 minutes) ----
+
   function startPresenceHeartbeats() {
-    sendHeartbeat(); // first immediate heartbeat
-    heartbeatInterval = setInterval(sendHeartbeat, 5000); // every 5 seconds
+    sendHeartbeat();
+    heartbeatInterval = setInterval(sendHeartbeat, 5000);
   }
 
   async function sendHeartbeat() {
     try {
-      const response = await fetch("{{ url_for('exchanges.video_call_heartbeat', exchange_id=exchange.id) }}", {
+      const response = await fetch(HEARTBEAT_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-CSRFToken": "{{ csrf_token() }}"
-        }
+          "X-CSRFToken": CSRF_TOKEN,
+        },
       });
       if (response.ok) {
         const data = await response.json();
-        
-        // Check if the other user is online
         if (data.other_online) {
-          handleUserJoined();
-        } else {
+          // Online state is confirmed by the live peer connection; no-op here.
+        } else if (wasConnected) {
           handleUserLeft();
-        }
-
-        // If call was ended remotely, end call locally
-        if (!data.video_call_active && wasConnected) {
-          window.location.reload();
         }
       }
     } catch (err) {
-      console.warn("Heartbeat update failed: ", err);
+      console.warn("Heartbeat update failed:", err);
     }
   }
 
   function handleUserJoined() {
     wasConnected = true;
     clearReconnectTimer();
-    
+
     callStatusDot.classList.remove("offline");
     callStatusDot.style.background = "#28a745";
     callStatusDot.style.boxShadow = "0 0 8px #28a745";
     callStatusText.textContent = "Live connected";
-    
+
     remoteSubText.textContent = "Connected • Mic/Camera Active";
     remotePlaceholder.style.background = "radial-gradient(circle, #2a3d30 0%, #101018 100%)";
   }
 
   function handleUserLeft() {
     if (!wasConnected) {
-      // Still waiting for first connection
       callStatusDot.classList.add("offline");
       callStatusText.textContent = "Waiting for other participant...";
       remoteSubText.textContent = "Offline • Not joined yet";
       return;
     }
 
-    // Connection dropped
     callStatusDot.classList.add("offline");
     callStatusText.textContent = "Reconnecting...";
     remoteSubText.textContent = "Disconnected • Reconnecting...";
@@ -573,21 +683,21 @@
   }
 
   function startReconnectTimer() {
-    if (reconnectTimer) return; // already running
-    
+    if (reconnectTimer) return;
+
     reconnectBanner.style.display = "block";
     reconnectSecondsRemaining = 120;
-    
+
     reconnectTimer = setInterval(() => {
       reconnectSecondsRemaining--;
-      
+
       const m = Math.floor(reconnectSecondsRemaining / 60);
       const s = reconnectSecondsRemaining % 60;
       countdownTimer.textContent = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-      
+
       if (reconnectSecondsRemaining <= 0) {
         clearInterval(reconnectTimer);
-        // Terminate call automatically
+        // Terminate call automatically after the 2-minute rejoin window.
         document.getElementById("end-call-form").submit();
       }
     }, 1000);
@@ -601,13 +711,25 @@
     reconnectBanner.style.display = "none";
   }
 
+  function endCallLocally() {
+    if (signalInterval) clearInterval(signalInterval);
+    if (heartbeatInterval) clearInterval(heartbeatInterval);
+    if (pc) {
+      try { pc.close(); } catch (e) {}
+      pc = null;
+    }
+    window.location.href = "{{ url_for('exchanges.detail', exchange_id=exchange.id) }}";
+  }
+
   // Cleanup on unload
   window.addEventListener("beforeunload", () => {
     if (heartbeatInterval) clearInterval(heartbeatInterval);
+    if (signalInterval) clearInterval(signalInterval);
     if (reconnectTimer) clearInterval(reconnectTimer);
+    if (pc) { try { pc.close(); } catch (e) {} }
     stopScreenSharing();
     if (localStream) {
-      localStream.getTracks().forEach(track => track.stop());
+      localStream.getTracks().forEach((track) => track.stop());
     }
   });
 </script>

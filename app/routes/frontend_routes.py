@@ -67,6 +67,7 @@ class FrontendRoutes:
 
         credits = Blueprint("credits", __name__, url_prefix="/credits")
         credits.route("/ledger", endpoint="ledger")(self.controller.wallet)
+        credits.route("/demo-topup", methods=["POST"], endpoint="demo_topup")(self.controller.demo_topup)
 
         matches = Blueprint("matches", __name__, url_prefix="/matches")
         matches.route("/", endpoint="index")(self.controller.matches)
@@ -87,10 +88,13 @@ class FrontendRoutes:
         exchanges.route("/<int:exchange_id>/video/start", methods=["POST"], endpoint="start_video_call")(self.controller.start_video_call)
         exchanges.route("/<int:exchange_id>/video/end", methods=["POST"], endpoint="end_video_call")(self.controller.end_video_call)
         exchanges.route("/<int:exchange_id>/video/heartbeat", methods=["POST"], endpoint="video_call_heartbeat")(self.controller.video_call_heartbeat)
+        exchanges.route("/<int:exchange_id>/video/signals", methods=["GET", "POST"], endpoint="video_call_signals")(self.controller.video_call_signals)
 
         messages = Blueprint("messages", __name__, url_prefix="/messages")
         messages.route("/", endpoint="index")(self.controller.messages)
         messages.route("/<int:conversation_id>", methods=["GET", "POST"], endpoint="detail")(self.controller.conversation)
+        messages.route("/<int:conversation_id>/stream", endpoint="stream")(self.controller.conversation_stream)
+        messages.route("/<int:conversation_id>/updates", endpoint="updates")(self.controller.conversation_updates)
 
         notifications = Blueprint("notifications", __name__, url_prefix="/notifications")
         notifications.route("/", endpoint="index")(self.controller.notifications)

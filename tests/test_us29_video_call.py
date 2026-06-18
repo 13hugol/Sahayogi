@@ -178,3 +178,178 @@ def test_video_call_auth_protection(app, client, login, exchange_setup, user_fac
 
     res = client.post(f"/exchanges/{exchange.id}/video/end")
     assert res.status_code == 403
+
+
+def test_start_call_button_visible_on_exchange_thread_and_detail(
+    app, client, login, exchange_setup
+):
+    """The Start Video Call option must be discoverable, not hidden behind the
+    both-online gate. It appears on the active exchange's message thread and on
+    the exchange detail page; server-side enforcement still rejects an actual
+    start when the peer is offline.
+    """
+    exchange = _create_accepted_exchange(app, client, login, exchange_setup)
+
+    # Mark both participants online so the thread resolves an active exchange.
+    with app.app_context():
+        with Database() as db:
+            db.execute(
+                "UPDATE users SET last_active_at = %s WHERE id IN (%s, %s)",
+                (datetime.utcnow(), exchange_setup["teacher"].id, exchange_setup["learner"].id),
+            )
+
+    # Message thread exposes a Start Call control for the active exchange.
+    login("learner@example.com")
+    with app.app_context():
+        conversation = exchange.conversation
+        assert conversation is not None
+        conversation_id = conversation.id
+    res = client.get(f"/messages/{conversation_id}")
+    assert res.status_code == 200
+    assert b"Start Call" in res.data
+
+    # Exchange detail page also exposes the Start Video Call control.
+    res = client.get(f"/exchanges/{exchange.id}")
+    assert res.status_code == 200
+    assert b"Start Video Call" in res.data
+
+
+def test_video_signaling_endpoints_require_participant(app, client, login, exchange_setup, user_factory):
+    """Only exchange participants may read or post WebRTC signals."""
+    exchange = _create_accepted_exchange(app, client, login, exchange_setup)
+
+    # Non-participant must be refused on both GET and POST.
+    client.get("/auth/logout", follow_redirects=True)
+    with app.app_context():
+        user_factory(email="intruder@example.com")
+    login("intruder@example.com")
+
+    res = client.get(f"/exchanges/{exchange.id}/video/signals")
+    assert res.status_code == 403
+
+    res = client.post(
+        f"/exchanges/{exchange.id}/video/signals",
+        json={"signal_type": "offer", "payload": {"sdp": "x"}},
+    )
+    assert res.status_code == 403
+
+
+def test_video_signal_delivery_and_consume(app, client, login, exchange_setup):
+    """A posted signal is delivered to its recipient exactly once."""
+    from app.repositories import VideoCallSignalRepository
+
+    exchange = _create_accepted_exchange(app, client, login, exchange_setup)
+
+    with app.app_context():
+        teacher_id = exchange_setup["teacher"].id
+        learner_id = exchange_setup["learner"].id
+
+    # Teacher posts an offer addressed to the learner.
+    login("teacher@example.com")
+    res = client.post(
+        f"/exchanges/{exchange.id}/video/signals",
+        json={"signal_type": "offer", "payload": {"sdp": "offer-sdp"}},
+    )
+    assert res.status_code == 200
+    assert res.get_json() == {"ok": True}
+
+    # The signal is waiting, unconsumed, in the store for the learner.
+    with app.app_context():
+        repo = VideoCallSignalRepository()
+        # Teacher sees nothing addressed to them.
+        own = repo.consume_pending_for(exchange_id=exchange.id, recipient_id=teacher_id)
+        assert own == []
+
+    # Learner polls and consumes the offer exactly once.
+    client.get("/auth/logout", follow_redirects=True)
+    login("learner@example.com")
+    res = client.get(f"/exchanges/{exchange.id}/video/signals")
+    assert res.status_code == 200
+    data = res.get_json()
+    assert "signals" in data
+    assert len(data["signals"]) == 1
+    sig = data["signals"][0]
+    assert sig["signal_type"] == "offer"
+    assert "offer-sdp" in sig["payload"]
+
+    # A second poll must not replay the already-consumed signal.
+    res = client.get(f"/exchanges/{exchange.id}/video/signals")
+    assert res.get_json()["signals"] == []
+
+
+def test_video_signal_rejects_invalid_type(app, client, login, exchange_setup):
+    exchange = _create_accepted_exchange(app, client, login, exchange_setup)
+    login("teacher@example.com")
+    res = client.post(
+        f"/exchanges/{exchange.id}/video/signals",
+        json={"signal_type": "bogus", "payload": "{}"},
+    )
+    assert res.status_code == 400
+
+
+def test_ending_call_clears_signals(app, client, login, exchange_setup):
+    """End-call clears stored signals so a future call starts clean."""
+    from app.repositories import VideoCallSignalRepository
+
+    exchange = _create_accepted_exchange(app, client, login, exchange_setup)
+
+    with app.app_context():
+        teacher_id = exchange_setup["teacher"].id
+        learner_id = exchange_setup["learner"].id
+
+    # Mark both online and start the call.
+    with app.app_context():
+        with Database() as db:
+            db.execute(
+                "UPDATE users SET last_active_at = %s WHERE id IN (%s, %s)",
+                (datetime.utcnow(), teacher_id, learner_id),
+            )
+
+    login("teacher@example.com")
+    client.post(f"/exchanges/{exchange.id}/video/start", follow_redirects=True)
+
+    # Leave some unconsumed signals in the store.
+    client.post(
+        f"/exchanges/{exchange.id}/video/signals",
+        json={"signal_type": "ice", "payload": {"candidate": "ice-1"}},
+    )
+    with app.app_context():
+        pending = VideoCallSignalRepository().consume_pending_for(
+            exchange_id=exchange.id, recipient_id=learner_id
+        )
+        assert len(pending) == 1
+
+    # Another ICE for the learner, left unconsumed, then end the call.
+    client.post(
+        f"/exchanges/{exchange.id}/video/signals",
+        json={"signal_type": "ice", "payload": {"candidate": "ice-2"}},
+    )
+
+    res = client.post(f"/exchanges/{exchange.id}/video/end", follow_redirects=True)
+    assert res.status_code == 200
+
+    with app.app_context():
+        ex = ExchangeRepository().find_by_id(exchange.id)
+        assert ex.video_call_active is False
+        assert "Duration:" in ex.video_session_summary
+        # Stale offer/ice signals are cleared; only the peer 'leave' notice
+        # posted by end-call should remain so the other side can hang up.
+        remaining = VideoCallSignalRepository().consume_pending_for(
+            exchange_id=exchange.id, recipient_id=learner_id
+        )
+        assert len(remaining) == 1
+        assert remaining[0].signal_type == "leave"
+
+
+def test_video_call_room_renders_ice_config_and_role(app, client, login, exchange_setup):
+    """The room exposes ICE servers and an offerer flag to the template."""
+    exchange = _create_accepted_exchange(app, client, login, exchange_setup)
+    login("teacher@example.com")
+    res = client.get(f"/exchanges/{exchange.id}/video")
+    assert res.status_code == 200
+    body = res.data.decode()
+    # The template injects the role flag and ICE config into JS.
+    assert "I_AM_OFFERER" in body
+    assert "ICE_SERVERS" in body
+    # Real peer connection wiring is present, not the old mock-only room.
+    assert "RTCPeerConnection" in body

@@ -11,6 +11,7 @@ from .exchange_request import ExchangeRequest
 from .exchange import Exchange
 from .report import Report
 from .credit_transaction import CreditTransaction, CreditHold
+from .video_call_signal import VideoCallSignal
 
 __all__ = [
     "AdminAuditLog",
@@ -33,4 +34,5 @@ __all__ = [
     "Report",
     "CreditTransaction",
     "CreditHold",
+    "VideoCallSignal",
 ]

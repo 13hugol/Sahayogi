@@ -54,6 +54,41 @@
       </div>
     </div>
     <div class="col-lg-4">
+      {% if exchange.status == "active" %}
+        <div class="card card-shell mb-4">
+          <div class="card-body">
+            <h2 class="h5 mb-3">Video call</h2>
+            <p class="text-muted small">
+              Start a live, in-app video session for this exchange. Both participants must be online.
+            </p>
+            <div class="d-grid gap-2">
+              {% if can_join_video %}
+                <a href="{{ url_for('exchanges.video_call_room', exchange_id=exchange.id) }}" class="btn btn-warning btn-with-icon">
+                  <span class="svg-icon svg-icon-video" aria-hidden="true"></span>
+                  <span>Join Video Call</span>
+                </a>
+              {% elif can_start_video %}
+                <form method="post" action="{{ url_for('exchanges.start_video_call', exchange_id=exchange.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn btn-accent w-100 btn-with-icon">
+                    <span class="svg-icon svg-icon-video" aria-hidden="true"></span>
+                    <span>Start Video Call</span>
+                  </button>
+                </form>
+              {% else %}
+                <button class="btn btn-outline-secondary w-100 btn-with-icon" disabled title="Both participants must be online to start a call.">
+                  <span class="svg-icon svg-icon-video-off" aria-hidden="true"></span>
+                  <span>Start Video Call (Offline)</span>
+                </button>
+              {% endif %}
+            </div>
+            {% if exchange.conversation and not can_join_video %}
+              <a class="btn btn-link btn-sm px-0 mt-1" href="{{ url_for('messages.detail', conversation_id=exchange.conversation.id) }}">Open chat to coordinate</a>
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
+
       <div class="card card-shell">
         <div class="card-body">
           <h2 class="h5 mb-3">Reviews on this exchange</h2>

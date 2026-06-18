@@ -434,7 +434,52 @@ class FrontendController(BaseController):
         credit_repo = CreditRepository()
         entries = credit_repo.get_history_for_user(current_user.id)
         holds = credit_repo.get_active_holds_for_user(current_user.id)
-        return self.render("credits/ledger.html", entries=entries, holds=holds)
+        # Demo top-up is available so the credit cycle can be exercised end to
+        # end in development/demos without real money. It is intentionally
+        # disabled in production where real payments are out of scope (guide.md
+        # §2). Demo credits are recorded as a normal ledger entry so the
+        # movement is always visible and auditable.
+        demo_allowed = bool(current_app.config.get("TESTING")) or current_app.debug
+        return self.render(
+            "credits/ledger.html",
+            entries=entries,
+            holds=holds,
+            demo_topup_allowed=demo_allowed,
+            demo_topup_amounts=[50, 100, 200],
+        )
+
+    @login_required
+    def demo_topup(self):
+        """Add demo internal credits in development/demo mode (no real money).
+
+        Disabled outside dev/test config. Credits are written through the normal
+        repository path so the ledger shows the movement, keeping the system
+        transparent and consistent with the internal-credit rules.
+        """
+        if not (bool(current_app.config.get("TESTING")) or current_app.debug):
+            flash("Demo top-up is disabled outside development/demo mode.", "warning")
+            return redirect(url_for("credits.ledger"))
+
+        amount_raw = (request.form.get("amount") or "").strip()
+        try:
+            amount = int(amount_raw)
+        except ValueError:
+            flash("Please choose a valid demo amount.", "danger")
+            return redirect(url_for("credits.ledger"))
+        if amount <= 0 or amount > 1000:
+            flash("Demo top-up must be between 1 and 1000 credits.", "danger")
+            return redirect(url_for("credits.ledger"))
+
+        from app.repositories.credit_repository import CreditRepository
+        CreditRepository().create_transaction(
+            user_id=current_user.id,
+            amount_delta=amount,
+            entry_type="demo_reward",
+            description=f"Demo top-up of {amount} credits (no real-money value).",
+        )
+        flash(f"{amount} demo credits added to your balance.", "success")
+        return redirect(url_for("credits.ledger"))
+
 
     @login_required
     def matches(self):
@@ -563,12 +608,28 @@ class FrontendController(BaseController):
         )
         already_reviewed = review_repo.find_by_exchange_and_reviewer(exchange.id, current_user.id) is not None
         can_review = exchange.status == "completed" and not already_reviewed
+
+        # Video-call entry point: show Start/Join only on active exchanges, and
+        # only enable Start when both participants are currently online. This
+        # mirrors the message-thread control and keeps call state authoritative.
+        from app.models.user import User
+        learner_user = User.find_by_id(request_obj.learner_id)
+        teacher_user = User.find_by_id(listing.user_id)
+        both_online = bool(
+            learner_user and teacher_user and learner_user.is_online and teacher_user.is_online
+        )
+        can_start_video = exchange.status == "active" and both_online
+        can_join_video = exchange.status == "active" and bool(exchange.video_call_active)
+
         return self.render(
             "exchanges/detail.html",
             exchange=exchange,
             can_mark_complete=can_mark_complete,
             can_review=can_review,
             reviews=review_repo.for_exchange(exchange.id),
+            can_start_video=can_start_video,
+            can_join_video=can_join_video,
+            both_online=both_online,
         )
 
     @login_required
@@ -595,12 +656,17 @@ class FrontendController(BaseController):
 
         from datetime import datetime
         completed_at = datetime.utcnow()
-        from app.database import Database
 
         mark_column = "learner_completed_at" if is_learner else "teacher_completed_at"
         other_already_marked = (
             exchange.teacher_completed_at if is_learner else exchange.learner_completed_at
         ) is not None
+
+        # Record this participant's completion mark. Credit settlement is handled
+        # below by the repository, not as inline raw SQL here, so the controller
+        # stays free of business logic and SQL per the MVC/database rules.
+        from app.repositories.credit_repository import CreditRepository
+        from app.database import Database
 
         db = Database()
         try:
@@ -614,41 +680,23 @@ class FrontendController(BaseController):
                         "UPDATE exchanges SET status = 'completed', completed_at = %s WHERE id = %s",
                         (completed_at, exchange_id),
                     )
-                    if listing.exchange_type == "credit":
-                        db.execute(
-                            "UPDATE credit_holds SET status = 'cleared' WHERE request_id = %s AND status = 'active'",
-                            (request_obj.id,),
-                        )
-                        # Deduct from learner
-                        db.execute(
-                            """
-                            INSERT INTO credit_transactions (user_id, amount_delta, entry_type, description, skill_id, exchange_id)
-                            VALUES (%s, %s, %s, %s, %s, %s)
-                            """,
-                            (request_obj.learner_id, -listing.credit_cost, "deduction", f"Spent on learning '{listing.title}'", listing.id, exchange.id),
-                        )
-                        db.execute(
-                            "UPDATE users SET credit_balance = credit_balance - %s WHERE id = %s",
-                            (listing.credit_cost, request_obj.learner_id),
-                        )
-                        # Credit to teacher
-                        db.execute(
-                            """
-                            INSERT INTO credit_transactions (user_id, amount_delta, entry_type, description, skill_id, exchange_id)
-                            VALUES (%s, %s, %s, %s, %s, %s)
-                            """,
-                            (listing.user_id, listing.credit_cost, "earning", f"Earned from teaching '{listing.title}'", listing.id, exchange.id),
-                        )
-                        db.execute(
-                            "UPDATE users SET credit_balance = credit_balance + %s WHERE id = %s",
-                            (listing.credit_cost, listing.user_id),
-                        )
-                    db.execute(
-                        "UPDATE profiles SET completed_exchange_count = completed_exchange_count + 1 WHERE user_id IN (%s, %s)",
-                        (request_obj.learner_id, listing.user_id),
-                    )
         finally:
             db.close()
+
+        # When both participants have confirmed, settle credits atomically. The
+        # repository method is idempotent, so a double-submit by either user
+        # cannot move credits twice.
+        settled_credits = False
+        if other_already_marked and listing.exchange_type == "credit":
+            CreditRepository().settle_exchange_credits(
+                exchange_id=exchange.id,
+                learner_id=request_obj.learner_id,
+                teacher_id=listing.user_id,
+                listing_id=listing.id,
+                skill_title=listing.title,
+                amount=listing.credit_cost,
+            )
+            settled_credits = True
 
         other_user_id = listing.user_id if is_learner else request_obj.learner_id
         if other_already_marked:
@@ -669,54 +717,69 @@ class FrontendController(BaseController):
             flash("Completion recorded. Waiting for the other participant to confirm.", "success")
         return redirect(url_for("exchanges.detail", exchange_id=exchange_id))
 
-    @login_required
-    def video_call_room(self, exchange_id: int):
+    def _resolve_video_call_exchange(self, exchange_id: int):
+        """Load an exchange for a video-call action and enforce participation.
+
+        Returns (exchange, request_obj, listing, other_user_id) or raises a
+        Flask HTTP error (404/403). Centralized so every video endpoint applies
+        the same access control instead of repeating it inline.
+        """
         from app.repositories import ExchangeRepository
+
         exchange = ExchangeRepository().find_by_id(exchange_id)
         if not exchange:
             abort(404)
-        if exchange.status != "active":
-            flash("This exchange is not active.", "warning")
-            return redirect(url_for("exchanges.detail", exchange_id=exchange_id))
-        
         request_obj = exchange.request
         listing = exchange.listing
         if not request_obj or not listing:
             abort(404)
         if current_user.id not in [request_obj.learner_id, listing.user_id]:
             abort(403)
-            
-        return self.render("exchanges/video.html", exchange=exchange)
+        other_user_id = (
+            listing.user_id if current_user.id == request_obj.learner_id else request_obj.learner_id
+        )
+        return exchange, request_obj, listing, other_user_id
+
+    @login_required
+    def video_call_room(self, exchange_id: int):
+        exchange, request_obj, listing, _ = self._resolve_video_call_exchange(exchange_id)
+        if exchange.status != "active":
+            flash("This exchange is not active.", "warning")
+            return redirect(url_for("exchanges.detail", exchange_id=exchange_id))
+
+        # The caller is the offerer when they are the lower-id participant; this
+        # keeps a deterministic "who creates the offer" decision without extra
+        # state. Exposed to the template for the JS negotiation logic.
+        i_am_offerer = current_user.id < (
+            listing.user_id if current_user.id == request_obj.learner_id else request_obj.learner_id
+        )
+        return self.render(
+            "exchanges/video.html",
+            exchange=exchange,
+            i_am_offerer=i_am_offerer,
+            ice_servers=current_app.config.get("WEBRTC_ICE_SERVERS") or [],
+        )
 
     @login_required
     def start_video_call(self, exchange_id: int):
         from app.repositories import ExchangeRepository
         from app.models.user import User
-        
-        exchange = ExchangeRepository().find_by_id(exchange_id)
-        if not exchange:
-            abort(404)
+
+        exchange, request_obj, listing, _ = self._resolve_video_call_exchange(exchange_id)
         if exchange.status != "active":
             flash("This exchange is not active.", "warning")
             return redirect(url_for("exchanges.detail", exchange_id=exchange_id))
-            
-        request_obj = exchange.request
-        listing = exchange.listing
-        if not request_obj or not listing:
-            abort(404)
-        if current_user.id not in [request_obj.learner_id, listing.user_id]:
-            abort(403)
-            
-        # Check if both are online
+
+        # Call state is authoritative: both participants must be online to start.
         learner = User.find_by_id(request_obj.learner_id)
         teacher = User.find_by_id(listing.user_id)
-        
+
         if not learner or not teacher or not learner.is_online or not teacher.is_online:
             flash("Both participants must be online to start a video call.", "danger")
             return redirect(url_for("messages.detail", conversation_id=exchange.conversation.id))
-            
+
         ExchangeRepository().start_video_call(exchange_id)
-        
+
         # Post system message to the chat
         conversation = exchange.conversation
         if conversation:
@@ -727,30 +790,21 @@ class FrontendController(BaseController):
                 sender_id=current_user.id,
                 body=msg_body
             )
-            
+
         return redirect(url_for("exchanges.video_call_room", exchange_id=exchange_id))
 
     @login_required
     def end_video_call(self, exchange_id: int):
-        from app.repositories import ExchangeRepository
+        from app.repositories import ExchangeRepository, VideoCallSignalRepository
         from datetime import datetime
-        
-        exchange = ExchangeRepository().find_by_id(exchange_id)
-        if not exchange:
-            abort(404)
-            
-        request_obj = exchange.request
-        listing = exchange.listing
-        if not request_obj or not listing:
-            abort(404)
-        if current_user.id not in [request_obj.learner_id, listing.user_id]:
-            abort(403)
-            
-        if not exchange.video_call_active:
-            flash("No active video call was found for this exchange.", "warning")
-            return redirect(url_for("exchanges.detail", exchange_id=exchange_id))
-            
-        # Compute duration
+
+        exchange, request_obj, listing, other_user_id = self._resolve_video_call_exchange(
+            exchange_id
+        )
+
+        was_active = exchange.video_call_active
+
+        # Compute duration from authoritative started_at state.
         started_at = exchange.video_call_started_at
         if started_at:
             if started_at.tzinfo is not None:
@@ -761,10 +815,21 @@ class FrontendController(BaseController):
             duration_str = f"{mins}m {secs}s"
         else:
             duration_str = "unknown duration"
-            
+
         summary = f"Video call ended. Duration: {duration_str}. Participants: {exchange.learner.full_name} and {exchange.teacher.full_name}."
         ExchangeRepository().end_video_call(exchange_id, summary)
-        
+        # Drop any unconsumed signaling messages so a future call starts clean.
+        VideoCallSignalRepository().clear_for_exchange(exchange_id)
+        # Tell the still-connected peer to hang up via a leave signal.
+        if was_active:
+            VideoCallSignalRepository().add_signal(
+                exchange_id=exchange_id,
+                sender_id=current_user.id,
+                recipient_id=other_user_id,
+                signal_type="leave",
+                payload="{}",
+            )
+
         # Post system message to the chat
         conversation = exchange.conversation
         if conversation:
@@ -775,27 +840,19 @@ class FrontendController(BaseController):
                 sender_id=current_user.id,
                 body=msg_body
             )
-            
+
         flash(f"Video call ended. {summary}", "success")
         return redirect(url_for("exchanges.detail", exchange_id=exchange_id))
 
     @login_required
     def video_call_heartbeat(self, exchange_id: int):
-        from app.repositories import ExchangeRepository
         from app.models.user import User
         from datetime import datetime
-        
-        exchange = ExchangeRepository().find_by_id(exchange_id)
-        if not exchange:
-            return jsonify({"error": "Exchange not found"}), 404
-            
-        request_obj = exchange.request
-        listing = exchange.listing
-        if not request_obj or not listing:
-            return jsonify({"error": "Exchange details not found"}), 404
-        if current_user.id not in [request_obj.learner_id, listing.user_id]:
-            return jsonify({"error": "Unauthorized"}), 403
-            
+
+        exchange, request_obj, listing, other_user_id = self._resolve_video_call_exchange(
+            exchange_id
+        )
+
         # Update user activity timestamp in database
         from app.database import Database
         db = Database()
@@ -803,15 +860,76 @@ class FrontendController(BaseController):
             db.execute("UPDATE users SET last_active_at = %s WHERE id = %s", (datetime.utcnow(), current_user.id))
         finally:
             db.close()
-            
-        other_user = listing.user if current_user.id == request_obj.learner_id else request_obj.learner
-        other_user_db = User.find_by_id(other_user.id)
-        
+
+        other_user_db = User.find_by_id(other_user_id)
+
         return jsonify({
             "other_online": other_user_db.is_online if other_user_db else False,
             "video_call_active": exchange.video_call_active,
             "summary": exchange.video_session_summary
         })
+
+    @login_required
+    def video_call_signals(self, exchange_id: int):
+        """Participant-only WebRTC signaling exchange via short polling.
+
+        GET  -> returns and consumes unconsumed signals addressed to the caller.
+        POST -> stores a signal (offer/answer/ice/leave) for the other participant.
+        """
+        from app.repositories import VideoCallSignalRepository
+
+        exchange, request_obj, listing, other_user_id = self._resolve_video_call_exchange(
+            exchange_id
+        )
+
+        signal_repo = VideoCallSignalRepository()
+
+        if request.method == "POST":
+            payload = request.get_json(silent=True) or {}
+            signal_type = str(payload.get("signal_type") or "").strip()
+            body = payload.get("payload")
+
+            if signal_type not in signal_repo.VALID_TYPES:
+                return jsonify({"error": "Invalid signal type."}), 400
+
+            # Serialize complex payloads (offer/answer/ice objects) to JSON text.
+            if not isinstance(body, str):
+                import json
+
+                try:
+                    body = json.dumps(body)
+                except (TypeError, ValueError):
+                    return jsonify({"error": "Invalid signal payload."}), 400
+            if len(body) > 65535:
+                return jsonify({"error": "Signal payload too large."}), 400
+
+            signal_repo.add_signal(
+                exchange_id=exchange_id,
+                sender_id=current_user.id,
+                recipient_id=other_user_id,
+                signal_type=signal_type,
+                payload=body,
+            )
+            return jsonify({"ok": True})
+
+        # GET: return and mark consumed all signals waiting for this participant.
+        pending = signal_repo.consume_pending_for(
+            exchange_id=exchange_id, recipient_id=current_user.id
+        )
+        return jsonify(
+            {
+                "signals": [
+                    {
+                        "id": s.id,
+                        "signal_type": s.signal_type,
+                        "payload": s.payload,
+                    }
+                    for s in pending
+                ],
+                "video_call_active": exchange.video_call_active,
+            }
+        )
+
 
     @login_required
     def create_request(self, listing_id: int):
@@ -843,7 +961,12 @@ class FrontendController(BaseController):
         )
         if listing.exchange_type == "credit":
             from app.repositories.credit_repository import CreditRepository
-            CreditRepository().create_hold(current_user.id, request_obj.id, listing.credit_cost)
+            credit_repo = CreditRepository()
+            # Guard against a duplicate active hold for the same request, which
+            # could otherwise happen if the create-request form is double
+            # submitted (e.g. a browser refresh of the POST).
+            if not credit_repo.has_active_hold_for_request(request_obj.id):
+                credit_repo.create_hold(current_user.id, request_obj.id, listing.credit_cost)
             
         self._notification_service.notify_exchange_request(
             user_id=listing.user_id,
@@ -945,12 +1068,27 @@ class FrontendController(BaseController):
                 )
                 conversations = self._message_service.list_conversations(current_user.id)
                 ordered_messages = active_conversation.messages
+        # Check active exchange & online status of participants
+        active_exchange = None
+        both_online = False
+        if active_conversation:
+            other_participant = active_conversation.other_participant(current_user.id)
+            if other_participant:
+                from app.repositories import ExchangeRepository, UserRepository
+                active_exchange = ExchangeRepository().find_active_between_users(current_user.id, other_participant.id)
+                if active_exchange:
+                    me = UserRepository().find_by_id(current_user.id)
+                    other = UserRepository().find_by_id(other_participant.id)
+                    both_online = me.is_online and other.is_online
+
         return self.render(
             "messages/index.html",
             conversations=conversations,
             conversation=active_conversation,
             ordered_messages=ordered_messages,
             form=MessageShellForm(),
+            active_exchange=active_exchange,
+            both_online=both_online,
         )
 
     @login_required
@@ -960,17 +1098,49 @@ class FrontendController(BaseController):
             abort(404)
         if request.method == "POST":
             body = request.form.get("body", "")
+            is_ajax = (
+                request.headers.get("X-Requested-With") == "XMLHttpRequest"
+                or "application/json" in request.headers.get("Accept", "")
+                or request.args.get("ajax") == "1"
+            )
             try:
-                self._message_service.send_message(
+                msg = self._message_service.send_message(
                     conversation_id=conversation_id,
                     sender_id=current_user.id,
                     body=body,
                 )
             except ValueError as exc:
+                if is_ajax:
+                    from flask import jsonify
+                    return jsonify({"status": "error", "message": str(exc)}), 400
                 flash(str(exc), "danger")
             except PermissionError:
+                if is_ajax:
+                    from flask import jsonify
+                    return jsonify({"status": "error", "message": "Permission denied"}), 403
                 abort(403)
             else:
+                if is_ajax:
+                    from flask import jsonify
+                    from app.repositories import ExchangeRepository
+                    other_participant = conversation.other_participant(current_user.id)
+                    active_exchange = None
+                    if other_participant:
+                        active_exchange = ExchangeRepository().find_active_between_users(current_user.id, other_participant.id)
+
+                    return jsonify({
+                        "status": "success",
+                        "message": {
+                            "id": msg.id,
+                            "sender_id": msg.sender_id,
+                            "sender_name": msg.sender.full_name if msg.sender else current_user.full_name,
+                            "body": msg.body,
+                            "created_at": msg.created_at.strftime('%b %d, %H:%M') if msg.created_at else '',
+                            "is_mine": True,
+                            "video_call_active": active_exchange.video_call_active if active_exchange else False,
+                            "exchange_id": active_exchange.id if active_exchange else None,
+                        }
+                    })
                 flash("Message sent.", "success")
                 return redirect(url_for("messages.detail", conversation_id=conversation_id))
 
@@ -999,6 +1169,104 @@ class FrontendController(BaseController):
             active_exchange=active_exchange,
             both_online=both_online,
         )
+
+    @login_required
+    def conversation_stream(self, conversation_id: int):
+        conversation = self._message_service.get_conversation(conversation_id, current_user.id)
+        if not conversation:
+            abort(404)
+
+        from flask import Response
+        import time
+        import json
+
+        def event_stream():
+            from app.repositories import MessageRepository
+            repo = MessageRepository()
+            last_id = request.args.get("last_id", type=int)
+
+            if not last_id:
+                messages = repo.list_messages(conversation_id)
+                last_id = max([m.id for m in messages]) if messages else 0
+
+            while True:
+                try:
+                    new_msgs = repo.list_messages_since(conversation_id, last_id)
+                    for msg in new_msgs:
+                        last_id = max(last_id, msg.id)
+                        
+                        from app.repositories import ExchangeRepository
+                        other_participant = conversation.other_participant(current_user.id)
+                        active_exchange = None
+                        if other_participant:
+                            active_exchange = ExchangeRepository().find_active_between_users(current_user.id, other_participant.id)
+
+                        msg_data = {
+                            "id": msg.id,
+                            "sender_id": msg.sender_id,
+                            "sender_name": msg.sender.full_name if msg.sender else msg.sender_name,
+                            "body": msg.body,
+                            "created_at": msg.created_at.strftime('%b %d, %H:%M') if msg.created_at else '',
+                            "is_mine": msg.sender_id == current_user.id,
+                            "video_call_active": active_exchange.video_call_active if active_exchange else False,
+                            "exchange_id": active_exchange.id if active_exchange else None,
+                        }
+                        yield f"data: {json.dumps(msg_data)}\n\n"
+                    time.sleep(1)
+                except GeneratorExit:
+                    break
+                except Exception:
+                    time.sleep(1)
+
+        return Response(event_stream(), mimetype="text/event-stream")
+
+    @login_required
+    def conversation_updates(self, conversation_id: int):
+        conversation = self._message_service.get_conversation(conversation_id, current_user.id)
+        if not conversation:
+            from flask import jsonify
+            return jsonify({"status": "error", "message": "Conversation not found"}), 404
+
+        last_id = request.args.get("last_id", type=int)
+        if last_id is None:
+            from flask import jsonify
+            return jsonify({"status": "error", "message": "Missing last_id parameter"}), 400
+
+        from app.repositories import MessageRepository, ExchangeRepository, UserRepository
+        repo = MessageRepository()
+        new_msgs = repo.list_messages_since(conversation_id, last_id)
+
+        other_participant = conversation.other_participant(current_user.id)
+        active_exchange = None
+        both_online = False
+        if other_participant:
+            active_exchange = ExchangeRepository().find_active_between_users(current_user.id, other_participant.id)
+            if active_exchange:
+                me = UserRepository().find_by_id(current_user.id)
+                other = UserRepository().find_by_id(other_participant.id)
+                both_online = me.is_online and other.is_online
+
+        msg_list = []
+        for msg in new_msgs:
+            msg_list.append({
+                "id": msg.id,
+                "sender_id": msg.sender_id,
+                "sender_name": msg.sender.full_name if msg.sender else msg.sender_name,
+                "body": msg.body,
+                "created_at": msg.created_at.strftime('%b %d, %H:%M') if msg.created_at else '',
+                "is_mine": msg.sender_id == current_user.id,
+                "video_call_active": active_exchange.video_call_active if active_exchange else False,
+                "exchange_id": active_exchange.id if active_exchange else None,
+            })
+
+        from flask import jsonify
+        return jsonify({
+            "status": "success",
+            "messages": msg_list,
+            "video_call_active": active_exchange.video_call_active if active_exchange else False,
+            "exchange_id": active_exchange.id if active_exchange else None,
+            "both_online": both_online,
+        })
 
     @login_required
     def notifications(self):

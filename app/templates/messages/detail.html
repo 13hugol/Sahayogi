@@ -2,115 +2,766 @@
 {% extends "base.html" %}
 {% block title %}Conversation | Sahayogi{% endblock %}
 {% block content %}
-  <header class="page-header">
-    <div>
-      <span class="eyebrow">Conversation</span>
-      <h1 class="h2 mb-1">{{ conversation.subject }}</h1>
-      <p class="page-subtitle">Messages are only available for accepted exchange conversations or mutual matches.</p>
-    </div>
-  </header>
+<style>
+  /* Root Messenger Theme Variables */
+  :root {
+    --messenger-orange: #ff5e00;
+    --messenger-orange-hover: #e04f00;
+    --messenger-orange-light: #fff7ed;
+    --messenger-orange-border: #fed7aa;
+    --messenger-dark: #1c1917;
+    --messenger-muted: #78716c;
+    --messenger-bg-light: #fafafa;
+    --messenger-border: #f0ebe8;
+  }
 
-  <div class="message-layout">
-    <aside class="table-card">
-      <div class="table-card-header">
-        <h2 class="h4 mb-0">Conversations</h2>
+  /* Scrollbar Styling */
+  .chat-list::-webkit-scrollbar,
+  .chat-body::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .chat-list::-webkit-scrollbar-track,
+  .chat-body::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .chat-list::-webkit-scrollbar-thumb,
+  .chat-body::-webkit-scrollbar-thumb {
+    background: #e7e5e4;
+    border-radius: 10px;
+  }
+  .chat-list::-webkit-scrollbar-thumb:hover,
+  .chat-body::-webkit-scrollbar-thumb:hover {
+    background: #d6d3d1;
+  }
+
+  /* Video call button override */
+  .btn-accent {
+    background-color: var(--messenger-orange) !important;
+    border-color: var(--messenger-orange) !important;
+    color: #ffffff !important;
+    font-weight: 500;
+  }
+  .btn-accent:hover {
+    background-color: var(--messenger-orange-hover) !important;
+    border-color: var(--messenger-orange-hover) !important;
+  }
+
+  /* Main Messenger Wrapper */
+  .chat-app-wrapper {
+    display: flex;
+    height: calc(100vh - 140px);
+    min-height: 550px;
+    background: #ffffff;
+    border: 1px solid var(--messenger-border);
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.02), 0 8px 10px -6px rgba(0, 0, 0, 0.02);
+    margin-bottom: 2rem;
+  }
+
+  /* Messenger Sidebar */
+  .chat-sidebar {
+    width: 360px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--messenger-border);
+    background: #ffffff;
+  }
+
+  .chat-sidebar-header {
+    padding: 1.5rem 1.25rem 1rem 1.25rem;
+    background: #ffffff;
+  }
+
+  .chat-sidebar-title {
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: var(--messenger-dark);
+    margin: 0;
+    letter-spacing: -0.02em;
+  }
+
+  .chat-list {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 0.25rem 0.75rem;
+  }
+
+  /* Conversation Item Styles */
+  .chat-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px;
+    text-decoration: none !important;
+    color: inherit;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 12px;
+    margin-bottom: 4px;
+  }
+
+  .chat-item:hover {
+    background-color: #f5f5f4;
+  }
+
+  .chat-item.active {
+    background-color: var(--messenger-orange-light);
+  }
+
+  .chat-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #ffa366, var(--messenger-orange));
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border: 2px solid #ffffff;
+    box-shadow: 0 2px 8px rgba(255, 94, 0, 0.15);
+  }
+
+  .chat-item-content {
+    flex-grow: 1;
+    min-width: 0;
+  }
+
+  .chat-item-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 2px;
+  }
+
+  .chat-item-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--messenger-dark);
+  }
+
+  .chat-item.active .chat-item-name {
+    color: var(--messenger-orange-hover);
+  }
+
+  .chat-item-subject {
+    font-size: 0.825rem;
+    color: var(--messenger-muted);
+    font-weight: 500;
+  }
+
+  .chat-item-preview {
+    font-size: 0.825rem;
+    color: var(--messenger-muted);
+  }
+
+  .chat-item-badge {
+    background-color: var(--messenger-orange);
+    color: #ffffff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 3px 7px;
+    border-radius: 12px;
+    min-width: 20px;
+    text-align: center;
+  }
+
+  /* Chat Pane Styles */
+  .chat-main {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: #ffffff;
+    position: relative;
+    min-width: 0;
+  }
+
+  .chat-header {
+    padding: 1.1rem 1.5rem;
+    background: #ffffff;
+    border-bottom: 1px solid var(--messenger-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 10;
+  }
+
+  .chat-header-info {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+  }
+
+  .chat-header-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--messenger-dark);
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+
+  .chat-header-subtitle {
+    font-size: 0.8rem;
+    color: var(--messenger-muted);
+    font-weight: 500;
+  }
+
+  /* Chat Message Grid Area */
+  .chat-body {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 1.5rem 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background-color: #ffffff;
+  }
+
+  .msg-group {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  /* Replicating Native Messenger Bubbles */
+  .msg-bubble {
+    max-width: 65%;
+    padding: 11px 16px;
+    font-size: 0.95rem;
+    line-height: 1.45;
+    position: relative;
+    word-break: break-word;
+  }
+
+  .msg-bubble.mine {
+    align-self: flex-end;
+    background-color: var(--messenger-orange);
+    color: #ffffff;
+    border-radius: 20px 20px 4px 20px;
+    box-shadow: 0 2px 8px rgba(255, 94, 0, 0.12);
+  }
+
+  .msg-bubble.theirs {
+    align-self: flex-start;
+    background-color: #f3f4f6;
+    color: var(--messenger-dark);
+    border-radius: 20px 20px 20px 4px;
+  }
+
+  .msg-sender {
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--messenger-muted);
+  }
+
+  .msg-bubble.mine .msg-sender {
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  .msg-meta {
+    font-size: 0.7rem;
+    margin-top: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    opacity: 0.8;
+  }
+  
+  .msg-bubble.theirs .msg-meta {
+    color: var(--messenger-muted);
+  }
+  
+  .msg-bubble.mine .msg-meta {
+    color: rgba(255, 255, 255, 0.8);
+  }
+
+  /* System Messaging / Video Call Card */
+  .system-message-card {
+    align-self: center;
+    background-color: var(--messenger-orange-light);
+    border: 1px solid var(--messenger-orange-border);
+    color: var(--messenger-dark);
+    border-radius: 14px;
+    padding: 10px 18px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-align: center;
+    max-width: 80%;
+    margin: 12px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 2px 6px rgba(255, 94, 0, 0.05);
+  }
+
+  .system-message-card .btn {
+    font-size: 0.75rem;
+    padding: 4px 10px;
+    border-radius: 8px;
+    margin-left: 8px;
+  }
+
+  /* Messenger Pill-style Footer Input */
+  .chat-footer {
+    padding: 1.25rem 1.5rem;
+    background: #ffffff;
+    border-top: 1px solid var(--messenger-border);
+  }
+
+  .chat-input-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .chat-input-field {
+    border-radius: 24px;
+    border: 1px solid transparent;
+    background-color: #f3f4f6;
+    padding: 12px 18px;
+    font-size: 0.95rem;
+    resize: none;
+    transition: all 0.2s ease;
+  }
+
+  .chat-input-field:focus {
+    outline: none;
+    background-color: #ffffff;
+    border-color: var(--messenger-orange-border);
+    box-shadow: 0 0 0 3px rgba(255, 94, 0, 0.1);
+  }
+
+  .chat-input-field::placeholder {
+    color: #9ca3af;
+  }
+
+  .btn-send {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background-color: var(--messenger-orange);
+    color: #ffffff;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 10px rgba(255, 94, 0, 0.2);
+  }
+
+  .btn-send:hover {
+    background-color: var(--messenger-orange-hover);
+    transform: scale(1.05);
+  }
+
+  .btn-send:active {
+    transform: scale(0.95);
+  }
+
+  .chat-empty-state {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+    text-align: center;
+    color: var(--messenger-muted);
+  }
+
+  .chat-empty-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background-color: var(--messenger-orange-light);
+    color: var(--messenger-orange);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1rem;
+    font-size: 1.75rem;
+  }
+
+  /* Mobile responsiveness styles */
+  @media (max-width: 768px) {
+    .chat-app-wrapper {
+      height: calc(100vh - 100px);
+      border-radius: 0;
+      border: none;
+      margin-bottom: 0;
+    }
+    .chat-sidebar.mobile-hidden {
+      display: none;
+    }
+    .chat-main.mobile-hidden {
+      display: none;
+    }
+  }
+</style>
+
+  <div class="chat-app-wrapper">
+    <!-- Sidebar -->
+    <aside class="chat-sidebar mobile-hidden">
+      <div class="chat-sidebar-header">
+        <h2 class="chat-sidebar-title">Chats</h2>
       </div>
-      <div class="list-group list-group-flush">
+      <div class="chat-list">
         {% for item in conversations %}
           {% set partner = item.other_participant(current_user.id) %}
-          <a class="list-group-item list-group-item-action {% if item.id == conversation.id %}active{% endif %}" href="{{ url_for('messages.detail', conversation_id=item.id) }}">
-            <div class="d-flex justify-content-between gap-2">
-              <strong>{{ item.subject }}</strong>
-              {% if item.unread_count %}
-                <span class="badge bg-warning text-dark">{{ item.unread_count }}</span>
+          <a class="chat-item {% if item.id == conversation.id %}active{% endif %}" href="{{ url_for('messages.detail', conversation_id=item.id) }}">
+            <div class="chat-avatar">
+              {{ (partner.full_name[0] if partner and partner.full_name else 'P') | upper }}
+            </div>
+            <div class="chat-item-content">
+              <div class="chat-item-meta">
+                <span class="chat-item-name">{{ partner.full_name if partner else 'Participant' }}</span>
+                {% if item.last_message and item.last_message.created_at %}
+                  <span class="text-muted small" style="font-size: 0.75rem;">{{ item.last_message.created_at.strftime('%H:%M') }}</span>
+                {% endif %}
+              </div>
+              <div class="chat-item-subject text-truncate">{{ item.subject }}</div>
+              {% if item.last_message %}
+                <div class="chat-item-preview text-truncate">{{ item.last_message.body }}</div>
               {% endif %}
             </div>
-            <div class="small text-muted">With {{ partner.full_name if partner else 'participant' }}</div>
-            {% if item.last_message %}
-              <div class="small text-muted text-truncate">{{ item.last_message.body }}</div>
+            {% if item.unread_count %}
+              <span class="chat-item-badge">{{ item.unread_count }}</span>
             {% endif %}
           </a>
         {% else %}
-          <div class="empty-state m-4">No conversations yet.</div>
+          <div class="chat-empty-state p-4">
+            <div class="chat-empty-icon">💬</div>
+            <h5>No conversations</h5>
+          </div>
         {% endfor %}
       </div>
     </aside>
 
-    <section class="card card-shell">
-      <div class="card-body">
-        <div class="d-flex flex-column flex-lg-row justify-content-between gap-2 mb-3">
-          <div>
-            <span class="eyebrow">{{ conversation.permission_source.replace('_', ' ') }}</span>
-            <h2 class="h4 mb-0">{{ conversation.subject }}</h2>
+    <!-- Main Active Chat Pane -->
+    <div class="chat-main">
+      <div class="chat-header">
+        <div class="chat-header-info">
+          <!-- Back button for mobile users -->
+          <a href="{{ url_for('messages.index') }}" class="btn btn-outline-secondary btn-sm d-md-none me-1 p-1" title="Back to conversations">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-arrow-left-short" viewBox="0 0 16 16">
+              <path fill-rule="evenodd" d="M12 8a.5.5 0 0 1-.5.5H5.707l2.147 2.146a.5.5 0 0 1-.708.708l-3-3a.5.5 0 0 1 0-.708l3-3a.5.5 0 1 1 .708.708L5.707 7.5H11.5a.5.5 0 0 1 .5.5z"/>
+            </svg>
+          </a>
+          
+          {% set active_partner = conversation.other_participant(current_user.id) %}
+          <div class="chat-avatar" style="width: 40px; height: 40px; font-size: 0.9rem;">
+            {{ (active_partner.full_name[0] if active_partner and active_partner.full_name else 'P') | upper }}
           </div>
+          <div class="min-w-0">
+            <h2 class="chat-header-title">{{ active_partner.full_name if active_partner else 'Conversation' }}</h2>
+            <div class="chat-header-subtitle text-truncate">{{ conversation.permission_source.replace('_', ' ') }} &middot; {{ conversation.subject }}</div>
+          </div>
+        </div>
+        
+        <div id="chatHeaderActions">
           {% if active_exchange %}
-            <div>
-              {% if both_online %}
-                {% if active_exchange.video_call_active %}
-                  <a href="{{ url_for('exchanges.video_call_room', exchange_id=active_exchange.id) }}" class="btn btn-warning btn-sm btn-with-icon">
-                    <span class="svg-icon svg-icon-video" aria-hidden="true"></span>
-                    <span>Join Video Call</span>
-                  </a>
-                {% else %}
-                  <form method="post" action="{{ url_for('exchanges.start_video_call', exchange_id=active_exchange.id) }}" class="d-inline">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="btn btn-accent btn-sm btn-with-icon">
-                      <span class="svg-icon svg-icon-video" aria-hidden="true"></span>
-                      <span>Start Video Call</span>
-                    </button>
-                  </form>
-                {% endif %}
-              {% else %}
-                <button class="btn btn-outline-secondary btn-sm btn-with-icon" disabled title="Both participants must be online to start a call.">
-                  <span class="svg-icon svg-icon-video-off" aria-hidden="true"></span>
-                  <span>Start Video Call (Offline)</span>
+            {% if active_exchange.video_call_active %}
+              <a href="{{ url_for('exchanges.video_call_room', exchange_id=active_exchange.id) }}" class="btn btn-warning btn-sm btn-with-icon d-flex align-items-center gap-1">
+                <span class="svg-icon svg-icon-video" aria-hidden="true"></span>
+                <span>Join Call</span>
+              </a>
+            {% elif both_online %}
+              <form method="post" action="{{ url_for('exchanges.start_video_call', exchange_id=active_exchange.id) }}" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-accent btn-sm btn-with-icon d-flex align-items-center gap-1">
+                  <span class="svg-icon svg-icon-video" aria-hidden="true"></span>
+                  <span>Start Call</span>
                 </button>
-              {% endif %}
-            </div>
+              </form>
+            {% else %}
+              <form method="post" action="{{ url_for('exchanges.start_video_call', exchange_id=active_exchange.id) }}" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-outline-secondary btn-sm btn-with-icon d-flex align-items-center gap-1" title="Both participants must be online. Try starting; the call opens when your partner joins.">
+                  <span class="svg-icon svg-icon-video" aria-hidden="true"></span>
+                  <span>Start Call</span>
+                </button>
+              </form>
+            {% endif %}
           {% endif %}
         </div>
-        <div class="message-thread mb-4">
-          {% for message in ordered_messages %}
-            <article class="message-bubble {% if message.sender_id == current_user.id %}mine{% endif %}">
-              <div class="small fw-bold">{{ message.sender.full_name }}</div>
-              <div>
-                {% if message.body.startswith("Video call started") %}
-                  <span class="video-call-message">
-                    <span class="svg-icon svg-icon-video" aria-hidden="true"></span>
-                    <span>{{ message.body }}</span>
-                    {% if active_exchange and active_exchange.video_call_active %}
-                      <a class="btn btn-warning btn-sm btn-with-icon" href="{{ url_for('exchanges.video_call_room', exchange_id=active_exchange.id) }}">
-                        <span class="svg-icon svg-icon-video" aria-hidden="true"></span>
-                        <span>Join Call</span>
-                      </a>
-                    {% endif %}
-                  </span>
-                {% elif message.body.startswith("Video call ended") %}
-                  <span class="video-call-message">
-                    <span class="svg-icon svg-icon-video-off" aria-hidden="true"></span>
-                    <span>{{ message.body }}</span>
-                  </span>
-                {% else %}
-                  {{ message.body }}
-                {% endif %}
-              </div>
-              <div class="small text-muted mt-1">
-                {{ message.created_at.strftime('%Y-%m-%d %H:%M') if message.created_at else '' }}
-                {% if message.sender_id == current_user.id %}
-                  &middot; {{ 'Read' if message.read_at else 'Delivered' }}
-                {% endif %}
-              </div>
-            </article>
+      </div>
+
+      <!-- Messages body -->
+      <div class="chat-body" id="chatBody">
+        {% for message in ordered_messages %}
+          {% if message.body.startswith("Video call started") %}
+            <div class="system-message-card" data-message-id="{{ message.id }}">
+              <span class="svg-icon svg-icon-video" aria-hidden="true"></span>
+              <span>{{ message.body }}</span>
+              {% if active_exchange and active_exchange.video_call_active %}
+                <a class="btn btn-warning btn-sm ms-2" href="{{ url_for('exchanges.video_call_room', exchange_id=active_exchange.id) }}">
+                  Join Call
+                </a>
+              {% endif %}
+            </div>
+          {% elif message.body.startswith("Video call ended") %}
+            <div class="system-message-card" data-message-id="{{ message.id }}">
+              <span class="svg-icon svg-icon-video-off text-muted" aria-hidden="true"></span>
+              <span>{{ message.body }}</span>
+            </div>
           {% else %}
-            <div class="empty-state">No messages yet.</div>
-          {% endfor %}
-        </div>
-        <form method="post">
+            <div class="msg-group" data-message-id="{{ message.id }}">
+              <div class="msg-bubble {% if message.sender_id == current_user.id %}mine{% else %}theirs{% endif %}">
+                <div class="msg-sender">{{ message.sender.full_name }}</div>
+                <div class="msg-text">{{ message.body }}</div>
+                <div class="msg-meta">
+                  <span>{{ message.created_at.strftime('%b %d, %H:%M') if message.created_at else '' }}</span>
+                  {% if message.sender_id == current_user.id %}
+                    <span>&middot; {{ 'Read' if message.read_at else 'Delivered' }}</span>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          {% endif %}
+        {% else %}
+          <div class="chat-empty-state">
+            <div class="chat-empty-icon">💬</div>
+            <h5>No messages yet</h5>
+            <p>Send a message to start the conversation.</p>
+          </div>
+        {% endfor %}
+      </div>
+
+      <!-- Footer inputs -->
+      <div class="chat-footer">
+        <form method="post" class="w-100">
           {{ form.hidden_tag() }}
-          <div class="mb-3">{{ form.body(class="form-control", rows="4", maxlength="2000", placeholder="Write your message") }}</div>
-          <button class="btn btn-accent" type="submit">Send</button>
+          <div class="chat-input-container">
+            {{ form.body(class="form-control chat-input-field", rows="1", maxlength="2000", placeholder="Aa", id="chatInputField") }}
+            <button class="btn btn-send" type="submit" title="Send">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M15.964.686a.5.5 0 0 0-.65-.65L.767 5.855H.766l-.452.18a.5.5 0 0 0-.082.887l.41.26.001.002 4.995 3.178 3.178 4.995.26.41.192-.082.18-.452z"/>
+              </svg>
+            </button>
+          </div>
         </form>
       </div>
-    </section>
+    </div>
   </div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function() {
+    const chatBody = document.getElementById("chatBody");
+    if (chatBody) {
+      chatBody.scrollTop = chatBody.scrollHeight;
+    }
+
+    const chatInputField = document.getElementById("chatInputField");
+    const messageForm = chatInputField ? chatInputField.closest("form") : null;
+    const conversationId = {{ conversation.id if conversation else 0 }};
+    const currentUserId = {{ current_user.id if current_user.is_authenticated else 0 }};
+    
+    // Retrieve CSRF token from form
+    let csrfToken = "";
+    if (messageForm) {
+      const csrfInput = messageForm.querySelector('input[name="csrf_token"]');
+      if (csrfInput) {
+        csrfToken = csrfInput.value;
+      }
+    }
+
+    function escapeHTML(str) {
+      if (!str) return '';
+      return str.replace(/[&<>'"]/g, 
+        tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+      );
+    }
+
+    function renderMessage(msg) {
+      if (chatBody.querySelector(`[data-message-id="${msg.id}"]`)) {
+        return;
+      }
+
+      const emptyState = chatBody.querySelector(".chat-empty-state");
+      if (emptyState) {
+        emptyState.remove();
+      }
+
+      let bubbleHTML = "";
+      if (msg.body.startsWith("Video call started")) {
+        bubbleHTML = `
+          <div class="system-message-card" data-message-id="${msg.id}">
+            <span class="svg-icon svg-icon-video" aria-hidden="true"></span>
+            <span>${escapeHTML(msg.body)}</span>
+            ${msg.video_call_active ? `
+              <a class="btn btn-warning btn-sm ms-2" href="/exchanges/${msg.exchange_id}/video">
+                Join Call
+              </a>
+            ` : ''}
+          </div>
+        `;
+      } else if (msg.body.startsWith("Video call ended")) {
+        bubbleHTML = `
+          <div class="system-message-card" data-message-id="${msg.id}">
+            <span class="svg-icon svg-icon-video-off text-muted" aria-hidden="true"></span>
+            <span>${escapeHTML(msg.body)}</span>
+          </div>
+        `;
+      } else {
+        const isMine = msg.sender_id === currentUserId || msg.is_mine;
+        bubbleHTML = `
+          <div class="msg-group" data-message-id="${msg.id}">
+            <div class="msg-bubble ${isMine ? 'mine' : 'theirs'}">
+              <div class="msg-sender">${escapeHTML(msg.sender_name)}</div>
+              <div class="msg-text">${escapeHTML(msg.body)}</div>
+              <div class="msg-meta">
+                <span>${escapeHTML(msg.created_at)}</span>
+                ${isMine ? '<span>&middot; Delivered</span>' : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      chatBody.insertAdjacentHTML("beforeend", bubbleHTML);
+      chatBody.scrollTop = chatBody.scrollHeight;
+    }
+
+    // Shared lastId tracker used by both AJAX send and polling
+    const getChatLastMessageId = () => {
+      if (!chatBody) return 0;
+      const messages = chatBody.querySelectorAll("[data-message-id]");
+      return messages.length > 0 ? parseInt(messages[messages.length - 1].dataset.messageId) || 0 : 0;
+    };
+    let lastId = getChatLastMessageId();
+
+    // Intercept form submission to post asynchronously (no page reload)
+    if (messageForm && chatInputField && conversationId > 0) {
+      messageForm.addEventListener("submit", function(event) {
+        event.preventDefault();
+        const bodyText = chatInputField.value.trim();
+        if (!bodyText) return;
+
+        // Clear input field instantly (same like messenger)
+        chatInputField.value = "";
+        chatInputField.style.height = "auto";
+
+        const formData = new FormData(messageForm);
+        formData.set("body", bodyText);
+
+        const actionUrl = messageForm.getAttribute("action") || window.location.pathname;
+        const fetchUrl = actionUrl.includes("?") ? `${actionUrl}&ajax=1` : `${actionUrl}?ajax=1`;
+
+        fetch(fetchUrl, {
+          method: "POST",
+          body: formData,
+          headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "Accept": "application/json"
+          }
+        })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error("Failed to send message");
+          }
+          return response.json();
+        })
+        .then(data => {
+          if (data.status === "success" && data.message) {
+            renderMessage(data.message);
+            // Update lastId to avoid fetching it in the next poll
+            lastId = Math.max(lastId, data.message.id);
+          } else {
+            console.error("Error sending message:", data.message);
+          }
+        })
+        .catch(error => {
+          console.error("Error sending message:", error);
+          alert("Failed to send message. Please try again.");
+          chatInputField.value = bodyText;
+        });
+      });
+
+      // Submit on pressing Enter (without Shift)
+      chatInputField.addEventListener("keydown", function(event) {
+        if (event.key === "Enter" && !event.shiftKey) {
+          event.preventDefault();
+          messageForm.dispatchEvent(new Event("submit"));
+        }
+      });
+    }
+
+    // Real-time message updates via lightweight polling
+    if (chatBody && conversationId > 0) {
+
+      const fetchUpdates = () => {
+        fetch(`/messages/${conversationId}/updates?last_id=${lastId}`, {
+          headers: { "X-Requested-With": "XMLHttpRequest" }
+        })
+        .then(res => {
+          if (!res.ok) throw new Error("Update check failed");
+          return res.json();
+        })
+        .then(data => {
+          if (data.status === "success") {
+            // Append any new messages
+            if (data.messages && data.messages.length > 0) {
+              data.messages.forEach(msg => {
+                renderMessage(msg);
+                lastId = Math.max(lastId, msg.id);
+              });
+            }
+
+            // Dynamically update the call actions in header based on exchange state
+            const headerActions = document.getElementById("chatHeaderActions");
+            if (headerActions && data.exchange_id !== undefined) {
+              if (data.exchange_id === null) {
+                headerActions.innerHTML = "";
+              } else if (data.video_call_active) {
+                headerActions.innerHTML = `
+                  <a href="/exchanges/${data.exchange_id}/video" class="btn btn-warning btn-sm btn-with-icon d-flex align-items-center gap-1">
+                    <span class="svg-icon svg-icon-video" aria-hidden="true"></span>
+                    <span>Join Call</span>
+                  </a>
+                `;
+              } else if (data.both_online) {
+                headerActions.innerHTML = `
+                  <form method="post" action="/exchanges/${data.exchange_id}/video/start" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="${csrfToken}">
+                    <button type="submit" class="btn btn-accent btn-sm btn-with-icon d-flex align-items-center gap-1">
+                      <span class="svg-icon svg-icon-video" aria-hidden="true"></span>
+                      <span>Start Call</span>
+                    </button>
+                  </form>
+                `;
+              } else {
+                headerActions.innerHTML = `
+                  <form method="post" action="/exchanges/${data.exchange_id}/video/start" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="${csrfToken}">
+                    <button type="submit" class="btn btn-outline-secondary btn-sm btn-with-icon d-flex align-items-center gap-1" title="Both participants must be online. Try starting; the call opens when your partner joins.">
+                      <span class="svg-icon svg-icon-video" aria-hidden="true"></span>
+                      <span>Start Call</span>
+                    </button>
+                  </form>
+                `;
+              }
+            }
+          }
+        })
+        .catch(err => console.warn("Polling updates failed:", err));
+      };
+
+      // Poll every 1.5 seconds for extremely live response without blocking
+      const pollInterval = setInterval(fetchUpdates, 1500);
+
+      // Clean up interval on page leave
+      window.addEventListener("beforeunload", () => {
+        clearInterval(pollInterval);
+      });
+    }
+  });
+</script>
 {% endblock %}

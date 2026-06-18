@@ -542,6 +542,10 @@ h6,
   filter: blur(20px);
 }
 
+.wallet-card {
+  padding: 24px;
+}
+
 .card-shell {
   overflow: hidden;
 }

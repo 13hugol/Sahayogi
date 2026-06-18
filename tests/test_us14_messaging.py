@@ -44,10 +44,9 @@ def test_conversation_list_and_send_message(app, client, login, user_factory):
     inbox = client.get("/messages/")
 
     assert inbox.status_code == 200
-    assert b"Conversations" in inbox.data
+    # The inbox lists conversations and surfaces the accepted-exchange subject.
     assert b"Accepted exchange: Python for Guitar" in inbox.data
-    assert b"With Test Member" in inbox.data
-    assert b"Write your message" in inbox.data
+    assert b"Chats" in inbox.data
 
     response = client.post(
         f"/messages/{conversation.id}",
@@ -155,3 +154,43 @@ def test_message_body_limit_and_participant_access(app, client, login, user_fact
     denied = client.get(f"/messages/{conversation.id}")
 
     assert denied.status_code == 404
+
+
+def test_ajax_send_and_polling_updates(app, client, login, user_factory):
+    with app.app_context():
+        sender = user_factory(email="ajax-sender@example.com")
+        recipient = user_factory(email="ajax-recipient@example.com")
+        conversation = MessageService(MessageRepository()).create_conversation(
+            subject="AJAX test",
+            permission_source="accepted_exchange",
+            participant_ids=[sender.id, recipient.id],
+        )
+
+    # 1. Post a message via AJAX
+    login("ajax-sender@example.com")
+    res = client.post(
+        f"/messages/{conversation.id}",
+        data={"body": "AJAX message body"},
+        headers={"X-Requested-With": "XMLHttpRequest"},
+    )
+    assert res.status_code == 200
+    json_data = res.get_json()
+    assert json_data["status"] == "success"
+    assert json_data["message"]["body"] == "AJAX message body"
+    assert json_data["message"]["is_mine"] is True
+    msg_id = json_data["message"]["id"]
+
+    # 2. Get updates via AJAX polling from recipient side
+    client.get("/auth/logout", follow_redirects=True)
+    login("ajax-recipient@example.com")
+    res_updates = client.get(
+        f"/messages/{conversation.id}/updates?last_id=0",
+        headers={"X-Requested-With": "XMLHttpRequest"},
+    )
+    assert res_updates.status_code == 200
+    updates_data = res_updates.get_json()
+    assert updates_data["status"] == "success"
+    assert len(updates_data["messages"]) == 1
+    assert updates_data["messages"][0]["id"] == msg_id
+    assert updates_data["messages"][0]["body"] == "AJAX message body"
+    assert updates_data["messages"][0]["is_mine"] is False

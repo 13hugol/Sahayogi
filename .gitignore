@@ -1,18 +1,29 @@
+# Secrets / local environment
 .env
+.env.example
+
+# Python generated artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
 .pytest_cache/
 .pytest_tmp/
 .tmp/
-__pycache__/
-*.py[cod]
+build/
+dist/
+
+# Virtual environments
+venv/
+.venv/
+
+# Local runtime instance data (keep placeholder/upload structure only)
 instance/*
 !instance/.gitkeep
 !instance/uploads/
 !instance/uploads/.gitkeep
-graphify-out/
-venv/
-tests/
-.env.example
-docs/
-migrations/
+
+# Local logs
 *.log
-venv/
+
+# Tooling output
+graphify-out/

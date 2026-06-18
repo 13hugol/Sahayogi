@@ -214,3 +214,17 @@ class MessageRepository(BaseRepository):
         ]
         conversation.last_message = MessagePost.from_row(last_row)
         conversation.unread_count = int((unread_row or {}).get("count") or 0)
+
+    def list_messages_since(self, conversation_id: int, last_id: int) -> list[MessagePost]:
+        with self._db() as db:
+            rows = db.fetch_all(
+                """
+                SELECT m.*, u.full_name AS sender_name
+                FROM message_posts m
+                JOIN users u ON u.id = m.sender_id
+                WHERE m.conversation_id = %s AND m.id > %s
+                ORDER BY m.created_at ASC, m.id ASC
+                """,
+                (conversation_id, last_id),
+            )
+        return [item for row in rows if (item := MessagePost.from_row(row))]
