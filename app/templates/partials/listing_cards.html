@@ -17,7 +17,9 @@
                   {{ listing.exchange_type|title }}
                 </span>
               </div>
-              {% if listing.user and listing.user.has_verified_skill(listing.skill_id) %}
+              {% if listing.certificate_status == 'pending' %}
+                <span class="badge text-bg-warning">Verification Pending</span>
+              {% elif listing.certificate_status == 'approved' or (listing.user and listing.user.has_verified_skill(listing.skill_id)) %}
                 <span class="badge text-bg-info">Verified</span>
               {% endif %}
             </div>

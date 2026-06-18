@@ -15,7 +15,11 @@
                 </span>
               {% endif %}
               <span class="badge {% if listing.exchange_type == 'credit' %}text-bg-warning{% else %}text-bg-success{% endif %}">{{ listing.exchange_type|title }}</span>
-              {% if listing.user.has_verified_skill(listing.skill_id) %}<span class="badge text-bg-info">Verified skill</span>{% endif %}
+              {% if listing.certificate_status == 'pending' %}
+                <span class="badge text-bg-warning">Verification Pending</span>
+              {% elif listing.certificate_status == 'approved' or listing.user.has_verified_skill(listing.skill_id) %}
+                <span class="badge text-bg-info">Verified skill</span>
+              {% endif %}
               <h1 class="h2 mt-3">{{ listing.title }}</h1>
               <div class="text-muted">
                 {{ listing.skill.name }} by

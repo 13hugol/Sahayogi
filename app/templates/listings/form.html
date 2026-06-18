@@ -22,18 +22,75 @@
               </div>
             </div>
           {% endif %}
-          <form method="post">
+          <form method="post" enctype="multipart/form-data">
             {{ form.hidden_tag() }}
             <div class="row g-3">
-              <div class="col-md-8">{{ form.title.label(class="form-label") }}{{ form.title(class="form-control") }}</div>
-              <div class="col-md-4">{{ form.exchange_type.label(class="form-label d-block") }}{% for subfield in form.exchange_type %}<div class="form-check form-check-inline">{{ subfield(class="form-check-input") }}{{ subfield.label(class="form-check-label") }}</div>{% endfor %}</div>
-              <div class="col-md-6">{{ form.skill_id.label(class="form-label") }}{{ form.skill_id(class="form-select") }}</div>
-              <div class="col-md-6">{{ form.category_id.label(class="form-label") }}{{ form.category_id(class="form-select", required=True) }}</div>
-              <div class="col-12">{{ form.description.label(class="form-label") }}{{ form.description(class="form-control", rows="6") }}</div>
-              <div class="col-md-4">{{ form.min_credits.label(class="form-label") }}{{ form.min_credits(class="form-control") }}</div>
-              <div class="col-md-4">{{ form.location_text.label(class="form-label") }}{{ form.location_text(class="form-control") }}</div>
-              <div class="col-md-4">{{ form.contact_method.label(class="form-label") }}{{ form.contact_method(class="form-control") }}</div>
-              <div class="col-12">{{ form.availability_labels.label(class="form-label") }}{{ form.availability_labels(class="form-control", rows="4") }}</div>
+              <div class="col-md-8">
+                {{ form.title.label(class="form-label") }}
+                {{ form.title(class="form-control") }}
+                {% if errors.title %}<div class="text-danger small">{{ errors.title }}</div>{% endif %}
+              </div>
+              <div class="col-md-4">
+                {{ form.exchange_type.label(class="form-label d-block") }}
+                {% for subfield in form.exchange_type %}
+                  <div class="form-check form-check-inline">
+                    {{ subfield(class="form-check-input") }}
+                    {{ subfield.label(class="form-check-label") }}
+                  </div>
+                {% endfor %}
+                {% if errors.exchange_type %}<div class="text-danger small">{{ errors.exchange_type }}</div>{% endif %}
+              </div>
+              <div class="col-md-6">
+                {{ form.skill_id.label(class="form-label") }}
+                {{ form.skill_id(class="form-select") }}
+                {% if errors.skill_id %}<div class="text-danger small">{{ errors.skill_id }}</div>{% endif %}
+              </div>
+              <div class="col-md-6">
+                {{ form.category_id.label(class="form-label") }}
+                {{ form.category_id(class="form-select", required=True) }}
+                {% if errors.category_id %}<div class="text-danger small">{{ errors.category_id }}</div>{% endif %}
+              </div>
+              <div class="col-12">
+                {{ form.description.label(class="form-label") }}
+                {{ form.description(class="form-control", rows="6") }}
+                {% if errors.description %}<div class="text-danger small">{{ errors.description }}</div>{% endif %}
+              </div>
+              <div class="col-md-4">
+                {{ form.min_credits.label(class="form-label") }}
+                {{ form.min_credits(class="form-control") }}
+                {% if errors.min_credits %}<div class="text-danger small">{{ errors.min_credits }}</div>{% endif %}
+              </div>
+              <div class="col-md-4">
+                {{ form.location_text.label(class="form-label") }}
+                {{ form.location_text(class="form-control") }}
+                {% if errors.location_text %}<div class="text-danger small">{{ errors.location_text }}</div>{% endif %}
+              </div>
+              <div class="col-md-4">
+                {{ form.contact_method.label(class="form-label") }}
+                {{ form.contact_method(class="form-control") }}
+                {% if errors.contact_method %}<div class="text-danger small">{{ errors.contact_method }}</div>{% endif %}
+              </div>
+              <div class="col-12">
+                {{ form.availability_labels.label(class="form-label") }}
+                {{ form.availability_labels(class="form-control", rows="4") }}
+                {% if errors.availability_labels %}<div class="text-danger small">{{ errors.availability_labels }}</div>{% endif %}
+              </div>
+              <div class="col-12">
+                <label for="certificate" class="form-label">Certificate (Optional, PDF or Image up to 10MB)</label>
+                <input type="file" name="certificate" id="certificate" class="form-control">
+                {% if errors.certificate %}<div class="text-danger small">{{ errors.certificate }}</div>{% endif %}
+                {% if listing and listing.certificate_path %}
+                  <div class="form-text text-muted mt-2">
+                    Current Certificate: <a href="{{ url_for('main.media', filename=listing.certificate_path) }}" target="_blank">View Certificate</a>
+                    <div class="form-check mt-1">
+                      <input class="form-check-input" type="checkbox" name="remove_certificate" id="remove_certificate">
+                      <label class="form-check-label" for="remove_certificate">
+                        Remove certificate
+                      </label>
+                    </div>
+                  </div>
+                {% endif %}
+              </div>
             </div>
             <div class="mt-4">{{ form.submit(class="btn btn-accent") }}</div>
           </form>

@@ -125,6 +125,11 @@ class ProfileCertificate(BaseModel):
     def skill(self):
         return SimpleNamespace(id=self.profile_skill_id, name=self.skill_name)
 
+    @property
+    def user(self):
+        from app.models.user import User
+        return User.find_by_id(self.user_id)
+
     @classmethod
     def from_row(cls, row: dict | None) -> "ProfileCertificate | None":
         if not row:

@@ -33,6 +33,8 @@ class AdminRoutes:
         self.bp.route("/listings/<int:listing_id>/approve", methods=["POST"])(self.controller.approve_listing)
         self.bp.route("/listings/<int:listing_id>/reject", methods=["POST"])(self.controller.reject_listing)
         self.bp.route("/certificates")(self.controller.certificates)
+        self.bp.route("/certificates/<int:certificate_id>/approve", methods=["POST"])(self.controller.approve_certificate)
+        self.bp.route("/certificates/<int:certificate_id>/reject", methods=["POST"])(self.controller.reject_certificate)
         self.bp.route("/reports")(self.controller.reports)
         self.bp.route("/reports/<int:report_id>/resolve", methods=["POST"])(self.controller.resolve_report)
         self.bp.route("/reviews")(self.controller.reviews)

@@ -104,6 +104,28 @@ class SkillRepository(BaseRepository):
                 ),
             )
 
+    def update_certificate_info(self, skill_id: int, certificate_path: str | None, certificate_status: str) -> None:
+        with self._db() as db:
+            db.execute(
+                """
+                UPDATE skills
+                SET certificate_path = %s, certificate_status = %s
+                WHERE id = %s
+                """,
+                (certificate_path, certificate_status, skill_id),
+            )
+
+    def update_certificate_info_by_skill_id(self, user_id: int, skill_id: int, certificate_path: str | None, certificate_status: str) -> None:
+        with self._db() as db:
+            db.execute(
+                """
+                UPDATE skills
+                SET certificate_path = %s, certificate_status = %s
+                WHERE user_id = %s AND skill_id = %s
+                """,
+                (certificate_path, certificate_status, user_id, skill_id),
+            )
+
     def delete(self, skill_id: int) -> bool:
         with self._db() as db:
             rows_affected = db.execute("DELETE FROM skills WHERE id = %s", (skill_id,))

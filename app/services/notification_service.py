@@ -190,3 +190,37 @@ class NotificationService:
             body=f"Your listing '{skill_title}' was rejected. Reason: {reason}",
             target_url=target_url,
         )
+
+    def notify_certificate_approved(
+        self,
+        *,
+        user_id: int,
+        skill_name: str,
+        target_url: str = "/profile/certificates",
+    ) -> int:
+        return self.create_notification(
+            user_id=user_id,
+            event_type=self.EVENT_GENERAL,
+            title="Certificate approved",
+            body=f"Your certificate for '{skill_name}' has been approved.",
+            target_url=target_url,
+        )
+
+    def notify_certificate_rejected(
+        self,
+        *,
+        user_id: int,
+        skill_name: str,
+        reason: str | None = None,
+        target_url: str = "/profile/certificates",
+    ) -> int:
+        body = f"Your certificate for '{skill_name}' was rejected."
+        if reason:
+            body += f" Reason: {reason}"
+        return self.create_notification(
+            user_id=user_id,
+            event_type=self.EVENT_GENERAL,
+            title="Certificate rejected",
+            body=body,
+            target_url=target_url,
+        )

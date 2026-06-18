@@ -37,6 +37,8 @@ class SkillType(str, Enum):
 
 
 class CertificateStatus(str, Enum):
+    NONE = "none"
     PENDING = "pending"
     APPROVED = "approved"
+    REJECTED = "rejected"
 

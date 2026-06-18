@@ -178,6 +178,87 @@ class ProfileCertificateRepository(BaseRepository):
             )
         return [certificate for row in rows if (certificate := ProfileCertificate.from_row(row))]
 
+    def find_by_user_id(self, user_id: int) -> list[ProfileCertificate]:
+        with self._db() as db:
+            rows = db.fetch_all(
+                """
+                SELECT *
+                FROM profile_certificates
+                WHERE user_id = %s
+                ORDER BY created_at DESC
+                """,
+                (user_id,),
+            )
+        return [ProfileCertificate.from_row(row) for row in rows if row]
+
+    def find_by_status(self, status: str) -> list[ProfileCertificate]:
+        with self._db() as db:
+            rows = db.fetch_all(
+                """
+                SELECT *
+                FROM profile_certificates
+                WHERE status = %s
+                ORDER BY created_at DESC
+                """,
+                (status,),
+            )
+        return [ProfileCertificate.from_row(row) for row in rows if row]
+
+    def find_by_id(self, certificate_id: int) -> ProfileCertificate | None:
+        with self._db() as db:
+            row = db.fetch_one("SELECT * FROM profile_certificates WHERE id = %s", (certificate_id,))
+        return ProfileCertificate.from_row(row)
+
+    def upsert(
+        self,
+        *,
+        user_id: int,
+        skill_name: str,
+        profile_skill_id: int,
+        file_path: str,
+        status: str = "pending",
+    ) -> None:
+        with self._db() as db:
+            row = db.fetch_one(
+                "SELECT id FROM profile_certificates WHERE user_id = %s AND profile_skill_id = %s",
+                (user_id, profile_skill_id),
+            )
+            if row:
+                db.execute(
+                    """
+                    UPDATE profile_certificates
+                    SET skill_name = %s, file_path = %s, status = %s, review_notes = NULL, created_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                    """,
+                    (skill_name.strip(), file_path, status, row["id"]),
+                )
+            else:
+                db.execute(
+                    """
+                    INSERT INTO profile_certificates (user_id, profile_skill_id, skill_name, status, file_path)
+                    VALUES (%s, %s, %s, %s, %s)
+                    """,
+                    (user_id, profile_skill_id, skill_name.strip(), status, file_path),
+                )
+
+    def delete_for_skill(self, user_id: int, profile_skill_id: int) -> None:
+        with self._db() as db:
+            db.execute(
+                "DELETE FROM profile_certificates WHERE user_id = %s AND profile_skill_id = %s",
+                (user_id, profile_skill_id),
+            )
+
+    def update_status(self, certificate_id: int, status: str, review_notes: str | None = None) -> None:
+        with self._db() as db:
+            db.execute(
+                """
+                UPDATE profile_certificates
+                SET status = %s, review_notes = %s
+                WHERE id = %s
+                """,
+                (status, review_notes, certificate_id),
+            )
+
     def create(
         self,
         *,

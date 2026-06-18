@@ -156,43 +156,49 @@ class FrontendController(BaseController):
         )
 
     @login_required
-    def post_listing(self, listing_id: int = None):
-        is_edit = listing_id is not None
-        title_text = "Edit listing" if is_edit else "Create listing"
-        
+    def post_listing(self, listing_id: int | None = None):
+        user = current_user
         listing = None
-        if is_edit:
+        if listing_id is not None:
             listing = self._skill_service.get_listing_by_id(listing_id)
             if not listing:
                 abort(404)
-            if listing.user_id != current_user.id:
+            if listing.user_id != user.id:
                 abort(403)
-                
-        skill_choices = [(ps.id, ps.skill_name) for ps in current_user.offered_skills]
+
+        offered_skills = list(user.offered_skills)
+        categories_list = self._skill_service.get_all_categories()
+        skill_choices = [(skill.id, skill.skill_name) for skill in offered_skills]
         if not skill_choices:
             skill_choices = [("", "Please add offered skills to your profile first")]
-        categories = self._skill_service.get_all_categories()
-        category_choices = [("", "Choose one category")] + [(c.id, f"{c.icon} - {c.name}") for c in categories]
-        
+        category_choices = [("", "Choose one category")] + [
+            (category.id, f"{category.icon} - {category.name}") for category in categories_list
+        ]
+        errors: dict[str, str] = {}
+
+        def register_error(field_name: str, message: str) -> None:
+            errors[field_name] = message
+            getattr(form, field_name).errors.append(message)
+
         if request.method == "POST":
             title = request.form.get("title", "").strip()
-            exchange_type = request.form.get("exchange_type", "").strip()
-            skill_id_str = request.form.get("skill_id", "").strip()
-            category_id_str = request.form.get("category_id", "").strip()
             description = request.form.get("description", "").strip()
-            min_credits_str = request.form.get("min_credits", "10").strip()
+            exchange_type = request.form.get("exchange_type", "").strip()
+            skill_id_raw = request.form.get("skill_id", "").strip()
+            category_id_raw = request.form.get("category_id", "").strip()
+            min_credits_raw = request.form.get("min_credits", "10").strip()
             location_text = request.form.get("location_text", "").strip()
             contact_method = request.form.get("contact_method", "").strip()
             availability_labels = request.form.get("availability_labels", "").strip()
-            
+
             form = ListingShellForm(
                 data={
                     "title": title,
                     "description": description,
                     "exchange_type": exchange_type,
-                    "skill_id": skill_id_str,
-                    "category_id": category_id_str,
-                    "min_credits": min_credits_str,
+                    "skill_id": skill_id_raw,
+                    "category_id": category_id_raw,
+                    "min_credits": min_credits_raw,
                     "location_text": location_text,
                     "contact_method": contact_method,
                     "availability_labels": availability_labels,
@@ -200,58 +206,81 @@ class FrontendController(BaseController):
             )
             form.skill_id.choices = skill_choices
             form.category_id.choices = category_choices
-            
+
             if not title or len(title) < 5 or len(title) > 120:
-                form.title.errors.append("Title must be between 5 and 120 characters.")
+                register_error("title", "Title must be between 5 and 120 characters.")
             if not description or len(description) < 10:
-                form.description.errors.append("Description must be at least 10 characters.")
-            
+                register_error("description", "Description must be at least 10 characters.")
+
             skill_id = None
             try:
-                skill_id = int(skill_id_str)
-                if skill_id not in [ps.id for ps in current_user.offered_skills]:
-                    form.skill_id.errors.append("Please select a valid skill from your profile.")
+                skill_id = int(skill_id_raw)
+                if skill_id not in {skill.id for skill in offered_skills}:
+                    register_error("skill_id", "Please select a valid skill from your profile.")
             except ValueError:
-                form.skill_id.errors.append("Please select a valid skill.")
-                
+                register_error("skill_id", "Please select a valid skill from your profile.")
+
             category_id = None
             try:
-                category_id = int(category_id_str)
-                if not self._skill_service.get_category_by_id(category_id):
-                    form.category_id.errors.append("Please select a valid category.")
+                category_id = int(category_id_raw)
+                if not any(category.id == category_id for category in categories_list):
+                    register_error("category_id", "Please select a valid category.")
             except ValueError:
-                form.category_id.errors.append("Please select a valid category.")
-                
-            if exchange_type not in ["credit", "teach"]:
-                form.exchange_type.errors.append("Please select a valid exchange type.")
-                
-            credit_cost = 10
+                register_error("category_id", "Please select a valid category.")
+
+            if exchange_type not in {"credit", "teach"}:
+                register_error("exchange_type", "Please select a valid exchange type.")
+
+            credit_cost = 0
             if exchange_type == "credit":
                 try:
-                    credit_cost = int(min_credits_str)
+                    credit_cost = int(min_credits_raw)
                     if credit_cost < 0:
-                        form.min_credits.errors.append("Credits cannot be negative.")
+                        register_error("min_credits", "Credits cannot be negative.")
                 except ValueError:
-                    form.min_credits.errors.append("Please enter a valid number of credits.")
-            else:
-                credit_cost = 0
-            
+                    register_error("min_credits", "Please enter a valid number of credits.")
+
             if not availability_labels:
-                form.availability_labels.errors.append("Please provide availability details.")
-                
-            has_errors = False
-            all_fields = set(form.fields.keys()) | set(form._fields_cache.keys())
-            for field_name in all_fields:
-                field = getattr(form, field_name)
-                if field.errors:
-                    has_errors = True
-                    for err in field.errors:
-                        flash(err, "danger")
-                
-            if not has_errors:
-                if is_edit:
+                register_error("availability_labels", "Please provide availability details.")
+
+            certificate_file = request.files.get("certificate")
+            certificate_extension = None
+            if certificate_file and certificate_file.filename:
+                certificate_extension, certificate_error = self._validate_certificate_upload(certificate_file)
+                if certificate_error:
+                    register_error("certificate", certificate_error)
+
+            if errors:
+                for message in errors.values():
+                    flash(message, "danger")
+            else:
+                certificate_path = listing.certificate_path if listing else None
+                certificate_status = listing.certificate_status if listing else "none"
+
+                from app.repositories import ProfileCertificateRepository
+
+                certificate_repo = ProfileCertificateRepository()
+
+                if listing and request.form.get("remove_certificate") == "on":
+                    certificate_path = None
+                    certificate_status = "none"
+                    certificate_repo.delete_for_skill(user.id, listing.skill_id)
+
+                if certificate_file and certificate_file.filename and certificate_extension:
+                    certificate_path = self._save_certificate_upload(certificate_file, certificate_extension)
+                    certificate_status = "pending"
+                    selected_skill = next(skill for skill in offered_skills if skill.id == skill_id)
+                    certificate_repo.upsert(
+                        user_id=user.id,
+                        skill_name=selected_skill.skill_name,
+                        profile_skill_id=skill_id,
+                        file_path=certificate_path,
+                        status="pending",
+                    )
+
+                if listing:
                     self._skill_service.edit_listing(
-                        listing_id=listing_id,
+                        listing_id=listing.id,
                         category_id=category_id,
                         skill_id=skill_id,
                         title=title,
@@ -261,12 +290,17 @@ class FrontendController(BaseController):
                         availability=availability_labels,
                         location_text=location_text,
                         contact_method=contact_method,
-                        status="pending"
+                        status="pending",
+                    )
+                    self._skill_service._skill_repository.update_certificate_info(
+                        listing.id,
+                        certificate_path,
+                        certificate_status,
                     )
                     flash("Listing updated successfully and is pending admin review.", "success")
                 else:
                     self._skill_service.create_listing(
-                        user_id=current_user.id,
+                        user_id=user.id,
                         category_id=category_id,
                         skill_id=skill_id,
                         title=title,
@@ -276,13 +310,14 @@ class FrontendController(BaseController):
                         availability=availability_labels,
                         location_text=location_text,
                         contact_method=contact_method,
-                        status="pending"
+                        status="pending",
+                        certificate_path=certificate_path,
+                        certificate_status=certificate_status,
                     )
                     flash("Listing submitted successfully and is pending admin review.", "success")
                 return redirect(url_for("listings.mine"))
         else:
-            if is_edit:
-                availability_str = "\n".join([item.label for item in listing.availability])
+            if listing:
                 form = ListingShellForm(
                     data={
                         "title": listing.title,
@@ -293,20 +328,21 @@ class FrontendController(BaseController):
                         "min_credits": listing.credit_cost,
                         "location_text": listing.location_text,
                         "contact_method": listing.contact_method,
-                        "availability_labels": availability_str,
+                        "availability_labels": listing._availability_raw,
                     }
                 )
             else:
-                form = ListingShellForm(
-                    data={
-                        "exchange_type": "credit",
-                        "min_credits": 10,
-                    }
-                )
-            form.skill_id.choices = skill_choices
-            form.category_id.choices = category_choices
-            
-        return self.render("listings/form.html", form=form, title=title_text)
+                form = ListingShellForm(data={"exchange_type": "credit", "min_credits": 10})
+
+        form.skill_id.choices = skill_choices
+        form.category_id.choices = category_choices
+        return self.render(
+            "listings/form.html",
+            form=form,
+            title="Edit listing" if listing else "Create listing",
+            listing=listing,
+            errors=errors,
+        )
 
     @login_required
     def my_listings(self):
@@ -1123,9 +1159,98 @@ class FrontendController(BaseController):
         avatar.save(avatar_dir / filename)
         return f"avatars/{filename}"
 
+    def _validate_certificate_upload(self, certificate) -> tuple[str | None, str | None]:
+        filename = secure_filename(certificate.filename or "")
+        extension = Path(filename).suffix.lower()
+        allowed_extensions = {".pdf", ".png", ".jpg", ".jpeg"}
+        allowed_mimetypes = {"application/pdf", "image/png", "image/jpeg"}
+        if extension not in allowed_extensions:
+            return None, "Certificate must be a PDF, JPG, or PNG file."
+        if certificate.mimetype not in allowed_mimetypes:
+            return None, "Certificate file type is not supported."
+
+        try:
+            certificate.stream.seek(0, os.SEEK_END)
+            size = certificate.stream.tell()
+            certificate.stream.seek(0)
+            header = certificate.stream.read(16)
+            certificate.stream.seek(0)
+        except OSError:
+            return None, "Certificate could not be read. Please choose another file."
+
+        if size <= 0:
+            return None, "Certificate file is empty."
+        if size > 10 * 1024 * 1024:
+            return None, "Certificate must be under 10MB."
+
+        if extension == ".pdf" and not header.startswith(b"%PDF"):
+            return None, "Certificate file content must match the PDF format."
+        if extension == ".png" and not header.startswith(b"\x89PNG\r\n\x1a\n"):
+            return None, "Certificate file content must match the PNG format."
+        if extension in {".jpg", ".jpeg"} and not header.startswith(b"\xff\xd8\xff"):
+            return None, "Certificate file content must match the JPG format."
+
+        return extension, None
+
+    def _save_certificate_upload(self, certificate, extension: str) -> str:
+        cert_dir = Path(current_app.config["UPLOAD_FOLDER"]) / "certificates"
+        cert_dir.mkdir(parents=True, exist_ok=True)
+        filename = f"user-{current_user.id}-cert-{uuid4().hex}{extension}"
+        certificate.stream.seek(0)
+        certificate.save(cert_dir / filename)
+        return f"certificates/{filename}"
+
     @login_required
     def certificates(self):
-        return self.render("profile/certificates.html", form=CertificateShellForm(), certificates=[])
+        user = current_user
+        from app.repositories import ProfileCertificateRepository
+        cert_repo = ProfileCertificateRepository()
+
+        if request.method == "POST":
+            skill_id_raw = request.form.get("skill_id", "").strip()
+            certificate_file = request.files.get("certificate")
+
+            skill_id = None
+            selected_skill = None
+            if not skill_id_raw:
+                flash("Please select a valid skill.", "danger")
+            else:
+                try:
+                    skill_id = int(skill_id_raw)
+                    selected_skill = next((s for s in user.offered_skills if s.id == skill_id), None)
+                    if not selected_skill:
+                        flash("Please select a valid skill from your profile.", "danger")
+                except ValueError:
+                    flash("Please select a valid skill.", "danger")
+
+            if selected_skill and certificate_file and certificate_file.filename:
+                extension, err = self._validate_certificate_upload(certificate_file)
+                if err:
+                    flash(err, "danger")
+                else:
+                    certificate_path = self._save_certificate_upload(certificate_file, extension)
+
+                    cert_repo.upsert(
+                        user_id=user.id,
+                        skill_name=selected_skill.skill_name,
+                        profile_skill_id=skill_id,
+                        file_path=certificate_path,
+                        status="pending",
+                    )
+
+                    self._skill_service._skill_repository.update_certificate_info_by_skill_id(
+                        user.id, skill_id, certificate_path, "pending"
+                    )
+
+                    flash("Certificate uploaded successfully and is pending admin review.", "success")
+                    return redirect(url_for("profile.certificates"))
+            elif not certificate_file or not certificate_file.filename:
+                flash("Please choose a certificate file to upload.", "danger")
+
+        certificates = cert_repo.find_by_user_id(user.id)
+        form = CertificateShellForm()
+        form.skill_id.choices = [(s.id, s.skill_name) for s in user.offered_skills]
+        return self.render("profile/certificates.html", form=form, certificates=certificates)
 
     def profile_view(self, user_id: int):
         try:
