@@ -144,6 +144,18 @@ class CategoryRepository(BaseRepository):
             row = db.fetch_one(query, params)
         return row is not None
 
+    def ensure(
+        self,
+        name: str,
+        description: str | None = None,
+        icon: str = "CAT",
+        sort_order: int = 0,
+    ) -> Category:
+        existing = self.find_by_name(name)
+        if existing:
+            return existing
+        return self.create(name=name, description=description, icon=icon, sort_order=sort_order)
+
     def create(
         self,
         *,
