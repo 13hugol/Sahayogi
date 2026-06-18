@@ -142,8 +142,168 @@ class FrontendController(BaseController):
         )
 
     @login_required
-    def post_listing(self):
-        return self.render("listings/form.html", form=ListingShellForm(), title="Create listing")
+    def post_listing(self, listing_id: int | None = None):
+        user = current_user
+        categories_list = self._skill_service.get_all_categories()
+        offered_skills = user.offered_skills
+
+        listing = None
+        if listing_id is not None:
+            listing = self._skill_service.get_listing_by_id(listing_id)
+            if not listing:
+                abort(404)
+            if listing.user_id != user.id:
+                abort(403)
+
+        errors: dict[str, str] = {}
+
+        if request.method == "POST":
+            title = request.form.get("title", "").strip()
+            description = request.form.get("description", "").strip()
+            exchange_type = request.form.get("exchange_type", "").strip()
+            skill_id_raw = request.form.get("skill_id", "").strip()
+            category_id_raw = request.form.get("category_id", "").strip()
+            min_credits_raw = request.form.get("min_credits", "").strip()
+            location_text = request.form.get("location_text", "").strip() or None
+            contact_method = request.form.get("contact_method", "").strip() or None
+            availability_labels = request.form.get("availability_labels", "").strip()
+
+            if not title or len(title) < 5 or len(title) > 120:
+                errors["title"] = "Title must be between 5 and 120 characters."
+
+            if not description or len(description) < 10:
+                errors["description"] = "Description must be at least 10 characters."
+
+            skill_id = None
+            if not skill_id_raw:
+                errors["skill_id"] = "Please select a valid skill from your profile."
+            else:
+                try:
+                    skill_id = int(skill_id_raw)
+                    if not any(s.id == skill_id for s in offered_skills):
+                        errors["skill_id"] = "Please select a valid skill from your profile."
+                except ValueError:
+                    errors["skill_id"] = "Please select a valid skill from your profile."
+
+            category_id = None
+            if not category_id_raw:
+                errors["category_id"] = "Please select a valid category."
+            else:
+                try:
+                    category_id = int(category_id_raw)
+                    if not any(c.id == category_id for c in categories_list):
+                        errors["category_id"] = "Please select a valid category."
+                except ValueError:
+                    errors["category_id"] = "Please select a valid category."
+
+            if exchange_type not in {"credit", "teach"}:
+                errors["exchange_type"] = "Please select a valid exchange type."
+
+            credit_cost = 0
+            if exchange_type == "credit":
+                if not min_credits_raw:
+                    errors["min_credits"] = "Please enter a valid number of credits."
+                else:
+                    try:
+                        credit_cost = int(min_credits_raw)
+                        if credit_cost < 0:
+                            errors["min_credits"] = "Credits cannot be negative."
+                    except ValueError:
+                        errors["min_credits"] = "Please enter a valid number of credits."
+
+            if not availability_labels:
+                errors["availability_labels"] = "Please provide availability details."
+
+            certificate_file = request.files.get("certificate")
+            certificate_extension = None
+            if certificate_file and certificate_file.filename:
+                certificate_extension, cert_err = self._validate_certificate_upload(certificate_file)
+                if cert_err:
+                    errors["certificate"] = cert_err
+
+            if not errors:
+                certificate_path = None
+                certificate_status = "none"
+
+                from app.repositories import ProfileCertificateRepository
+                cert_repo = ProfileCertificateRepository()
+
+                if listing:
+                    certificate_path = listing.certificate_path
+                    certificate_status = listing.certificate_status
+
+                    if request.form.get("remove_certificate") == "on":
+                        certificate_path = None
+                        certificate_status = "none"
+                        cert_repo.delete_for_skill(user.id, listing.skill_id)
+
+                if certificate_file and certificate_file.filename and certificate_extension:
+                    certificate_path = self._save_certificate_upload(certificate_file, certificate_extension)
+                    certificate_status = "pending"
+                    selected_skill = next(s for s in offered_skills if s.id == skill_id)
+                    cert_repo.upsert(
+                        user_id=user.id,
+                        skill_name=selected_skill.skill_name,
+                        profile_skill_id=skill_id,
+                        file_path=certificate_path,
+                        status="pending"
+                    )
+
+                if listing:
+                    self._skill_service.edit_listing(
+                        listing_id=listing.id,
+                        category_id=category_id,
+                        skill_id=skill_id,
+                        title=title,
+                        description=description,
+                        exchange_type=exchange_type,
+                        credit_cost=credit_cost,
+                        availability=availability_labels,
+                        location_text=location_text,
+                        contact_method=contact_method,
+                        status="pending",
+                    )
+                    self._skill_service._skill_repository.update_certificate_info(
+                        listing.id, certificate_path, certificate_status
+                    )
+                    flash("Listing updated successfully and is pending admin review.", "success")
+                    return redirect(url_for("listings.mine"))
+                else:
+                    self._skill_service.create_listing(
+                        user_id=user.id,
+                        category_id=category_id,
+                        skill_id=skill_id,
+                        title=title,
+                        description=description,
+                        exchange_type=exchange_type,
+                        credit_cost=credit_cost,
+                        availability=availability_labels,
+                        location_text=location_text,
+                        contact_method=contact_method,
+                        status="pending",
+                        certificate_path=certificate_path,
+                        certificate_status=certificate_status,
+                    )
+                    flash("Listing submitted successfully and is pending admin review.", "success")
+                    return redirect(url_for("listings.mine"))
+
+            form = ListingShellForm(data=request.form)
+        else:
+            if listing:
+                form = ListingShellForm(data=listing, availability_labels=listing._availability_raw)
+            else:
+                form = ListingShellForm()
+
+        form.skill_id.choices = [(s.id, s.skill_name) for s in offered_skills]
+        form.category_id.choices = [(c.id, f"{c.icon} - {c.name}") for c in categories_list]
+
+        return self.render(
+            "listings/form.html",
+            form=form,
+            title="Edit listing" if listing else "Create listing",
+            listing=listing,
+            errors=errors,
+        )
 
     @login_required
     def my_listings(self):
@@ -655,9 +815,98 @@ class FrontendController(BaseController):
         avatar.save(avatar_dir / filename)
         return f"avatars/{filename}"
 
+    def _validate_certificate_upload(self, certificate) -> tuple[str | None, str | None]:
+        filename = secure_filename(certificate.filename or "")
+        extension = Path(filename).suffix.lower()
+        allowed_extensions = {".pdf", ".png", ".jpg", ".jpeg"}
+        allowed_mimetypes = {"application/pdf", "image/png", "image/jpeg"}
+        if extension not in allowed_extensions:
+            return None, "Certificate must be a PDF, JPG, or PNG file."
+        if certificate.mimetype not in allowed_mimetypes:
+            return None, "Certificate file type is not supported."
+
+        try:
+            certificate.stream.seek(0, os.SEEK_END)
+            size = certificate.stream.tell()
+            certificate.stream.seek(0)
+            header = certificate.stream.read(16)
+            certificate.stream.seek(0)
+        except OSError:
+            return None, "Certificate could not be read. Please choose another file."
+
+        if size <= 0:
+            return None, "Certificate file is empty."
+        if size > 10 * 1024 * 1024:
+            return None, "Certificate must be under 10MB."
+
+        if extension == ".pdf" and not header.startswith(b"%PDF"):
+            return None, "Certificate file content must match the PDF format."
+        if extension == ".png" and not header.startswith(b"\x89PNG\r\n\x1a\n"):
+            return None, "Certificate file content must match the PNG format."
+        if extension in {".jpg", ".jpeg"} and not header.startswith(b"\xff\xd8\xff"):
+            return None, "Certificate file content must match the JPG format."
+
+        return extension, None
+
+    def _save_certificate_upload(self, certificate, extension: str) -> str:
+        cert_dir = Path(current_app.config["UPLOAD_FOLDER"]) / "certificates"
+        cert_dir.mkdir(parents=True, exist_ok=True)
+        filename = f"user-{current_user.id}-cert-{uuid4().hex}{extension}"
+        certificate.stream.seek(0)
+        certificate.save(cert_dir / filename)
+        return f"certificates/{filename}"
+
     @login_required
     def certificates(self):
-        return self.render("profile/certificates.html", form=CertificateShellForm(), certificates=[])
+        user = current_user
+        from app.repositories import ProfileCertificateRepository
+        cert_repo = ProfileCertificateRepository()
+
+        if request.method == "POST":
+            skill_id_raw = request.form.get("skill_id", "").strip()
+            certificate_file = request.files.get("certificate")
+
+            skill_id = None
+            selected_skill = None
+            if not skill_id_raw:
+                flash("Please select a valid skill.", "danger")
+            else:
+                try:
+                    skill_id = int(skill_id_raw)
+                    selected_skill = next((s for s in user.offered_skills if s.id == skill_id), None)
+                    if not selected_skill:
+                        flash("Please select a valid skill from your profile.", "danger")
+                except ValueError:
+                    flash("Please select a valid skill.", "danger")
+
+            if selected_skill and certificate_file and certificate_file.filename:
+                extension, err = self._validate_certificate_upload(certificate_file)
+                if err:
+                    flash(err, "danger")
+                else:
+                    certificate_path = self._save_certificate_upload(certificate_file, extension)
+
+                    cert_repo.upsert(
+                        user_id=user.id,
+                        skill_name=selected_skill.skill_name,
+                        profile_skill_id=skill_id,
+                        file_path=certificate_path,
+                        status="pending",
+                    )
+
+                    self._skill_service._skill_repository.update_certificate_info_by_skill_id(
+                        user.id, skill_id, certificate_path, "pending"
+                    )
+
+                    flash("Certificate uploaded successfully and is pending admin review.", "success")
+                    return redirect(url_for("profile.certificates"))
+            elif not certificate_file or not certificate_file.filename:
+                flash("Please choose a certificate file to upload.", "danger")
+
+        certificates = cert_repo.find_by_user_id(user.id)
+        form = CertificateShellForm()
+        form.skill_id.choices = [(s.id, s.skill_name) for s in user.offered_skills]
+        return self.render("profile/certificates.html", form=form, certificates=certificates)
 
     def profile_view(self, user_id: int):
         try:

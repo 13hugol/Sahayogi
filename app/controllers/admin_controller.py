@@ -124,7 +124,79 @@ class AdminController(BaseController):
 
     @admin_required
     def certificates(self):
-        return self.render("admin/certificates.html", certificates=[])
+        from app.repositories import ProfileCertificateRepository
+        certificates = ProfileCertificateRepository().find_by_status("pending")
+        return self.render("admin/certificates.html", certificates=certificates)
+
+    @admin_required
+    def approve_certificate(self, certificate_id: int):
+        from app.repositories import ProfileCertificateRepository, SkillRepository
+        cert_repo = ProfileCertificateRepository()
+        cert = cert_repo.find_by_id(certificate_id)
+        if not cert:
+            abort(404)
+
+        notes = request.form.get("notes", "").strip() or None
+        cert_repo.update_status(certificate_id, "approved", notes)
+
+        # update matching skill listings
+        SkillRepository().update_certificate_info_by_skill_id(
+            cert.user_id, cert.profile_skill_id, cert.file_path, "approved"
+        )
+
+        # create admin audit log
+        self._admin_service._audit_repository.create(
+            admin_id=current_user.id,
+            action="approve_certificate",
+            target_type="ProfileCertificate",
+            target_id=certificate_id,
+            detail=f"Certificate for '{cert.skill_name}' (User ID: {cert.user_id}) approved by admin {current_user.email}",
+        )
+
+        # send notification
+        self._admin_service._notification_service.notify_certificate_approved(
+            user_id=cert.user_id,
+            skill_name=cert.skill_name,
+        )
+
+        flash(f"Certificate for '{cert.skill_name}' approved successfully.", "success")
+        return redirect(url_for("admin.certificates"))
+
+    @admin_required
+    def reject_certificate(self, certificate_id: int):
+        from app.repositories import ProfileCertificateRepository, SkillRepository
+        cert_repo = ProfileCertificateRepository()
+        cert = cert_repo.find_by_id(certificate_id)
+        if not cert:
+            abort(404)
+
+        notes = request.form.get("notes", "").strip() or None
+        cert_repo.update_status(certificate_id, "rejected", notes)
+
+        # update matching skill listings
+        SkillRepository().update_certificate_info_by_skill_id(
+            cert.user_id, cert.profile_skill_id, cert.file_path, "rejected"
+        )
+
+        # create admin audit log
+        self._admin_service._audit_repository.create(
+            admin_id=current_user.id,
+            action="reject_certificate",
+            target_type="ProfileCertificate",
+            target_id=certificate_id,
+            detail=f"Certificate for '{cert.skill_name}' (User ID: {cert.user_id}) rejected by admin {current_user.email}. Reason: {notes}",
+        )
+
+        # send notification
+        self._admin_service._notification_service.notify_certificate_rejected(
+            user_id=cert.user_id,
+            skill_name=cert.skill_name,
+            reason=notes,
+        )
+
+        flash(f"Certificate for '{cert.skill_name}' rejected.", "warning")
+        return redirect(url_for("admin.certificates"))
+
 
     @admin_required
     def reports(self):
