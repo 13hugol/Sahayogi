@@ -45,12 +45,12 @@
             <div class="listing-actions mt-auto">
               <a class="btn btn-outline-primary" href="{{ url_for('listings.detail', listing_id=listing.id) }}">View listing</a>
               {% if current_user.is_authenticated and listing.id in saved_listing_ids %}
-                <form method="post" action="{{ url_for('listings.unsave', listing_id=listing.id) }}">
+                <form class="d-inline-block" method="post" action="{{ url_for('listings.unsave', listing_id=listing.id) }}">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <button class="btn btn-outline-secondary" type="submit">Saved</button>
                 </form>
               {% elif current_user.is_authenticated %}
-                <form method="post" action="{{ url_for('listings.save', listing_id=listing.id) }}">
+                <form class="d-inline-block" method="post" action="{{ url_for('listings.save', listing_id=listing.id) }}">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <button class="btn btn-outline-secondary" type="submit">Save</button>
                 </form>

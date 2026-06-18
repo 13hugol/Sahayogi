@@ -427,6 +427,23 @@ class Database:
                 CONSTRAINT fk_credit_holds_request FOREIGN KEY (request_id) REFERENCES exchange_requests(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """,
+            """
+            CREATE TABLE IF NOT EXISTS video_call_signals (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                exchange_id INT NOT NULL,
+                sender_id INT NOT NULL,
+                recipient_id INT NOT NULL,
+                signal_type VARCHAR(16) NOT NULL,
+                payload LONGTEXT NOT NULL,
+                consumed_at DATETIME DEFAULT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                INDEX ix_video_signals_exchange_created (exchange_id, created_at),
+                INDEX ix_video_signals_recipient_consumed (recipient_id, consumed_at),
+                CONSTRAINT fk_video_signals_exchange FOREIGN KEY (exchange_id) REFERENCES exchanges(id) ON DELETE CASCADE,
+                CONSTRAINT fk_video_signals_sender FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
+                CONSTRAINT fk_video_signals_recipient FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """,
         ]
         try:
             for statement in statements:

@@ -42,6 +42,26 @@ def _mail_password() -> str | None:
     return password
 
 
+def _ice_servers_from_env(raw: str | None) -> list[dict]:
+    """Parse an optional WEBRTC_ICE_SERVERS JSON array.
+
+    Returns an empty list by default so local two-party calls connect without a
+    TURN/STUN dependency. Accepts a JSON array of RTCIceServer objects, e.g.
+    [{"urls": "stun:stun.l.google.com:19302"}].
+    """
+    import json
+
+    if not raw:
+        return []
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, ValueError):
+        return []
+    if not isinstance(parsed, list):
+        return []
+    return [item for item in parsed if isinstance(item, dict)]
+
+
 class Config:
     SECRET_KEY = env_value("SECRET_KEY", "dev-secret-key-change-me")
     DATABASE_URL = env_value("DATABASE_URL")
@@ -70,6 +90,11 @@ class Config:
     DEFAULT_ADMIN_PASSWORD = env_value("DEFAULT_ADMIN_PASSWORD", "Admin123!")
     DEFAULT_ADMIN_NAME = env_value("DEFAULT_ADMIN_NAME", "Sahayogi Admin")
     WTF_CSRF_ENABLED = env_value("WTF_CSRF_ENABLED", "true").lower() == "true"
+
+    # WebRTC ICE servers for the in-app video call. Defaults to an empty list so
+    # local/demo calls work without any external dependency; set WEBRTC_ICE_SERVERS
+    # as a JSON array string in the environment for deployment behind NAT.
+    WEBRTC_ICE_SERVERS = _ice_servers_from_env(env_value("WEBRTC_ICE_SERVERS"))
 
     @classmethod
     def validate(cls) -> None:

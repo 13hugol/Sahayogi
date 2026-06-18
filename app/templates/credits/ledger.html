@@ -1,11 +1,11 @@
 {% set active_nav = 'credits' %}
 {% extends "base.html" %}
-{% block title %}Wallet | Sahayogi{% endblock %}
+{% block title %}Credit Ledger | Sahayogi{% endblock %}
 {% block content %}
   <header class="page-header">
     <div>
-      <h1 class="h2 mb-1">Wallet</h1>
-      <p class="page-subtitle">Manage your credits and view transaction history.</p>
+      <h1 class="h2 mb-1">Credit Ledger</h1>
+      <p class="page-subtitle">Earn credits by teaching, spend them to learn. Credits are internal only and have no monetary value.</p>
     </div>
   </header>
 
@@ -19,19 +19,24 @@
               <strong>{{ current_user.available_credit_balance }}</strong>
               <span>Credits</span>
             </div>
-            <p class="text-faint mb-0">Equivalent to approx. {{ (current_user.available_credit_balance // 100) or 0 }} hours of specialized service.</p>
+            <p class="text-faint mb-0">Reserved in open requests: {{ holds|length }} credit{{ '' if holds|length == 1 else 's' }} held.</p>
           </div>
           <div class="d-flex flex-wrap gap-2">
-            <button class="btn btn-outline-light" type="button">Transfer</button>
-            <button class="btn btn-accent" type="button">Top Up</button>
+            <a href="{{ url_for('listings.index') }}" class="btn btn-outline-light btn-with-icon">
+              <span class="svg-icon svg-icon-marketplace" aria-hidden="true"></span>
+              <span>Learn a skill</span>
+            </a>
+            <a href="{{ url_for('listings.create') }}" class="btn btn-accent btn-with-icon">
+              <span class="svg-icon svg-icon-add" aria-hidden="true"></span>
+              <span>Teach to earn</span>
+            </a>
           </div>
         </div>
       </section>
 
       <section class="table-card">
         <div class="table-card-header">
-          <h2 class="h4 mb-0">Recent Transactions</h2>
-          <span class="small fw-bold text-muted">View All</span>
+          <h2 class="h4 mb-0">Transaction History</h2>
         </div>
         <div class="transaction-list">
           {% for entry in entries %}
@@ -44,6 +49,7 @@
                   <strong>{{ entry.description }}</strong>
                   <div class="text-muted small">
                     {{ entry.entry_type|replace('_', ' ')|title }} &middot; {{ entry.created_at.strftime('%b %d, %Y') }}
+                    {% if entry.exchange_id %} &middot; <a href="{{ url_for('exchanges.detail', exchange_id=entry.exchange_id) }}">Exchange #{{ entry.exchange_id }}</a>{% endif %}
                   </div>
                 </div>
               </div>
@@ -51,11 +57,11 @@
                 <div class="transaction-amount {% if entry.amount_delta >= 0 %}positive{% endif %}">
                   {{ "%+d"|format(entry.amount_delta) }} <span class="small text-muted">CR</span>
                 </div>
-                <span class="badge text-bg-light">Completed</span>
+                <span class="badge text-bg-light">{{ entry.entry_type|replace('_', ' ')|title }}</span>
               </div>
             </article>
           {% else %}
-            <div class="empty-state m-4">No credit history yet.</div>
+            <div class="empty-state m-4">No credit transactions yet. Teach a skill to earn your first credits.</div>
           {% endfor %}
         </div>
       </section>
@@ -80,60 +86,82 @@
               <span class="badge text-bg-warning">{{ hold.status|title }}</span>
             </article>
           {% else %}
-            <div class="empty-state m-4">No active credit holds.</div>
+            <div class="empty-state m-4">No active credit holds. Your full balance is available.</div>
           {% endfor %}
         </div>
       </section>
     </div>
 
-    <aside class="wallet-card add-credits-card">
-      <h2 class="h4 mb-4">Add Credits</h2>
-      <div class="mb-4">
-        <div class="form-label">Select Amount</div>
-        <div class="amount-grid">
-          <button class="amount-chip" type="button">100</button>
-          <button class="amount-chip active" type="button">500</button>
-          <button class="amount-chip" type="button">1000</button>
-        </div>
-      </div>
-      <div class="mb-3">
-        <label class="form-label" for="customCredits">Custom</label>
-        <input class="form-control" id="customCredits" placeholder="Enter amount" disabled>
-      </div>
-      <p class="text-end text-muted">Total: $50.00 USD</p>
+    <aside class="wallet-card">
+      <h2 class="h4 mb-4">How Credits Move</h2>
+      <ul class="list-unstyled d-grid gap-3 mb-0">
+        <li class="d-flex gap-3">
+          <span class="svg-icon svg-icon-credit-in text-success" aria-hidden="true"></span>
+          <div>
+            <strong>Earn credits</strong>
+            <div class="text-muted small">Complete a teaching session to receive the listing's credit reward.</div>
+          </div>
+        </li>
+        <li class="d-flex gap-3">
+          <span class="svg-icon svg-icon-credit-hold text-warning" aria-hidden="true"></span>
+          <div>
+            <strong>Reserve on request</strong>
+            <div class="text-muted small">Requesting a skill reserves its cost until the teacher responds.</div>
+          </div>
+        </li>
+        <li class="d-flex gap-3">
+          <span class="svg-icon svg-icon-credit-out text-danger" aria-hidden="true"></span>
+          <div>
+            <strong>Spend on completion</strong>
+            <div class="text-muted small">When both sides complete the exchange, credits transfer to the teacher.</div>
+          </div>
+        </li>
+      </ul>
 
-      <div class="mb-4">
-        <div class="form-label">Payment Method</div>
-        <div class="d-grid gap-3">
-          <div class="payment-option">
-            <div class="d-flex align-items-center gap-3">
-              <span class="payment-radio active"></span>
-              <div>
-                <strong>Credit Card</strong>
-                <div class="text-muted">**** **** **** 4242</div>
-              </div>
-            </div>
-            <span class="payment-method-icon" aria-hidden="true">
-              <span class="svg-icon svg-icon-card"></span>
-            </span>
+      {% if demo_topup_allowed %}
+        <hr class="my-4">
+        <form method="post" action="{{ url_for('credits.demo_topup') }}" id="demo-topup-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="amount" id="demo-topup-amount" value="{{ demo_topup_amounts[1] if demo_topup_amounts else 100 }}">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <h3 class="h6 mb-0">Demo top-up</h3>
+            <span class="badge text-bg-warning">Demo only</span>
           </div>
-          <div class="payment-option">
-            <div class="d-flex align-items-center gap-3">
-              <span class="payment-radio"></span>
-              <div>
-                <strong>PayPal</strong>
-                <div class="text-muted">{{ current_user.email }}</div>
-              </div>
-            </div>
-            <span class="payment-method-icon" aria-hidden="true">
-              <span class="svg-icon svg-icon-paypal"></span>
-            </span>
+          <p class="text-muted small mb-3">Add internal credits to try the full credit cycle. These are not purchased and have no real-money value.</p>
+          <div class="amount-grid mb-3">
+            {% for amt in demo_topup_amounts %}
+              <button type="button" class="amount-chip{% if loop.first == false and amt == (demo_topup_amounts[1] if demo_topup_amounts|length > 1 else amt) %} active{% endif %}" data-amount="{{ amt }}">+{{ amt }}</button>
+            {% endfor %}
           </div>
-          <button class="btn btn-outline-secondary w-100" type="button" disabled>+ Add New Method</button>
-        </div>
-      </div>
-      <button class="btn btn-accent w-100" type="button" disabled>Pay $50.00</button>
-      <p class="text-center text-muted mt-3 mb-0">Payment top-up is a UI placeholder until a real payment backend is added.</p>
+          <button type="submit" class="btn btn-accent w-100 btn-with-icon">
+            <span class="svg-icon svg-icon-credit-in" aria-hidden="true"></span>
+            <span>Add demo credits</span>
+          </button>
+        </form>
+      {% endif %}
+
+      <hr class="my-4">
+      <p class="text-muted small mb-0">
+        Sahayogi uses an internal credit system only. Credits cannot be bought, sold, or withdrawn for real money; demo top-ups exist only for testing the platform.
+      </p>
     </aside>
   </div>
+
+  {% if demo_topup_allowed %}
+  <script>
+    (function () {
+      var form = document.getElementById('demo-topup-form');
+      if (!form) return;
+      var amountInput = document.getElementById('demo-topup-amount');
+      var chips = form.querySelectorAll('.amount-chip');
+      chips.forEach(function (chip) {
+        chip.addEventListener('click', function () {
+          chips.forEach(function (c) { c.classList.remove('active'); });
+          chip.classList.add('active');
+          amountInput.value = chip.getAttribute('data-amount');
+        });
+      });
+    })();
+  </script>
+  {% endif %}
 {% endblock %}

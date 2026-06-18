@@ -17,6 +17,7 @@ from .exchange_request_repository import ExchangeRequestRepository
 from .exchange_repository import ExchangeRepository
 from .report_repository import ReportRepository
 from .credit_repository import CreditRepository
+from .video_call_signal_repository import VideoCallSignalRepository
 
 __all__ = [
     "AdminAuditRepository",
@@ -37,4 +38,5 @@ __all__ = [
     "ExchangeRepository",
     "ReportRepository",
     "CreditRepository",
+    "VideoCallSignalRepository",
 ]
