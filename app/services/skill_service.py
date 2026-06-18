@@ -91,6 +91,20 @@ class SkillService:
     ) -> list[Skill]:
         return self._skill_repository.search(query, category_id, exchange_type, status)
 
+    def search_listings_by_location(
+        self,
+        user_lat: float,
+        user_lng: float,
+        radius_km: int,
+        query: str | None = None,
+        category_ids: list[int] | None = None,
+        exchange_type: str | None = None,
+        status: str | None = "approved",
+    ) -> list[Skill]:
+        return self._skill_repository.search_by_location(
+            user_lat, user_lng, radius_km, query, category_ids, exchange_type, status
+        )
+
     def get_all_categories(self) -> list[Category]:
         return self._category_repository.all()
 

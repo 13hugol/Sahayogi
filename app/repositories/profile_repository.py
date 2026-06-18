@@ -74,6 +74,19 @@ class ProfileRepository(BaseRepository):
             row = db.fetch_one("SELECT user_id FROM profiles WHERE username = %s", (username,))
         return row is not None
 
+    def save_location_coords(self, user_id: int, latitude: float, longitude: float, location_label: str) -> None:
+        with self._db() as db:
+            db.execute(
+                """
+                UPDATE profiles
+                   SET latitude       = %s,
+                       longitude      = %s,
+                       location_label = %s
+                 WHERE user_id = %s
+                """,
+                (latitude, longitude, location_label, user_id)
+            )
+
     def top_rated(self, limit: int = 12) -> list[TopRatedProfile]:
         with self._db() as db:
             rows = db.fetch_all(

@@ -113,6 +113,7 @@ class FrontendRoutes:
         profile = Blueprint("profile", __name__)
         profile.route("/profile/me", endpoint="me")(self.controller.profile_me)
         profile.route("/profile/edit", methods=["GET", "POST"], endpoint="edit")(self.controller.profile_edit)
+        profile.route("/profile/update-location", methods=["POST"], endpoint="update_location")(self.controller.update_location_coords)
         profile.route("/profile/certificates", endpoint="certificates")(self.controller.certificates)
         profile.route("/profile/delete", methods=["POST"], endpoint="delete_account")(self.controller.delete_account)
         profile.route("/users/<int:user_id>", endpoint="view")(self.controller.profile_view)

@@ -60,6 +60,9 @@ class Profile(BaseModel):
     reputation_score: float = 0.0
     review_count: int = 0
     completed_exchange_count: int = 0
+    latitude: float | None = None
+    longitude: float | None = None
+    location_label: str | None = None
 
     @classmethod
     def from_row(cls, row: dict | None) -> "Profile | None":
@@ -76,6 +79,9 @@ class Profile(BaseModel):
             reputation_score=float(row.get("reputation_score") or 0),
             review_count=int(row.get("review_count") or 0),
             completed_exchange_count=int(row.get("completed_exchange_count") or 0),
+            latitude=float(row["latitude"]) if row.get("latitude") is not None else None,
+            longitude=float(row["longitude"]) if row.get("longitude") is not None else None,
+            location_label=row.get("location_label"),
         )
 
     @classmethod

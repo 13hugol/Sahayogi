@@ -159,9 +159,64 @@ class SkillRepository(BaseRepository):
             rows = db.fetch_all(sql, params)
         return [s for row in rows if (s := Skill.from_row(row))]
 
+<<<<<<< HEAD
     def deactivate_all_for_user(self, user_id: int) -> None:
         with self._db() as db:
             db.execute(
                 "UPDATE skills SET status = 'deactivated' WHERE user_id = %s",
                 (user_id,),
             )
+
+    def search_by_location(
+        self,
+        user_lat: float,
+        user_lng: float,
+        radius_km: int,
+        query: str | None = None,
+        category_ids: list[int] | None = None,
+        exchange_type: str | None = None,
+        status: str | None = "approved",
+    ) -> list[Skill]:
+        params: list[object] = [user_lat, user_lng, user_lat]
+        sql = """
+            SELECT s.*, 
+            (
+                6371 * ACOS(
+                    COS(RADIANS(%s)) * COS(RADIANS(p.latitude))
+                    * COS(RADIANS(p.longitude) - RADIANS(%s))
+                    + SIN(RADIANS(%s)) * SIN(RADIANS(p.latitude))
+                )
+            ) AS distance_km
+            FROM skills s
+            JOIN users u ON s.user_id = u.id
+            JOIN profiles p ON s.user_id = p.user_id
+            WHERE p.latitude IS NOT NULL AND p.longitude IS NOT NULL
+        """
+        if status:
+            sql += " AND s.status = %s"
+            params.append(status)
+        if exchange_type:
+            sql += " AND s.exchange_type = %s"
+            params.append(exchange_type)
+        if category_ids:
+            placeholders = ", ".join(["%s"] * len(category_ids))
+            sql += f" AND s.category_id IN ({placeholders})"
+            params.extend(category_ids)
+        if query:
+            sql += " AND (s.title LIKE %s OR s.description LIKE %s)"
+            like_query = f"%{query}%"
+            params.extend([like_query, like_query])
+            
+        sql += " HAVING distance_km <= %s ORDER BY distance_km ASC"
+        params.append(radius_km)
+        
+        with self._db() as db:
+            rows = db.fetch_all(sql, params)
+        
+        results = []
+        for row in rows:
+            skill = Skill.from_row(row)
+            if skill:
+                skill.distance = row.get("distance_km")
+                results.append(skill)
+        return results

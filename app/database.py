@@ -448,6 +448,8 @@ class Database:
         try:
             for statement in statements:
                 db.execute(statement)
+<<<<<<< HEAD
+            Database.seed_search_listing_examples(db)
             for statement, duplicate_codes in (
                 ("ALTER TABLE profile_reviews ADD COLUMN exchange_id INT NULL AFTER id", {1060}),
                 (
@@ -460,6 +462,16 @@ class Database:
                     "FOREIGN KEY (exchange_id) REFERENCES exchanges(id) ON DELETE CASCADE",
                     {1061, 1826},
                 ),
+                ("ALTER TABLE profiles ADD COLUMN headline VARCHAR(160)", {1060}),
+                ("ALTER TABLE profiles ADD COLUMN bio TEXT", {1060}),
+                ("ALTER TABLE profiles ADD COLUMN latitude DECIMAL(9, 6) NULL", {1060}),
+                ("ALTER TABLE profiles ADD COLUMN longitude DECIMAL(9, 6) NULL", {1060}),
+                ("ALTER TABLE profiles ADD COLUMN location_label VARCHAR(255) NULL", {1060}),
+                ("CREATE INDEX idx_profiles_lat_lng ON profiles (latitude, longitude)", {1061}),
+                ("ALTER TABLE notifications ADD COLUMN type VARCHAR(50) DEFAULT 'general'", {1060}),
+                ("ALTER TABLE notifications ADD COLUMN target_url VARCHAR(255)", {1060}),
+                ("ALTER TABLE profiles MODIFY COLUMN reputation_score DECIMAL(3,1) DEFAULT NULL", {1061}),
+                ("ALTER TABLE profiles ADD COLUMN score_updated_at DATETIME DEFAULT NULL", {1060}),
             ):
                 try:
                     db.execute(statement)

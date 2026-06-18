@@ -45,6 +45,7 @@ class ProfileService:
     def get_top_rated_profiles(self, limit: int = 12):
         return self._profile_repository.top_rated(limit)
 
+<<<<<<< HEAD
     def delete_account(self, user_id: int) -> None:
         user = self._user_repository.find_by_id(user_id)
         if not user:
@@ -103,4 +104,6 @@ class ProfileService:
             "Dear User,\n\nThis email confirms that your account and all associated personal data have been permanently deleted from our platform in accordance with your request and GDPR regulations.\n\nThank you for being a part of our community.\n\nBest regards,\nThe Sahayogi Team"
         )
 
+    def save_location_coords(self, user_id: int, latitude: float, longitude: float, location_label: str) -> None:
+        self._profile_repository.save_location_coords(user_id, latitude, longitude, location_label)
 

@@ -56,10 +56,7 @@ class FrontendController(BaseController):
 
     def _get_filtered_listings(self):
         q = request.args.get("q", "").strip()
-        db_listings = self._skill_service.search_listings(query=q if q else None, status="approved")
-        for l in db_listings:
-            l.distance = None
-        
+
         category_ids = []
         raw_cats = request.args.getlist("category") + request.args.getlist("category[]")
         for cid in raw_cats:
@@ -72,9 +69,35 @@ class FrontendController(BaseController):
                 cid = cid.strip()
                 if cid.isdigit():
                     category_ids.append(int(cid))
+
+        try:
+            user_lat = float(request.args.get("lat", ""))
+            user_lng = float(request.args.get("lng", ""))
+            radius_km = min(int(request.args.get("radius", 10)), 100)
+
+            listings = self._skill_service.search_listings_by_location(
+                user_lat=user_lat,
+                user_lng=user_lng,
+                radius_km=radius_km,
+                query=q if q else None,
+                category_ids=category_ids if category_ids else None,
+                status="approved"
+            )
+
+            session["last_lat"] = user_lat
+            session["last_lng"] = user_lng
+            session["last_loc_label"] = request.args.get("label", "")
+            return listings
+        except (ValueError, TypeError):
+            pass
+
+        listings = self._skill_service.search_listings(query=q if q else None, status="approved")
+        for l in listings:
+            l.distance = None
+
         if category_ids:
-            db_listings = [l for l in db_listings if l.category_id in category_ids]
-            
+            listings = [l for l in listings if l.category_id in category_ids]
+
         location_query = request.args.get("location", "").strip()
         radius_query = request.args.get("radius", "").strip()
         if location_query:
@@ -87,7 +110,7 @@ class FrontendController(BaseController):
                 except ValueError:
                     pass
             filtered_listings = []
-            for l in db_listings:
+            for l in listings:
                 l_loc_str = l.location_text.strip() if l.location_text else None
                 if not l_loc_str and l.user and l.user.profile and l.user.profile.location:
                     l_loc_str = l.user.profile.location.strip()
@@ -100,12 +123,12 @@ class FrontendController(BaseController):
                 elif not search_coords and l_loc_str and location_query.lower() in l_loc_str.lower():
                     l.distance = None
                     filtered_listings.append(l)
-            db_listings = filtered_listings
+            listings = filtered_listings
 
         try:
             has_db_listings = len(self._skill_service.search_listings(status="approved")) > 0
             if has_db_listings:
-                return db_listings
+                return listings
 
             from app.services.listing_catalog import filter_listings as catalog_filter_listings
             mock_listings = catalog_filter_listings(
@@ -116,9 +139,26 @@ class FrontendController(BaseController):
             for m in mock_listings:
                 if location_query:
                     m.distance = None
-            return db_listings + mock_listings
+            return listings + mock_listings
         except Exception:
-            return db_listings
+            return listings
+
+    @login_required
+    def update_location_coords(self):
+        data = request.get_json(silent=True) or {}
+        try:
+            lat = float(data.get("lat"))
+            lng = float(data.get("lng"))
+            label = str(data.get("label", ""))[:255]
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "Invalid coordinates"}), 400
+
+        if not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+            return jsonify({"ok": False, "error": "Coordinates out of range"}), 400
+
+        self._profile_service.save_location_coords(current_user.id, lat, lng, label)
+        return jsonify({"ok": True, "label": label})
+
 
     def _categories(self):
         return self._skill_service.get_all_categories()

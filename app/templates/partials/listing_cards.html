@@ -29,10 +29,19 @@
             </p>
             <p class="flex-grow-1">{{ listing.description[:160] }}{% if listing.description|length > 160 %}...{% endif %}</p>
             <div class="listing-meta mb-3">
-              <div>Location: {{ listing.location_text or (listing.user.profile.location if listing.user and listing.user.profile else None) or "Flexible" }}{% if listing.distance is defined and listing.distance is not none %} ({{ listing.distance|round(1) }} km away){% endif %}</div>
-              <div>Reputation:
-                {% if listing.user and listing.user.profile and listing.user.profile.review_count >= 3 %}
-                  {{ listing.user.profile.reputation_score }} / 5
+              <div>
+                Location: {{ listing.location_text or (listing.user.profile.location if listing.user and listing.user.profile else None) or "Flexible" }}
+                {% if listing.distance is defined and listing.distance is not none %}
+                  <span class="badge bg-secondary location-distance-badge ms-1" title="Distance from your location">
+                    <i class="bi bi-geo-alt"></i> {{ "%.1f"|format(listing.distance) }} km away
+                  </span>
+                {% endif %}
+              </div>
+              <div class="listing-card-score mt-1 mb-1">
+                {% if listing.user and listing.user.profile and listing.user.profile.reputation_score %}
+                  <span class="star-mini filled">★</span>
+                  <span>{{ listing.user.profile.reputation_score }}</span>
+                  <span class="text-muted small">({{ listing.user.profile.review_count }})</span>
                 {% else %}
                   New Member
                 {% endif %}
