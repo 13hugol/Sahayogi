@@ -197,13 +197,13 @@
             <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-3">
               <div>
                 <h2 class="h5 mb-1">Delete account</h2>
-                <p class="text-muted mb-0">This schedules deletion and removes or anonymizes personal data after the recovery window.</p>
+                <p class="text-muted mb-0">This permanently deletes your account and removes or anonymizes all personal data (name, email, bio, messages, and listings) immediately.</p>
               </div>
             </div>
             <form method="post" action="{{ url_for('profile.delete_account') }}" class="row g-3">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <div class="col-md-8">
-                <label class="form-label" for="delete-password">Confirm password to schedule deletion</label>
+                <label class="form-label" for="delete-password">Confirm password to permanently delete account</label>
                 <input class="form-control" type="password" id="delete-password" name="password" required>
               </div>
               <div class="col-md-4 d-flex align-items-end">

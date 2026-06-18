@@ -236,3 +236,93 @@ class UserRepository(BaseRepository):
                 """,
                 (status, suspended_until, suspension_reason, user_id),
             )
+
+    def anonymize_and_cleanup_user_data(self, user_id: int) -> None:
+        email = f"deleted_user_{user_id}@deleted.invalid"
+        username = f"deleted_user_{user_id}"
+        
+        with self._db() as db:
+            with db.transaction():
+                # 1. Update user credentials and status to deleted
+                db.execute(
+                    """
+                    UPDATE users
+                    SET full_name = 'Deleted User',
+                        email = %s,
+                        password_hash = '',
+                        status = 'deleted',
+                        is_email_verified = FALSE,
+                        verification_token = NULL,
+                        verification_token_expires = NULL,
+                        locked_until = NULL,
+                        failed_login_count = 0
+                    WHERE id = %s
+                    """,
+                    (email, user_id),
+                )
+                
+                # 2. Clear profile details
+                db.execute(
+                    """
+                    UPDATE profiles
+                    SET username = %s,
+                        location = NULL,
+                        contact_email = NULL,
+                        avatar_path = NULL,
+                        headline = NULL,
+                        bio = NULL,
+                        reputation_score = 0.0,
+                        review_count = 0,
+                        completed_exchange_count = 0
+                    WHERE user_id = %s
+                    """,
+                    (username, user_id),
+                )
+                
+                # 3. Delete profile skills
+                db.execute("DELETE FROM profile_skills WHERE user_id = %s", (user_id,))
+                
+                # 4. Delete profile certificates
+                db.execute("DELETE FROM profile_certificates WHERE user_id = %s", (user_id,))
+                
+                # 5. Delete listings/skills
+                db.execute("DELETE FROM skills WHERE user_id = %s", (user_id,))
+                
+                # 6. Delete message posts sent by this user
+                db.execute("DELETE FROM message_posts WHERE sender_id = %s", (user_id,))
+                
+                # 7. Delete message participant entries
+                db.execute("DELETE FROM message_participants WHERE user_id = %s", (user_id,))
+                
+                # 8. Delete exchange requests sent by this user
+                db.execute("DELETE FROM exchange_requests WHERE learner_id = %s", (user_id,))
+                
+                # 9. Anonymize reviews left by this user
+                db.execute(
+                    """
+                    UPDATE profile_reviews
+                    SET reviewer_id = NULL,
+                        reviewer_name = 'Deleted User'
+                    WHERE reviewer_id = %s
+                    """,
+                    (user_id,),
+                )
+                
+                # 10. Delete reviews received by this user
+                db.execute("DELETE FROM profile_reviews WHERE reviewee_user_id = %s", (user_id,))
+                
+                # 11. Delete notifications
+                db.execute("DELETE FROM notifications WHERE user_id = %s", (user_id,))
+                
+                # 12. Delete password reset tokens
+                db.execute("DELETE FROM password_reset_tokens WHERE user_id = %s", (user_id,))
+                
+                # 13. Delete credit holds
+                db.execute("DELETE FROM credit_holds WHERE user_id = %s", (user_id,))
+                
+                # 14. Delete exchange completion marks
+                db.execute("DELETE FROM exchange_completion_marks WHERE user_id = %s", (user_id,))
+                
+                # 15. Delete reports filed by or against the user
+                db.execute("DELETE FROM reports WHERE reporter_id = %s OR reported_user_id = %s", (user_id, user_id))
+

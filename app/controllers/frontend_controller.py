@@ -1288,6 +1288,33 @@ class FrontendController(BaseController):
         flash("This action is frontend-only in the current project scope.", "info")
         return redirect(request.referrer or url_for("main.dashboard"))
 
+    @login_required
+    def delete_account(self):
+        user = User.find_by_id(current_user.id)
+        if not user:
+            abort(404)
+        if request.method == "POST":
+            password = request.form.get("password")
+            if not password or not user.check_password(password):
+                flash("Incorrect password confirmation.", "danger")
+                return redirect(url_for("profile.edit"))
+            
+            # Perform deletion/anonymization
+            self._profile_service.delete_account(user.id)
+            
+            # Log out the user
+            from flask_login import logout_user
+            logout_user()
+            
+            # Clean session
+            session.pop("csrf_token", None)
+            
+            flash("Your account has been deleted successfully. A final confirmation email has been sent.", "success")
+            return redirect(url_for("auth.login"))
+            
+        return redirect(url_for("profile.edit"))
+
+
     def _browse_page(self, page: int | None = None):
         selected_categories = self._selected_category_ids()
         listings = filter_listings(
