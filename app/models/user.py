@@ -198,6 +198,18 @@ class User(UserMixin, BaseModel):
             last_active_at=row.get("last_active_at"),
         )
 
+    @property
+    def is_online(self) -> bool:
+        if not self.last_active_at:
+            return False
+        from datetime import datetime
+        now = datetime.utcnow()
+        last_active = self.last_active_at
+        if last_active.tzinfo is not None:
+            last_active = last_active.replace(tzinfo=None)
+        diff = now - last_active
+        return diff.total_seconds() < 120
+
     @classmethod
     def find_by_email(cls, email: str) -> "User | None":
         from app.repositories import UserRepository

@@ -90,6 +90,12 @@ def register_status_check(app: Flask) -> None:
         if current_user and current_user.is_authenticated:
             user = User.find_by_id(current_user.id)
             if user:
+                from app.database import Database
+                db = Database()
+                try:
+                    db.execute("UPDATE users SET last_active_at = %s WHERE id = %s", (datetime.utcnow(), user.id))
+                finally:
+                    db.close()
                 current_user.status = user.status
                 current_user.suspended_until = user.suspended_until
                 current_user.suspension_reason = user.suspension_reason
