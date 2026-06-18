@@ -812,11 +812,9 @@ class FrontendController(BaseController):
 
     @login_required
     def notification_counts(self):
-        from app.repositories import MessageRepository
-
         return jsonify(
             {
-                "messages": MessageRepository().count_unread(current_user.id),
+                "messages": self._message_service.count_unread(current_user.id),
                 "notifications": self._notification_service.unread_count(current_user.id),
             }
         )

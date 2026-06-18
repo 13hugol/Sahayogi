@@ -55,11 +55,11 @@
             <a class="sidenav-link {% if active == 'exchanges' %}active{% endif %}" href="{{ url_for('exchanges.index') }}"><span>E</span>Exchanges</a>
             <a class="sidenav-link {% if active == 'messages' %}active{% endif %}" href="{{ url_for('messages.index') }}">
               <span>C</span>Messages
-              <b class="nav-count sidenav-count" data-count-type="messages">{{ nav_counts.messages }}</b>
+              <b class="nav-count sidenav-count{% if nav_counts.messages == 0 %} d-none{% endif %}" data-count-type="messages">{{ nav_counts.messages }}</b>
             </a>
             <a class="sidenav-link {% if active == 'notifications' %}active{% endif %}" href="{{ url_for('notifications.index') }}">
               <span>N</span>Notifications
-              <b class="nav-count sidenav-count" data-count-type="notifications">{{ nav_counts.notifications }}</b>
+              <b class="nav-count sidenav-count{% if nav_counts.notifications == 0 %} d-none{% endif %}" data-count-type="notifications">{{ nav_counts.notifications }}</b>
             </a>
             <a class="sidenav-link {% if active == 'profile' %}active{% endif %}" href="{{ url_for('profile.me') }}"><span>P</span>Profile</a>
             {% if current_user.is_admin %}
@@ -79,7 +79,7 @@
               <a class="topbar-credit" href="{{ url_for('credits.ledger') }}">{{ available_credits }} Credits</a>
               <a class="topbar-icon" href="{{ url_for('notifications.index') }}" aria-label="Notifications">
                 N
-                <b class="nav-count" data-count-type="notifications">{{ nav_counts.notifications }}</b>
+                <b class="nav-count{% if nav_counts.notifications == 0 %} d-none{% endif %}" data-count-type="notifications">{{ nav_counts.notifications }}</b>
               </a>
               <a class="topbar-avatar" href="{{ url_for('profile.me') }}" aria-label="Profile">
                 {% if current_user.profile and current_user.profile.avatar_path %}
