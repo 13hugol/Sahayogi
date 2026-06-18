@@ -1,0 +1,564 @@
+{% set active_nav = 'exchanges' %}
+{% extends "base.html" %}
+
+{% block title %}Video Call | Sahayogi{% endblock %}
+
+{% block head %}
+<style>
+  .video-call-container {
+    background: #0f0f15;
+    border-radius: 16px;
+    position: relative;
+    width: 100%;
+    height: 70vh;
+    min-height: 500px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    color: #fff;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  }
+
+  .video-grid {
+    flex: 1;
+    position: relative;
+    background: #151520;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .remote-video-wrapper {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle, #252538 0%, #101018 100%);
+  }
+
+  .remote-video-feed {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .local-video-wrapper {
+    position: absolute;
+    bottom: 24px;
+    right: 24px;
+    width: 180px;
+    height: 135px;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    background: #1e1e2d;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    transition: all 0.3s ease;
+    z-index: 10;
+  }
+
+  .local-video-wrapper:hover {
+    transform: scale(1.05);
+    border-color: #fd761a;
+  }
+
+  .local-video-feed {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1); /* Mirror local feed */
+  }
+
+  .video-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    background: #1c1c28;
+  }
+
+  .placeholder-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: #fd761a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 12px;
+    box-shadow: 0 0 20px rgba(253, 118, 26, 0.4);
+    animation: pulse 2.5s infinite alternate;
+  }
+
+  @keyframes pulse {
+    0% { transform: scale(1); box-shadow: 0 0 10px rgba(253, 118, 26, 0.4); }
+    100% { transform: scale(1.08); box-shadow: 0 0 25px rgba(253, 118, 26, 0.8); }
+  }
+
+  /* Glassmorphism call control bar */
+  .call-controls {
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(15, 15, 25, 0.75);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50px;
+    padding: 12px 28px;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    z-index: 20;
+  }
+
+  .control-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .control-btn:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: scale(1.08);
+  }
+
+  .control-btn.active-off {
+    background: #dc3545;
+    box-shadow: 0 0 15px rgba(220, 53, 69, 0.4);
+  }
+
+  .control-btn.active-off:hover {
+    background: #c82333;
+  }
+
+  .control-btn.btn-end {
+    background: #dc3545;
+    width: 54px;
+    height: 54px;
+  }
+
+  .control-btn.btn-end:hover {
+    background: #bd2130;
+    transform: scale(1.1);
+  }
+
+  .status-overlay {
+    position: absolute;
+    top: 24px;
+    left: 24px;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    padding: 8px 16px;
+    border-radius: 30px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    z-index: 10;
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #28a745;
+    box-shadow: 0 0 8px #28a745;
+  }
+
+  .status-dot.offline {
+    background: #ffc107;
+    box-shadow: 0 0 8px #ffc107;
+    animation: flash 1s infinite alternate;
+  }
+
+  @keyframes flash {
+    0% { opacity: 0.3; }
+    100% { opacity: 1; }
+  }
+
+  /* Connection Warning Modal/Banner */
+  .connection-banner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(30, 20, 20, 0.95);
+    backdrop-filter: blur(12px);
+    border: 2px solid #ffc107;
+    border-radius: 16px;
+    padding: 32px;
+    text-align: center;
+    width: 90%;
+    max-width: 400px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    display: none;
+    z-index: 30;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <a href="{{ url_for('exchanges.detail', exchange_id=exchange.id) }}" class="btn btn-outline-secondary btn-sm mb-2">&larr; Back to Exchange</a>
+      <h1 class="h3 mb-0">Live Learning Room</h1>
+      <p class="text-muted small mb-0">Topic: {{ exchange.listing.title }}</p>
+    </div>
+  </div>
+
+  <div class="video-call-container">
+    <!-- Status Indicator Overlay -->
+    <div class="status-overlay">
+      <div id="call-status-dot" class="status-dot"></div>
+      <span id="call-status-text">Connecting...</span>
+    </div>
+
+    <!-- Video Grid -->
+    <div class="video-grid">
+      <!-- Remote Participant Stream Area -->
+      <div class="remote-video-wrapper">
+        <div id="remote-placeholder" class="video-placeholder">
+          <div class="placeholder-avatar">
+            {% if current_user.id == exchange.learner_id %}
+              {{ exchange.teacher.full_name[:1] }}
+            {% else %}
+              {{ exchange.learner.full_name[:1] }}
+            {% endif %}
+          </div>
+          <h3 class="h5 mb-1">
+            {% if current_user.id == exchange.learner_id %}
+              {{ exchange.teacher.full_name }}
+            {% else %}
+              {{ exchange.learner.full_name }}
+            {% endif %}
+          </h3>
+          <p class="text-muted small mb-0" id="remote-sub-text">Waiting for user to connect...</p>
+        </div>
+        
+        <!-- Mock video element for remote participant screen share / mock camera -->
+        <video id="remote-video" class="remote-video-feed d-none" autoplay playsinline loop muted>
+          <source src="" type="video/mp4">
+        </video>
+      </div>
+
+      <!-- Local Participant Stream (PIP overlay) -->
+      <div class="local-video-wrapper">
+        <div id="local-placeholder" class="video-placeholder">
+          <div class="small fw-bold text-center mb-1">{{ current_user.full_name[:1] }}</div>
+          <span class="small text-muted">No Feed</span>
+        </div>
+        <video id="local-video" class="local-video-feed d-none" autoplay playsinline muted></video>
+      </div>
+    </div>
+
+    <!-- Glass Control Panel -->
+    <div class="call-controls">
+      <button id="btn-audio" class="control-btn" title="Toggle Microphone" onclick="toggleAudio()">
+        🎤
+      </button>
+      <button id="btn-video" class="control-btn" title="Toggle Camera" onclick="toggleVideo()">
+        📹
+      </button>
+      <button id="btn-screen" class="control-btn" title="Share Screen" onclick="toggleScreenShare()">
+        🖥️
+      </button>
+      
+      <!-- End Call Form -->
+      <form id="end-call-form" method="post" action="{{ url_for('exchanges.end_video_call', exchange_id=exchange.id) }}" class="d-inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="control-btn btn-end" title="End Call">
+          ❌
+        </button>
+      </form>
+    </div>
+
+    <!-- Reconnect Banner (Modal) -->
+    <div id="reconnect-banner" class="connection-banner">
+      <h3 class="text-warning h5 mb-3">⚠️ Connection Lost</h3>
+      <p class="mb-4">Other participant disconnected. Waiting for rejoin...</p>
+      <div class="display-6 fw-bold text-danger mb-4" id="countdown-timer">02:00</div>
+      <div class="spinner-border text-warning" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let localStream = null;
+  let screenStream = null;
+  
+  let isVideoOn = false;
+  let isAudioOn = true;
+  let isScreenSharing = false;
+
+  let heartbeatInterval = null;
+  let reconnectTimer = null;
+  let reconnectSecondsRemaining = 120;
+  let wasConnected = false;
+
+  const localVideo = document.getElementById("local-video");
+  const localPlaceholder = document.getElementById("local-placeholder");
+  const remoteVideo = document.getElementById("remote-video");
+  const remotePlaceholder = document.getElementById("remote-placeholder");
+  const remoteSubText = document.getElementById("remote-sub-text");
+  
+  const callStatusDot = document.getElementById("call-status-dot");
+  const callStatusText = document.getElementById("call-status-text");
+  const reconnectBanner = document.getElementById("reconnect-banner");
+  const countdownTimer = document.getElementById("countdown-timer");
+
+  const btnAudio = document.getElementById("btn-audio");
+  const btnVideo = document.getElementById("btn-video");
+  const btnScreen = document.getElementById("btn-screen");
+
+  // Attempt to initialize webcam automatically
+  window.addEventListener("DOMContentLoaded", () => {
+    initLocalWebcam();
+    startPresenceHeartbeats();
+  });
+
+  async function initLocalWebcam() {
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      localVideo.srcObject = localStream;
+      localVideo.classList.remove("d-none");
+      localPlaceholder.classList.add("d-none");
+      
+      isVideoOn = true;
+      isAudioOn = true;
+      updateControlButtons();
+    } catch (err) {
+      console.warn("Could not access camera/mic: ", err);
+      // Fallback: Try audio only
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        isAudioOn = true;
+        updateControlButtons();
+      } catch (audioErr) {
+        console.error("No media devices accessible: ", audioErr);
+        isAudioOn = false;
+        updateControlButtons();
+      }
+    }
+  }
+
+  function toggleAudio() {
+    if (!localStream) return;
+    const audioTracks = localStream.getAudioTracks();
+    if (audioTracks.length > 0) {
+      isAudioOn = !isAudioOn;
+      audioTracks[0].enabled = isAudioOn;
+      updateControlButtons();
+    }
+  }
+
+  function toggleVideo() {
+    if (!localStream) return;
+    const videoTracks = localStream.getVideoTracks();
+    if (videoTracks.length > 0) {
+      isVideoOn = !isVideoOn;
+      videoTracks[0].enabled = isVideoOn;
+      if (isVideoOn) {
+        localVideo.classList.remove("d-none");
+        localPlaceholder.classList.add("d-none");
+      } else {
+        localVideo.classList.add("d-none");
+        localPlaceholder.classList.remove("d-none");
+      }
+      updateControlButtons();
+    }
+  }
+
+  async function toggleScreenShare() {
+    if (!isScreenSharing) {
+      try {
+        screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        localVideo.srcObject = screenStream;
+        localVideo.classList.remove("d-none");
+        localPlaceholder.classList.add("d-none");
+        
+        isScreenSharing = true;
+        
+        // When user stops screen sharing from browser bar
+        screenStream.getVideoTracks()[0].onended = () => {
+          stopScreenSharing();
+        };
+        updateControlButtons();
+      } catch (err) {
+        console.warn("Screen share cancelled/failed: ", err);
+      }
+    } else {
+      stopScreenSharing();
+    }
+  }
+
+  function stopScreenSharing() {
+    if (screenStream) {
+      screenStream.getTracks().forEach(t => t.stop());
+      screenStream = null;
+    }
+    isScreenSharing = false;
+    if (localStream && isVideoOn) {
+      localVideo.srcObject = localStream;
+    } else {
+      localVideo.classList.add("d-none");
+      localPlaceholder.classList.remove("d-none");
+    }
+    updateControlButtons();
+  }
+
+  function updateControlButtons() {
+    // Microphone Button styling
+    if (isAudioOn) {
+      btnAudio.classList.remove("active-off");
+      btnAudio.innerHTML = "🎤";
+    } else {
+      btnAudio.classList.add("active-off");
+      btnAudio.innerHTML = "🔇";
+    }
+
+    // Camera Button styling
+    if (isVideoOn) {
+      btnVideo.classList.remove("active-off");
+      btnVideo.innerHTML = "📹";
+    } else {
+      btnVideo.classList.add("active-off");
+      btnVideo.innerHTML = "📷";
+    }
+
+    // Screen Button styling
+    if (isScreenSharing) {
+      btnScreen.classList.remove("active-off");
+      btnScreen.classList.add("btn-warning");
+    } else {
+      btnScreen.classList.remove("btn-warning");
+    }
+  }
+
+  // Heartbeat Presence Verification
+  function startPresenceHeartbeats() {
+    sendHeartbeat(); // first immediate heartbeat
+    heartbeatInterval = setInterval(sendHeartbeat, 5000); // every 5 seconds
+  }
+
+  async function sendHeartbeat() {
+    try {
+      const response = await fetch("{{ url_for('exchanges.video_call_heartbeat', exchange_id=exchange.id) }}", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": "{{ csrf_token() }}"
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Check if the other user is online
+        if (data.other_online) {
+          handleUserJoined();
+        } else {
+          handleUserLeft();
+        }
+
+        // If call was ended remotely, end call locally
+        if (!data.video_call_active && wasConnected) {
+          window.location.reload();
+        }
+      }
+    } catch (err) {
+      console.warn("Heartbeat update failed: ", err);
+    }
+  }
+
+  function handleUserJoined() {
+    wasConnected = true;
+    clearReconnectTimer();
+    
+    callStatusDot.classList.remove("offline");
+    callStatusDot.style.background = "#28a745";
+    callStatusDot.style.boxShadow = "0 0 8px #28a745";
+    callStatusText.textContent = "Live connected";
+    
+    remoteSubText.textContent = "Connected • Mic/Camera Active";
+    remotePlaceholder.style.background = "radial-gradient(circle, #2a3d30 0%, #101018 100%)";
+  }
+
+  function handleUserLeft() {
+    if (!wasConnected) {
+      // Still waiting for first connection
+      callStatusDot.classList.add("offline");
+      callStatusText.textContent = "Waiting for other participant...";
+      remoteSubText.textContent = "Offline • Not joined yet";
+      return;
+    }
+
+    // Connection dropped
+    callStatusDot.classList.add("offline");
+    callStatusText.textContent = "Reconnecting...";
+    remoteSubText.textContent = "Disconnected • Reconnecting...";
+    remotePlaceholder.style.background = "radial-gradient(circle, #3d2a2a 0%, #101018 100%)";
+
+    startReconnectTimer();
+  }
+
+  function startReconnectTimer() {
+    if (reconnectTimer) return; // already running
+    
+    reconnectBanner.style.display = "block";
+    reconnectSecondsRemaining = 120;
+    
+    reconnectTimer = setInterval(() => {
+      reconnectSecondsRemaining--;
+      
+      const m = Math.floor(reconnectSecondsRemaining / 60);
+      const s = reconnectSecondsRemaining % 60;
+      countdownTimer.textContent = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+      
+      if (reconnectSecondsRemaining <= 0) {
+        clearInterval(reconnectTimer);
+        // Terminate call automatically
+        document.getElementById("end-call-form").submit();
+      }
+    }, 1000);
+  }
+
+  function clearReconnectTimer() {
+    if (reconnectTimer) {
+      clearInterval(reconnectTimer);
+      reconnectTimer = null;
+    }
+    reconnectBanner.style.display = "none";
+  }
+
+  // Cleanup on unload
+  window.addEventListener("beforeunload", () => {
+    if (heartbeatInterval) clearInterval(heartbeatInterval);
+    if (reconnectTimer) clearInterval(reconnectTimer);
+    stopScreenSharing();
+    if (localStream) {
+      localStream.getTracks().forEach(track => track.stop());
+    }
+  });
+</script>
+{% endblock %}
