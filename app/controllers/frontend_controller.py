@@ -686,7 +686,7 @@ class FrontendController(BaseController):
         if conversation:
             from app.repositories import MessageRepository
             join_url = url_for("exchanges.video_call_room", exchange_id=exchange_id)
-            msg_body = f"🎥 Video call started. Join the call here: [Join Call]({join_url})"
+            msg_body = f"🎥 Video call started. <a href='{join_url}' class='btn btn-warning btn-sm ms-2 fw-bold text-dark'>Join Call</a>"
             MessageRepository().create_message(
                 conversation_id=conversation.id,
                 sender_id=current_user.id,
@@ -734,7 +734,7 @@ class FrontendController(BaseController):
         conversation = exchange.conversation
         if conversation:
             from app.repositories import MessageRepository
-            msg_body = f"🎥 Video call ended. Duration: {duration_str}."
+            msg_body = f"🎥 Video call ended. Duration: <strong>{duration_str}</strong>."
             MessageRepository().create_message(
                 conversation_id=conversation.id,
                 sender_id=current_user.id,
@@ -942,12 +942,27 @@ class FrontendController(BaseController):
         self._message_service.mark_read(conversation_id=conversation_id, user_id=current_user.id)
         conversation = self._message_service.get_conversation(conversation_id, current_user.id)
         conversations = self._message_service.list_conversations(current_user.id)
+
+        # Check active exchange & online status of participants
+        from app.repositories import ExchangeRepository, UserRepository
+        active_exchange = None
+        both_online = False
+        other_participant = conversation.other_participant(current_user.id)
+        if other_participant:
+            active_exchange = ExchangeRepository().find_active_between_users(current_user.id, other_participant.id)
+            if active_exchange:
+                me = UserRepository().find_by_id(current_user.id)
+                other = UserRepository().find_by_id(other_participant.id)
+                both_online = me.is_online and other.is_online
+
         return self.render(
             "messages/detail.html",
             conversation=conversation,
             conversations=conversations,
             ordered_messages=conversation.messages,
             form=MessageShellForm(),
+            active_exchange=active_exchange,
+            both_online=both_online,
         )
 
     @login_required
