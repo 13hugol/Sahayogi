@@ -88,7 +88,7 @@
                 {% if current_user.profile and current_user.profile.avatar_path %}
                   <img src="{{ url_for('main.media', filename=current_user.profile.avatar_path) }}" alt="{{ current_user.full_name }}">
                 {% else %}
-                  {{ current_user.full_name[:1] }}
+                  {{ svg_icon('profile') }}
                 {% endif %}
               </a>
               <form method="post" action="{{ url_for('auth.logout') }}" class="d-inline">

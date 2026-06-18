@@ -97,6 +97,18 @@
     animation: pulse 2.5s infinite alternate;
   }
 
+  .placeholder-avatar .svg-icon {
+    width: 34px;
+    height: 34px;
+  }
+
+  .local-placeholder-icon {
+    width: 22px;
+    height: 22px;
+    margin-bottom: 4px;
+    color: #ffffff;
+  }
+
   @keyframes pulse {
     0% { transform: scale(1); box-shadow: 0 0 10px rgba(253, 118, 26, 0.4); }
     100% { transform: scale(1.08); box-shadow: 0 0 25px rgba(253, 118, 26, 0.8); }
@@ -276,11 +288,7 @@
       <div class="remote-video-wrapper">
         <div id="remote-placeholder" class="video-placeholder">
           <div class="placeholder-avatar">
-            {% if current_user.id == exchange.learner_id %}
-              {{ exchange.teacher.full_name[:1] }}
-            {% else %}
-              {{ exchange.learner.full_name[:1] }}
-            {% endif %}
+            <span class="svg-icon svg-icon-profile" aria-hidden="true"></span>
           </div>
           <h3 class="h5 mb-1">
             {% if current_user.id == exchange.learner_id %}
@@ -301,7 +309,7 @@
       <!-- Local Participant Stream (PIP overlay) -->
       <div class="local-video-wrapper">
         <div id="local-placeholder" class="video-placeholder">
-          <div class="small fw-bold text-center mb-1">{{ current_user.full_name[:1] }}</div>
+          <span class="svg-icon svg-icon-video-off local-placeholder-icon" aria-hidden="true"></span>
           <span class="small text-muted">No Feed</span>
         </div>
         <video id="local-video" class="local-video-feed d-none" autoplay playsinline muted></video>

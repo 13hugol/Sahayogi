@@ -9,7 +9,9 @@
           {% if user.profile.avatar_path %}
             <img class="avatar-large mb-3" src="{{ url_for('main.media', filename=user.profile.avatar_path) }}" alt="{{ user.full_name }}">
           {% else %}
-            <div class="profile-avatar-placeholder mb-3">{{ user.full_name[:1] }}</div>
+            <div class="profile-avatar-placeholder mb-3">
+              <span class="svg-icon svg-icon-profile" aria-hidden="true"></span>
+            </div>
           {% endif %}
           <h1 class="h3 mb-1">{{ user.full_name }}</h1>
           <p class="text-muted">@{{ user.profile.username }}</p>

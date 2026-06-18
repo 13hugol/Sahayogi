@@ -22,10 +22,14 @@
                 <div class="profile-edit-avatar">
                   {% if user.profile.avatar_path %}
                     <img data-avatar-preview src="{{ url_for('main.media', filename=user.profile.avatar_path) }}" alt="{{ user.full_name }}">
-                    <div class="profile-avatar-placeholder d-none" data-avatar-placeholder>{{ values.full_name[:1] or "S" }}</div>
+                    <div class="profile-avatar-placeholder d-none" data-avatar-placeholder>
+                      <span class="svg-icon svg-icon-profile" aria-hidden="true"></span>
+                    </div>
                   {% else %}
                     <img class="d-none" data-avatar-preview alt="{{ user.full_name }}">
-                    <div class="profile-avatar-placeholder" data-avatar-placeholder>{{ values.full_name[:1] or "S" }}</div>
+                    <div class="profile-avatar-placeholder" data-avatar-placeholder>
+                      <span class="svg-icon svg-icon-profile" aria-hidden="true"></span>
+                    </div>
                   {% endif %}
                 </div>
                 <label class="form-label mt-3" for="avatar">Avatar</label>
