@@ -43,3 +43,6 @@ class ProfileService:
     def get_top_rated_profiles(self, limit: int = 12):
         return self._profile_repository.top_rated(limit)
 
+    def save_location_coords(self, user_id: int, latitude: float, longitude: float, location_label: str) -> None:
+        self._profile_repository.save_location_coords(user_id, latitude, longitude, location_label)
+
