@@ -43,3 +43,62 @@ class ProfileService:
     def get_top_rated_profiles(self, limit: int = 12):
         return self._profile_repository.top_rated(limit)
 
+    def delete_account(self, user_id: int) -> None:
+        user = self._user_repository.find_by_id(user_id)
+        if not user:
+            return
+        recipient_email = user.email
+
+        # 1. Fetch file paths before database cleanup
+        with self._user_repository._db() as db:
+            avatar_row = db.fetch_one("SELECT avatar_path FROM profiles WHERE user_id = %s", (user_id,))
+            cert_rows = db.fetch_all("SELECT file_path FROM profile_certificates WHERE user_id = %s", (user_id,))
+            skill_cert_rows = db.fetch_all("SELECT certificate_path FROM skills WHERE user_id = %s", (user_id,))
+
+        # 2. Perform database anonymization and deletion
+        self._user_repository.anonymize_and_cleanup_user_data(user_id)
+
+        # 3. Clean up physical files from disk
+        from flask import current_app
+        from pathlib import Path
+
+        upload_folder = current_app.config.get("UPLOAD_FOLDER")
+        if upload_folder:
+            # Delete avatar
+            if avatar_row and avatar_row.get("avatar_path"):
+                avatar_path = Path(upload_folder) / avatar_row["avatar_path"]
+                if avatar_path.is_file():
+                    try:
+                        avatar_path.unlink()
+                    except OSError:
+                        pass
+
+            # Delete profile certificates
+            for row in cert_rows:
+                if row.get("file_path"):
+                    cert_path = Path(upload_folder) / row["file_path"]
+                    if cert_path.is_file():
+                        try:
+                            cert_path.unlink()
+                        except OSError:
+                            pass
+
+            # Delete skill listing certificates
+            for row in skill_cert_rows:
+                if row.get("certificate_path"):
+                    skill_cert_path = Path(upload_folder) / row["certificate_path"]
+                    if skill_cert_path.is_file():
+                        try:
+                            skill_cert_path.unlink()
+                        except OSError:
+                            pass
+
+        # 4. Send final confirmation email
+        from app.utils.email import send_email
+        send_email(
+            "Account Deletion Confirmed",
+            recipient_email,
+            "Dear User,\n\nThis email confirms that your account and all associated personal data have been permanently deleted from our platform in accordance with your request and GDPR regulations.\n\nThank you for being a part of our community.\n\nBest regards,\nThe Sahayogi Team"
+        )
+
+
