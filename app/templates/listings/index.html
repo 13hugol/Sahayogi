@@ -22,41 +22,82 @@
       <span class="badge text-bg-light">Live refresh</span>
     </div>
     <div class="card-body">
-      <form id="searchForm" data-live-search="true" class="row g-3" method="get" action="{{ url_for('listings.index') }}">
-        <div class="col-lg-3">
-          <label class="form-label" for="q">Keyword</label>
-          <input class="form-control" id="q" name="q" value="{{ request.args.get('q', '') }}" placeholder="Search by skill, title, or topic">
-        </div>
-        <div class="col-lg-3">
-          <label class="form-label" for="category">Categories</label>
-          <select class="form-select" id="category" name="category" multiple size="4">
-            {% for category in categories %}
-              <option value="{{ category.id }}" {% if category.id|string in request.args.getlist('category') %}selected{% endif %}>{{ category.name }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="col-lg-3">
-          <label class="form-label" for="location">Location</label>
-          <div class="input-group">
-            <input class="form-control" id="location" name="location" value="{{ request.args.get('location', '') }}" placeholder="City or coordinates">
-            <button class="btn btn-outline-secondary" type="button" id="detectLocationBtn" title="Detect Location">📍 Detect Location</button>
+      {% if request.args.get('lat') and request.args.get('lng') %}
+      <div class="alert alert-info d-flex align-items-center gap-2 mb-3" role="alert">
+        <i class="bi bi-geo-alt-fill"></i>
+        Showing <strong>{{ total_results }}</strong> listing{{ 's' if total_results != 1 }}
+        within <strong>{{ request.args.get('radius', 10) }} km</strong> of
+        <strong>{{ request.args.get('label') or session.get('last_loc_label') or 'your location' }}</strong>.
+        <a href="{{ url_for('listings.index', q=request.args.get('q')) }}" class="ms-auto btn btn-sm btn-outline-secondary">
+          Clear Location Filter
+        </a>
+      </div>
+      {% endif %}
+
+      <form id="searchForm" data-live-search="true" method="get" action="{{ url_for('listings.index') }}">
+        <div class="row g-3 mb-3">
+          <div class="col-lg-6">
+            <label class="form-label" for="q">Keyword</label>
+            <input class="form-control" id="q" name="q" value="{{ request.args.get('q', '') }}" placeholder="Search by skill, title, or topic">
+          </div>
+          <div class="col-lg-6">
+            <label class="form-label" for="category">Categories</label>
+            <select class="form-select" id="category" name="category" multiple size="4">
+              {% for category in categories %}
+                <option value="{{ category.id }}" {% if category.id|string in request.args.getlist('category') %}selected{% endif %}>{{ category.name }}</option>
+              {% endfor %}
+            </select>
           </div>
         </div>
-        <div class="col-lg-2">
-          <label class="form-label" for="radius">Radius km</label>
-          <select class="form-select" id="radius" name="radius">
-            <option value="">Any</option>
-            {% for value in ['10', '50', '100'] %}
-              <option value="{{ value }}" {% if request.args.get('radius') == value %}selected{% endif %}>{{ value }} km</option>
-            {% endfor %}
-          </select>
+
+        <div class="card shadow-sm border-info border-start border-4" id="location-filter-panel">
+          <div class="card-body">
+            <h6 class="card-title fw-semibold mb-3">
+              <i class="bi bi-geo-alt"></i> Filter by Location
+            </h6>
+
+            <input type="hidden" name="lat"   id="loc-lat"   value="{{ request.args.get('lat', '') }}">
+            <input type="hidden" name="lng"   id="loc-lng"   value="{{ request.args.get('lng', '') }}">
+            <input type="hidden" name="label" id="loc-label" value="{{ request.args.get('label', '') }}">
+
+            <div class="row g-2 align-items-end">
+              <div class="col-md-5">
+                <label for="location-input" class="form-label small text-muted">City or region</label>
+                <input type="text" class="form-control" id="location-input"
+                       placeholder="e.g. Kathmandu"
+                       value="{{ request.args.get('label', '') }}"
+                       autocomplete="off">
+              </div>
+              <div class="col-md-3">
+                <label for="radius-select" class="form-label small text-muted">Radius</label>
+                <select class="form-select" name="radius" id="radius-select">
+                  <option value="10"  {% if request.args.get('radius', '10') == '10'  %}selected{% endif %}>10 km</option>
+                  <option value="50"  {% if request.args.get('radius') == '50'  %}selected{% endif %}>50 km</option>
+                  <option value="100" {% if request.args.get('radius') == '100' %}selected{% endif %}>100 km</option>
+                </select>
+              </div>
+              <div class="col-md-2">
+                <button type="button" class="btn btn-outline-secondary w-100"
+                        id="use-my-location-btn"
+                        title="Use device location">
+                  <i class="bi bi-crosshair"></i> Detect
+                </button>
+              </div>
+              <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100"
+                        id="apply-location-filter-btn" {% if not request.args.get('lat') %}disabled{% endif %}>
+                  Apply
+                </button>
+              </div>
+            </div>
+
+            <div id="location-status" class="form-text mt-1 text-muted"></div>
+          </div>
         </div>
-        <div class="col-lg-1 d-flex align-items-end">
-          <button class="btn btn-accent w-100" type="submit">Search</button>
-        </div>
+
       </form>
       {% if active_filters %}
-        <div class="filter-tags" aria-label="Active filters">
+        <div class="filter-tags mt-3" aria-label="Active filters">
           {% for filter in active_filters %}
             <a class="filter-tag" href="{{ filter.remove_url }}">{{ filter.label }} <span aria-hidden="true">&times;</span></a>
           {% endfor %}
@@ -88,37 +129,9 @@
     </nav>
   {% endif %}
 
+  <script src="{{ url_for('static', filename='js/location_filter.js') }}" defer></script>
   <script>
     document.addEventListener("DOMContentLoaded", function() {
-        const detectBtn = document.getElementById("detectLocationBtn");
-        const locationInput = document.getElementById("location");
-        if (detectBtn && locationInput) {
-            detectBtn.addEventListener("click", () => {
-                if (navigator.geolocation) {
-                    detectBtn.disabled = true;
-                    detectBtn.innerHTML = "⌛ ...";
-                    navigator.geolocation.getCurrentPosition(
-                        (position) => {
-                            const lat = position.coords.latitude.toFixed(4);
-                            const lon = position.coords.longitude.toFixed(4);
-                            locationInput.value = lat + ", " + lon;
-                            locationInput.dispatchEvent(new Event("input"));
-                            locationInput.dispatchEvent(new Event("change"));
-                            detectBtn.disabled = false;
-                            detectBtn.innerHTML = "📍 Detect Location";
-                        },
-                        (error) => {
-                            alert("Error detecting location: " + error.message);
-                            detectBtn.disabled = false;
-                            detectBtn.innerHTML = "📍 Detect Location";
-                        }
-                    );
-                } else {
-                    alert("Geolocation is not supported by this browser.");
-                }
-            });
-        }
-
         const activeFiltersContainer = document.getElementById("activeFilters");
         const form = document.getElementById("searchForm");
 
@@ -127,8 +140,8 @@
             activeFiltersContainer.innerHTML = "";
 
             const qInput = form.querySelector("#q");
-            const locInput = form.querySelector("#location");
-            const radSelect = form.querySelector("#radius");
+            const locInput = form.querySelector("#location-input");
+            const radSelect = form.querySelector("#radius-select");
             const catSelect = form.querySelector("#category");
 
             const qVal = qInput ? qInput.value.trim() : "";
@@ -158,6 +171,9 @@
             if (locVal) {
                 activeFiltersContainer.appendChild(createTag('Location: ' + locVal, function() {
                     locInput.value = "";
+                    document.getElementById("loc-lat").value = "";
+                    document.getElementById("loc-lng").value = "";
+                    document.getElementById("loc-label").value = "";
                     locInput.dispatchEvent(new Event("input"));
                     locInput.dispatchEvent(new Event("change"));
                 }));
@@ -165,7 +181,7 @@
 
             if (radVal) {
                 activeFiltersContainer.appendChild(createTag('Radius: ' + radVal + ' km', function() {
-                    radSelect.value = "";
+                    radSelect.value = "10";
                     radSelect.dispatchEvent(new Event("change"));
                 }));
             }
