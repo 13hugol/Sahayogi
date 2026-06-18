@@ -150,6 +150,7 @@ class User(UserMixin, BaseModel):
         suspended_until: datetime | None = None,
         suspension_reason: str | None = None,
         credit_balance: int = 100,
+        last_active_at: datetime | None = None,
     ):
         self.id = id
         self.full_name = full_name
@@ -168,6 +169,7 @@ class User(UserMixin, BaseModel):
         self.suspended_until = suspended_until
         self.suspension_reason = suspension_reason
         self.credit_balance = credit_balance
+        self.last_active_at = last_active_at
 
     @classmethod
     def from_row(cls, row: dict | None) -> "User | None":
@@ -193,7 +195,20 @@ class User(UserMixin, BaseModel):
             suspended_until=row.get("suspended_until"),
             suspension_reason=row.get("suspension_reason"),
             credit_balance=int(row.get("credit_balance") if row.get("credit_balance") is not None else 100),
+            last_active_at=row.get("last_active_at"),
         )
+
+    @property
+    def is_online(self) -> bool:
+        if not self.last_active_at:
+            return False
+        from datetime import datetime
+        now = datetime.utcnow()
+        last_active = self.last_active_at
+        if last_active.tzinfo is not None:
+            last_active = last_active.replace(tzinfo=None)
+        diff = now - last_active
+        return diff.total_seconds() < 120
 
     @classmethod
     def find_by_email(cls, email: str) -> "User | None":

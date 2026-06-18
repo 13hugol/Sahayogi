@@ -110,6 +110,7 @@ class Database:
                 locked_until DATETIME,
                 role_id INT NOT NULL,
                 credit_balance INT NOT NULL DEFAULT 100,
+                last_active_at DATETIME DEFAULT NULL,
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 INDEX ix_users_email (email),
@@ -367,6 +368,9 @@ class Database:
                 learner_completed_at DATETIME DEFAULT NULL,
                 teacher_completed_at DATETIME DEFAULT NULL,
                 video_session_summary TEXT DEFAULT NULL,
+                video_call_active BOOLEAN NOT NULL DEFAULT FALSE,
+                video_call_started_at DATETIME DEFAULT NULL,
+                video_call_ended_at DATETIME DEFAULT NULL,
                 CONSTRAINT fk_exchanges_request FOREIGN KEY (request_id) REFERENCES exchange_requests(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """,
@@ -544,6 +548,10 @@ class Database:
                 "ALTER TABLE exchanges ADD COLUMN teacher_completed_at DATETIME DEFAULT NULL",
                 "ALTER TABLE profile_reviews ADD COLUMN exchange_id INT DEFAULT NULL",
                 "ALTER TABLE profile_reviews ADD UNIQUE KEY uq_profile_reviews_exchange_reviewer (exchange_id, reviewer_id)",
+                "ALTER TABLE users ADD COLUMN last_active_at DATETIME DEFAULT NULL",
+                "ALTER TABLE exchanges ADD COLUMN video_call_active BOOLEAN NOT NULL DEFAULT FALSE",
+                "ALTER TABLE exchanges ADD COLUMN video_call_started_at DATETIME DEFAULT NULL",
+                "ALTER TABLE exchanges ADD COLUMN video_call_ended_at DATETIME DEFAULT NULL",
             ):
                 try:
                     db.execute(statement)

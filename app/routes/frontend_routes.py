@@ -83,6 +83,10 @@ class FrontendRoutes:
         exchanges.route("/", endpoint="index")(self.controller.exchanges)
         exchanges.route("/<int:exchange_id>", endpoint="detail")(self.controller.exchange_detail)
         exchanges.route("/<int:exchange_id>/complete", methods=["POST"], endpoint="mark_complete")(self.controller.mark_complete)
+        exchanges.route("/<int:exchange_id>/video", endpoint="video_call_room")(self.controller.video_call_room)
+        exchanges.route("/<int:exchange_id>/video/start", methods=["POST"], endpoint="start_video_call")(self.controller.start_video_call)
+        exchanges.route("/<int:exchange_id>/video/end", methods=["POST"], endpoint="end_video_call")(self.controller.end_video_call)
+        exchanges.route("/<int:exchange_id>/video/heartbeat", methods=["POST"], endpoint="video_call_heartbeat")(self.controller.video_call_heartbeat)
 
         messages = Blueprint("messages", __name__, url_prefix="/messages")
         messages.route("/", endpoint="index")(self.controller.messages)
