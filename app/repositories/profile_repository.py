@@ -334,7 +334,19 @@ class ProfileReviewRepository(BaseRepository):
         return {"score": score, "count": count}
 
     def update_cached_score(self, user_id: int) -> None:
-        data = self.get_reputation_score(user_id)
+        with self._db() as db:
+            row = db.fetch_one(
+                """
+                SELECT
+                    COUNT(*)              AS review_count,
+                    ROUND(AVG(rating), 1) AS avg_score
+                FROM profile_reviews
+                WHERE reviewee_user_id = %s
+                """,
+                (user_id,),
+            )
+        count = int((row or {}).get("review_count") or 0)
+        score = float(row["avg_score"]) if row and row.get("avg_score") is not None else None
         with self._db() as db:
             db.execute(
                 """
@@ -344,6 +356,6 @@ class ProfileReviewRepository(BaseRepository):
                     score_updated_at  = NOW()
                 WHERE user_id = %s
                 """,
-                (data["score"], data["count"], user_id)
+                (score, count, user_id)
             )
 

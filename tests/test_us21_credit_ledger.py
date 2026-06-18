@@ -18,10 +18,14 @@ def setup_credit_listing(app, user_factory):
         db.execute("UPDATE users SET credit_balance = 50 WHERE id = %s", (teacher.id,))
         db.execute("UPDATE users SET credit_balance = 100 WHERE id = %s", (learner.id,))
         
-        cat_id = db.execute(
-            "INSERT INTO categories (name, description) VALUES (%s, %s)",
-            ("Music", "Music skills")
-        )
+        category = db.fetch_one("SELECT id FROM categories WHERE name = %s", ("Music",))
+        if category:
+            cat_id = category["id"]
+        else:
+            cat_id = db.execute(
+                "INSERT INTO categories (name, description) VALUES (%s, %s)",
+                ("Music", "Music skills")
+            )
         ps_id = db.execute(
             "INSERT INTO profile_skills (user_id, skill_name, skill_type) VALUES (%s, %s, 'offered')",
             (teacher.id, "Guitar")

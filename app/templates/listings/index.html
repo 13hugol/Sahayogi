@@ -40,7 +40,10 @@
           <label class="form-label" for="location">Location</label>
           <div class="input-group">
             <input class="form-control" id="location" name="location" value="{{ request.args.get('location', '') }}" placeholder="City or coordinates">
-            <button class="btn btn-outline-secondary" type="button" id="detectLocationBtn" title="Detect Location">📍 Detect Location</button>
+            <button class="btn btn-outline-secondary btn-with-icon" type="button" id="detectLocationBtn" title="Detect Location">
+              <span class="svg-icon svg-icon-geo" aria-hidden="true"></span>
+              <span>Detect Location</span>
+            </button>
           </div>
         </div>
         <div class="col-lg-2">
@@ -93,11 +96,17 @@
     document.addEventListener("DOMContentLoaded", function() {
         const detectBtn = document.getElementById("detectLocationBtn");
         const locationInput = document.getElementById("location");
+        function setDetectButton(state) {
+            if (!detectBtn) return;
+            const iconClass = state === "loading" ? "svg-icon-loading" : "svg-icon-geo";
+            const label = state === "loading" ? "Detecting" : "Detect Location";
+            detectBtn.innerHTML = '<span class="svg-icon ' + iconClass + '" aria-hidden="true"></span><span>' + label + '</span>';
+        }
         if (detectBtn && locationInput) {
             detectBtn.addEventListener("click", () => {
                 if (navigator.geolocation) {
                     detectBtn.disabled = true;
-                    detectBtn.innerHTML = "⌛ ...";
+                    setDetectButton("loading");
                     navigator.geolocation.getCurrentPosition(
                         (position) => {
                             const lat = position.coords.latitude.toFixed(4);
@@ -106,12 +115,12 @@
                             locationInput.dispatchEvent(new Event("input"));
                             locationInput.dispatchEvent(new Event("change"));
                             detectBtn.disabled = false;
-                            detectBtn.innerHTML = "📍 Detect Location";
+                            setDetectButton("ready");
                         },
                         (error) => {
                             alert("Error detecting location: " + error.message);
                             detectBtn.disabled = false;
-                            detectBtn.innerHTML = "📍 Detect Location";
+                            setDetectButton("ready");
                         }
                     );
                 } else {

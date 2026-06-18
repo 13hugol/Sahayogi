@@ -213,6 +213,43 @@
     display: none;
     z-index: 30;
   }
+
+  .control-btn {
+    font-size: 0;
+  }
+
+  .control-btn .svg-icon {
+    width: 20px;
+    height: 20px;
+    font-size: 20px;
+  }
+
+  .connection-banner .text-warning {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 0;
+  }
+
+  .connection-banner .text-warning::before,
+  .connection-banner .text-warning::after {
+    font-size: 1.25rem;
+  }
+
+  .connection-banner .text-warning::before {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    background-color: currentColor;
+    -webkit-mask: url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/icons/camera-video-off.svg") center / contain no-repeat;
+    mask: url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/icons/camera-video-off.svg") center / contain no-repeat;
+    content: "";
+  }
+
+  .connection-banner .text-warning::after {
+    content: "Connection Lost";
+  }
 </style>
 {% endblock %}
 
@@ -274,27 +311,27 @@
     <!-- Glass Control Panel -->
     <div class="call-controls">
       <button id="btn-audio" class="control-btn" title="Toggle Microphone" onclick="toggleAudio()">
-        🎤
+        <span class="svg-icon svg-icon-mic" aria-hidden="true"></span>
       </button>
       <button id="btn-video" class="control-btn" title="Toggle Camera" onclick="toggleVideo()">
-        📹
+        <span class="svg-icon svg-icon-video" aria-hidden="true"></span>
       </button>
       <button id="btn-screen" class="control-btn" title="Share Screen" onclick="toggleScreenShare()">
-        🖥️
+        <span class="svg-icon svg-icon-screen" aria-hidden="true"></span>
       </button>
       
       <!-- End Call Form -->
       <form id="end-call-form" method="post" action="{{ url_for('exchanges.end_video_call', exchange_id=exchange.id) }}" class="d-inline">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="control-btn btn-end" title="End Call">
-          ❌
+          <span class="svg-icon svg-icon-end-call" aria-hidden="true"></span>
         </button>
       </form>
     </div>
 
     <!-- Reconnect Banner (Modal) -->
     <div id="reconnect-banner" class="connection-banner">
-      <h3 class="text-warning h5 mb-3">⚠️ Connection Lost</h3>
+      <h3 class="text-warning h5 mb-3">Connection Lost</h3>
       <p class="mb-4">Other participant disconnected. Waiting for rejoin...</p>
       <div class="display-6 fw-bold text-danger mb-4" id="countdown-timer">02:00</div>
       <div class="spinner-border text-warning" role="status">
@@ -334,6 +371,7 @@
 
   // Attempt to initialize webcam automatically
   window.addEventListener("DOMContentLoaded", () => {
+    updateControlButtons();
     initLocalWebcam();
     startPresenceHeartbeats();
   });
@@ -428,32 +466,36 @@
     updateControlButtons();
   }
 
+  function setControlIcon(button, iconClass) {
+    if (!button) return;
+    button.innerHTML = '<span class="svg-icon ' + iconClass + '" aria-hidden="true"></span>';
+  }
+
   function updateControlButtons() {
-    // Microphone Button styling
     if (isAudioOn) {
       btnAudio.classList.remove("active-off");
-      btnAudio.innerHTML = "🎤";
+      setControlIcon(btnAudio, "svg-icon-mic");
     } else {
       btnAudio.classList.add("active-off");
-      btnAudio.innerHTML = "🔇";
+      setControlIcon(btnAudio, "svg-icon-mic-off");
     }
 
-    // Camera Button styling
     if (isVideoOn) {
       btnVideo.classList.remove("active-off");
-      btnVideo.innerHTML = "📹";
+      setControlIcon(btnVideo, "svg-icon-video");
     } else {
       btnVideo.classList.add("active-off");
-      btnVideo.innerHTML = "📷";
+      setControlIcon(btnVideo, "svg-icon-video-off");
     }
 
-    // Screen Button styling
     if (isScreenSharing) {
       btnScreen.classList.remove("active-off");
       btnScreen.classList.add("btn-warning");
     } else {
       btnScreen.classList.remove("btn-warning");
     }
+    setControlIcon(btnScreen, "svg-icon-screen");
+    setControlIcon(document.querySelector(".btn-end"), "svg-icon-end-call");
   }
 
   // Heartbeat Presence Verification

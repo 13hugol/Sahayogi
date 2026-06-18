@@ -1,5 +1,8 @@
 {% set layout = layout_variant|default('app' if current_user.is_authenticated else 'public') %}
 {% set active = active_nav|default('') %}
+{% macro svg_icon(name, extra_class='') -%}
+  <span class="svg-icon svg-icon-{{ name }}{% if extra_class %} {{ extra_class }}{% endif %}" aria-hidden="true"></span>
+{%- endmacro %}
 {% macro render_page_content() %}
   {% include "partials/flash.html" %}
   {% block content %}{% endblock %}
@@ -24,7 +27,7 @@
       <main class="transactional-shell">
         <section class="transactional-brand">
           <a class="brand-lockup" href="{{ url_for('main.home') }}" aria-label="Sahayogi home">
-            <span class="brand-mark">S</span>
+            <span class="brand-mark">{{ svg_icon('brand') }}</span>
             <span>
               <strong>Sahayogi</strong>
               <small>Skill Bartering</small>
@@ -40,30 +43,30 @@
       <div class="app-shell">
         <aside class="sidenav">
           <a class="brand-lockup sidenav-brand" href="{{ url_for('main.dashboard') }}">
-            <span class="brand-mark">S</span>
+            <span class="brand-mark">{{ svg_icon('brand') }}</span>
             <span>
               <strong>Sahayogi</strong>
               <small>Skill Bartering</small>
             </span>
           </a>
           <nav class="sidenav-menu" aria-label="Primary">
-            <a class="sidenav-link {% if active == 'dashboard' %}active{% endif %}" href="{{ url_for('main.dashboard') }}"><span>D</span>Dashboard</a>
-            <a class="sidenav-link {% if active == 'listings' %}active{% endif %}" href="{{ url_for('listings.index') }}"><span>M</span>Marketplace</a>
-            <a class="sidenav-link {% if active == 'credits' %}active{% endif %}" href="{{ url_for('credits.ledger') }}"><span>W</span>Wallet</a>
-            <a class="sidenav-link {% if active == 'matches' %}active{% endif %}" href="{{ url_for('matches.index') }}"><span>F</span>Matches</a>
-            <a class="sidenav-link {% if active == 'requests' %}active{% endif %}" href="{{ url_for('requests_bp.inbox') }}"><span>R</span>Requests</a>
-            <a class="sidenav-link {% if active == 'exchanges' %}active{% endif %}" href="{{ url_for('exchanges.index') }}"><span>E</span>Exchanges</a>
+            <a class="sidenav-link {% if active == 'dashboard' %}active{% endif %}" href="{{ url_for('main.dashboard') }}">{{ svg_icon('dashboard', 'nav-icon') }}Dashboard</a>
+            <a class="sidenav-link {% if active == 'listings' %}active{% endif %}" href="{{ url_for('listings.index') }}">{{ svg_icon('marketplace', 'nav-icon') }}Marketplace</a>
+            <a class="sidenav-link {% if active == 'credits' %}active{% endif %}" href="{{ url_for('credits.ledger') }}">{{ svg_icon('wallet', 'nav-icon') }}Wallet</a>
+            <a class="sidenav-link {% if active == 'matches' %}active{% endif %}" href="{{ url_for('matches.index') }}">{{ svg_icon('matches', 'nav-icon') }}Matches</a>
+            <a class="sidenav-link {% if active == 'requests' %}active{% endif %}" href="{{ url_for('requests_bp.inbox') }}">{{ svg_icon('requests', 'nav-icon') }}Requests</a>
+            <a class="sidenav-link {% if active == 'exchanges' %}active{% endif %}" href="{{ url_for('exchanges.index') }}">{{ svg_icon('exchanges', 'nav-icon') }}Exchanges</a>
             <a class="sidenav-link {% if active == 'messages' %}active{% endif %}" href="{{ url_for('messages.index') }}">
-              <span>C</span>Messages
+              {{ svg_icon('messages', 'nav-icon') }}Messages
               <b class="nav-count sidenav-count{% if nav_counts.messages == 0 %} d-none{% endif %}" data-count-type="messages">{{ nav_counts.messages }}</b>
             </a>
             <a class="sidenav-link {% if active == 'notifications' %}active{% endif %}" href="{{ url_for('notifications.index') }}">
-              <span>N</span>Notifications
+              {{ svg_icon('bell', 'nav-icon') }}Notifications
               <b class="nav-count sidenav-count{% if nav_counts.notifications == 0 %} d-none{% endif %}" data-count-type="notifications">{{ nav_counts.notifications }}</b>
             </a>
-            <a class="sidenav-link {% if active == 'profile' %}active{% endif %}" href="{{ url_for('profile.me') }}"><span>P</span>Profile</a>
+            <a class="sidenav-link {% if active == 'profile' %}active{% endif %}" href="{{ url_for('profile.me') }}">{{ svg_icon('profile', 'nav-icon') }}Profile</a>
             {% if current_user.is_admin %}
-              <a class="sidenav-link {% if active == 'admin' %}active{% endif %}" href="{{ url_for('admin.dashboard') }}"><span>A</span>Admin</a>
+              <a class="sidenav-link {% if active == 'admin' %}active{% endif %}" href="{{ url_for('admin.dashboard') }}">{{ svg_icon('admin', 'nav-icon') }}Admin</a>
             {% endif %}
           </nav>
           <a class="btn btn-dark w-100 sidenav-action" href="{{ url_for('listings.create') }}">+ Post a Skill</a>
@@ -78,7 +81,7 @@
             <div class="topbar-actions">
               <a class="topbar-credit" href="{{ url_for('credits.ledger') }}">{{ available_credits }} Credits</a>
               <a class="topbar-icon" href="{{ url_for('notifications.index') }}" aria-label="Notifications">
-                N
+                {{ svg_icon('bell') }}
                 <b class="nav-count{% if nav_counts.notifications == 0 %} d-none{% endif %}" data-count-type="notifications">{{ nav_counts.notifications }}</b>
               </a>
               <a class="topbar-avatar" href="{{ url_for('profile.me') }}" aria-label="Profile">
@@ -103,7 +106,7 @@
       <nav class="public-nav">
         <div class="container d-flex align-items-center justify-content-between gap-3">
           <a class="brand-lockup" href="{{ url_for('main.home') }}">
-            <span class="brand-mark">S</span>
+            <span class="brand-mark">{{ svg_icon('brand') }}</span>
             <span>
               <strong>Sahayogi</strong>
               <small>Skill Bartering</small>

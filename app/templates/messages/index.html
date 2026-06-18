@@ -53,7 +53,7 @@
                 <div class="small text-muted mt-1">
                   {{ message.created_at.strftime('%Y-%m-%d %H:%M') if message.created_at else '' }}
                   {% if message.sender_id == current_user.id %}
-                    · {{ 'Read' if message.read_at else 'Delivered' }}
+                    &middot; {{ 'Read' if message.read_at else 'Delivered' }}
                   {% endif %}
                 </div>
               </article>

@@ -685,8 +685,7 @@ class FrontendController(BaseController):
         conversation = exchange.conversation
         if conversation:
             from app.repositories import MessageRepository
-            join_url = url_for("exchanges.video_call_room", exchange_id=exchange_id)
-            msg_body = f"🎥 Video call started. <a href='{join_url}' class='btn btn-warning btn-sm ms-2 fw-bold text-dark'>Join Call</a>"
+            msg_body = "Video call started. Join from this conversation while the exchange is active."
             MessageRepository().create_message(
                 conversation_id=conversation.id,
                 sender_id=current_user.id,
@@ -734,7 +733,7 @@ class FrontendController(BaseController):
         conversation = exchange.conversation
         if conversation:
             from app.repositories import MessageRepository
-            msg_body = f"🎥 Video call ended. Duration: <strong>{duration_str}</strong>."
+            msg_body = f"Video call ended. Duration: {duration_str}."
             MessageRepository().create_message(
                 conversation_id=conversation.id,
                 sender_id=current_user.id,

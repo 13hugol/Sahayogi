@@ -37,7 +37,9 @@
           {% for entry in entries %}
             <article class="transaction-row">
               <div class="d-flex align-items-center gap-3">
-                <span class="transaction-icon">{% if entry.amount_delta >= 0 %}+{% else %}-{% endif %}</span>
+                <span class="transaction-icon" aria-hidden="true">
+                  <span class="svg-icon {% if entry.amount_delta >= 0 %}svg-icon-credit-in{% else %}svg-icon-credit-out{% endif %}"></span>
+                </span>
                 <div>
                   <strong>{{ entry.description }}</strong>
                   <div class="text-muted small">
@@ -67,7 +69,9 @@
           {% for hold in holds %}
             <article class="transaction-row">
               <div class="d-flex align-items-center gap-3">
-                <span class="transaction-icon">H</span>
+                <span class="transaction-icon" aria-hidden="true">
+                  <span class="svg-icon svg-icon-credit-hold"></span>
+                </span>
                 <div>
                   <strong>{{ hold.amount }} credits reserved</strong>
                   <div class="text-muted small">Request #{{ hold.request_id }}</div>
@@ -109,7 +113,9 @@
                 <div class="text-muted">**** **** **** 4242</div>
               </div>
             </div>
-            <span class="text-muted fw-bold">Card</span>
+            <span class="payment-method-icon" aria-hidden="true">
+              <span class="svg-icon svg-icon-card"></span>
+            </span>
           </div>
           <div class="payment-option">
             <div class="d-flex align-items-center gap-3">
@@ -119,7 +125,9 @@
                 <div class="text-muted">{{ current_user.email }}</div>
               </div>
             </div>
-            <span class="text-muted fw-bold">Pay</span>
+            <span class="payment-method-icon" aria-hidden="true">
+              <span class="svg-icon svg-icon-paypal"></span>
+            </span>
           </div>
           <button class="btn btn-outline-secondary w-100" type="button" disabled>+ Add New Method</button>
         </div>

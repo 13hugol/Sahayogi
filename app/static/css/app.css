@@ -106,6 +106,42 @@ h6,
   font-size: 12px;
 }
 
+.svg-icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  flex: 0 0 auto;
+  background-color: currentColor;
+  -webkit-mask: var(--svg-icon-url) center / contain no-repeat;
+  mask: var(--svg-icon-url) center / contain no-repeat;
+}
+
+.svg-icon-brand { --svg-icon-url: url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/icons/people-fill.svg"); }
+.svg-icon-dashboard { --svg-icon-url: url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/icons/speedometer2.svg"); }
+.svg-icon-marketplace { --svg-icon-url: url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/icons/shop-window.svg"); }
+.svg-icon-wallet { --svg-icon-url: url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/icons/wallet2.svg"); }
+.svg-icon-matches { --svg-icon-url: url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/icons/stars.svg"); }
+.svg-icon-requests { --svg-icon-url: url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/icons/inbox.svg"); }
+.svg-icon-exchanges { --svg-icon-url: url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/icons/arrow-left-right.svg"); }
+.svg-icon-messages { --svg-icon-url: url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/icons/chat-dots.svg"); }
+.svg-icon-bell { --svg-icon-url: url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/icons/bell.svg"); }
+.svg-icon-profile { --svg-icon-url: url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/icons/person-circle.svg"); }
+.svg-icon-admin { --svg-icon-url: url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/icons/shield-lock.svg"); }
+.svg-icon-add { --svg-icon-url: url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/icons/plus-circle.svg"); }
+.svg-icon-credit-in { --svg-icon-url: url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/icons/plus-lg.svg"); }
+.svg-icon-credit-out { --svg-icon-url: url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/icons/dash-lg.svg"); }
+.svg-icon-credit-hold { --svg-icon-url: url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/icons/pause-circle.svg"); }
+.svg-icon-card { --svg-icon-url: url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/icons/credit-card.svg"); }
+.svg-icon-paypal { --svg-icon-url: url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/icons/paypal.svg"); }
+.svg-icon-geo { --svg-icon-url: url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/icons/geo-alt.svg"); }
+.svg-icon-loading { --svg-icon-url: url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/icons/hourglass-split.svg"); }
+.svg-icon-video { --svg-icon-url: url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/icons/camera-video.svg"); }
+.svg-icon-video-off { --svg-icon-url: url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/icons/camera-video-off.svg"); }
+.svg-icon-mic { --svg-icon-url: url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/icons/mic.svg"); }
+.svg-icon-mic-off { --svg-icon-url: url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/icons/mic-mute.svg"); }
+.svg-icon-screen { --svg-icon-url: url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/icons/display.svg"); }
+.svg-icon-end-call { --svg-icon-url: url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/icons/telephone-x.svg"); }
+
 .brand-mark {
   display: inline-flex;
   width: 32px;
@@ -116,7 +152,12 @@ h6,
   border-radius: 16px;
   background: var(--orange);
   color: #ffffff;
-  font-weight: 800;
+  font-size: 18px;
+}
+
+.brand-mark .svg-icon {
+  width: 18px;
+  height: 18px;
 }
 
 .public-nav {
@@ -199,15 +240,14 @@ h6,
   font-weight: 600;
 }
 
-.sidenav-link > span {
+.sidenav-link > .nav-icon {
   display: inline-flex;
   width: 18px;
   height: 18px;
   align-items: center;
   justify-content: center;
   color: inherit;
-  font-size: 11px;
-  font-weight: 800;
+  font-size: 18px;
 }
 
 .sidenav-link:hover,
@@ -329,6 +369,11 @@ h6,
 .topbar-icon:hover,
 .topbar-avatar:hover {
   background: var(--surface-soft);
+}
+
+.topbar-icon .svg-icon {
+  width: 18px;
+  height: 18px;
 }
 
 .topbar-icon .nav-count {
@@ -642,6 +687,12 @@ h6,
   font-weight: 800;
 }
 
+.transaction-icon .svg-icon,
+.row-icon .svg-icon {
+  width: 18px;
+  height: 18px;
+}
+
 .transaction-amount {
   color: var(--text);
   font-weight: 800;
@@ -720,6 +771,21 @@ h6,
   content: "";
 }
 
+.payment-method-icon {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 28px;
+  color: var(--text-muted);
+}
+
+.payment-method-icon .svg-icon {
+  width: 22px;
+  height: 22px;
+}
+
 .upload-zone {
   display: flex;
   min-height: 150px;
@@ -786,6 +852,18 @@ h6,
 .btn-dark {
   background: var(--navy);
   border-color: var(--navy);
+}
+
+.btn-with-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-with-icon .svg-icon {
+  width: 16px;
+  height: 16px;
 }
 
 .form-control,
