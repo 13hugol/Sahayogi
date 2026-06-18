@@ -112,6 +112,11 @@ def register_status_check(app: Flask) -> None:
                     session.pop("csrf_token", None)
                     flash(f"Your account has been permanently banned. Reason: {user.suspension_reason}", "danger")
                     return redirect(url_for("auth.login"))
+                elif user.status == "deleted":
+                    logout_user()
+                    session.pop("csrf_token", None)
+                    flash("Your account has been permanently deleted.", "danger")
+                    return redirect(url_for("auth.login"))
         return None
 
 
