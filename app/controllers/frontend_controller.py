@@ -634,6 +634,151 @@ class FrontendController(BaseController):
         return redirect(url_for("exchanges.detail", exchange_id=exchange_id))
 
     @login_required
+    def video_call_room(self, exchange_id: int):
+        from app.repositories import ExchangeRepository
+        exchange = ExchangeRepository().find_by_id(exchange_id)
+        if not exchange:
+            abort(404)
+        if exchange.status != "active":
+            flash("This exchange is not active.", "warning")
+            return redirect(url_for("exchanges.detail", exchange_id=exchange_id))
+        
+        request_obj = exchange.request
+        listing = exchange.listing
+        if not request_obj or not listing:
+            abort(404)
+        if current_user.id not in [request_obj.learner_id, listing.user_id]:
+            abort(403)
+            
+        return self.render("exchanges/video.html", exchange=exchange)
+
+    @login_required
+    def start_video_call(self, exchange_id: int):
+        from app.repositories import ExchangeRepository
+        from app.models.user import User
+        
+        exchange = ExchangeRepository().find_by_id(exchange_id)
+        if not exchange:
+            abort(404)
+        if exchange.status != "active":
+            flash("This exchange is not active.", "warning")
+            return redirect(url_for("exchanges.detail", exchange_id=exchange_id))
+            
+        request_obj = exchange.request
+        listing = exchange.listing
+        if not request_obj or not listing:
+            abort(404)
+        if current_user.id not in [request_obj.learner_id, listing.user_id]:
+            abort(403)
+            
+        # Check if both are online
+        learner = User.find_by_id(request_obj.learner_id)
+        teacher = User.find_by_id(listing.user_id)
+        
+        if not learner or not teacher or not learner.is_online or not teacher.is_online:
+            flash("Both participants must be online to start a video call.", "danger")
+            return redirect(url_for("messages.detail", conversation_id=exchange.conversation.id))
+            
+        ExchangeRepository().start_video_call(exchange_id)
+        
+        # Post system message to the chat
+        conversation = exchange.conversation
+        if conversation:
+            from app.repositories import MessageRepository
+            join_url = url_for("exchanges.video_call_room", exchange_id=exchange_id)
+            msg_body = f"🎥 Video call started. Join the call here: [Join Call]({join_url})"
+            MessageRepository().create_message(
+                conversation_id=conversation.id,
+                sender_id=current_user.id,
+                body=msg_body
+            )
+            
+        return redirect(url_for("exchanges.video_call_room", exchange_id=exchange_id))
+
+    @login_required
+    def end_video_call(self, exchange_id: int):
+        from app.repositories import ExchangeRepository
+        from datetime import datetime
+        
+        exchange = ExchangeRepository().find_by_id(exchange_id)
+        if not exchange:
+            abort(404)
+            
+        request_obj = exchange.request
+        listing = exchange.listing
+        if not request_obj or not listing:
+            abort(404)
+        if current_user.id not in [request_obj.learner_id, listing.user_id]:
+            abort(403)
+            
+        if not exchange.video_call_active:
+            flash("No active video call was found for this exchange.", "warning")
+            return redirect(url_for("exchanges.detail", exchange_id=exchange_id))
+            
+        # Compute duration
+        started_at = exchange.video_call_started_at
+        if started_at:
+            if started_at.tzinfo is not None:
+                started_at = started_at.replace(tzinfo=None)
+            duration_sec = int((datetime.utcnow() - started_at).total_seconds())
+            mins = duration_sec // 60
+            secs = duration_sec % 60
+            duration_str = f"{mins}m {secs}s"
+        else:
+            duration_str = "unknown duration"
+            
+        summary = f"Video call ended. Duration: {duration_str}. Participants: {exchange.learner.full_name} and {exchange.teacher.full_name}."
+        ExchangeRepository().end_video_call(exchange_id, summary)
+        
+        # Post system message to the chat
+        conversation = exchange.conversation
+        if conversation:
+            from app.repositories import MessageRepository
+            msg_body = f"🎥 Video call ended. Duration: {duration_str}."
+            MessageRepository().create_message(
+                conversation_id=conversation.id,
+                sender_id=current_user.id,
+                body=msg_body
+            )
+            
+        flash(f"Video call ended. {summary}", "success")
+        return redirect(url_for("exchanges.detail", exchange_id=exchange_id))
+
+    @login_required
+    def video_call_heartbeat(self, exchange_id: int):
+        from app.repositories import ExchangeRepository
+        from app.models.user import User
+        from datetime import datetime
+        
+        exchange = ExchangeRepository().find_by_id(exchange_id)
+        if not exchange:
+            return jsonify({"error": "Exchange not found"}), 404
+            
+        request_obj = exchange.request
+        listing = exchange.listing
+        if not request_obj or not listing:
+            return jsonify({"error": "Exchange details not found"}), 404
+        if current_user.id not in [request_obj.learner_id, listing.user_id]:
+            return jsonify({"error": "Unauthorized"}), 403
+            
+        # Update user activity timestamp in database
+        from app.database import Database
+        db = Database()
+        try:
+            db.execute("UPDATE users SET last_active_at = %s WHERE id = %s", (datetime.utcnow(), current_user.id))
+        finally:
+            db.close()
+            
+        other_user = listing.user if current_user.id == request_obj.learner_id else request_obj.learner
+        other_user_db = User.find_by_id(other_user.id)
+        
+        return jsonify({
+            "other_online": other_user_db.is_online if other_user_db else False,
+            "video_call_active": exchange.video_call_active,
+            "summary": exchange.video_session_summary
+        })
+
+    @login_required
     def create_request(self, listing_id: int):
         listing = SkillRepository().find_by_id(listing_id)
         if not listing:

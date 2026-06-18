@@ -72,3 +72,48 @@ class ExchangeRepository(BaseRepository):
                 """,
                 (status, completed_at, exchange_id),
             )
+
+    def find_active_between_users(self, user_a_id: int, user_b_id: int) -> Exchange | None:
+        query = """
+            SELECT e.*
+            FROM exchanges e
+            JOIN exchange_requests er ON er.id = e.request_id
+            JOIN skills s ON s.id = er.listing_id
+            WHERE e.status = 'active'
+              AND (
+                (er.learner_id = %s AND s.user_id = %s)
+                OR (er.learner_id = %s AND s.user_id = %s)
+              )
+            LIMIT 1
+        """
+        with self._db() as db:
+            row = db.fetch_one(query, (user_a_id, user_b_id, user_b_id, user_a_id))
+        return Exchange.from_row(row)
+
+    def start_video_call(self, exchange_id: int) -> None:
+        from datetime import datetime
+        with self._db() as db:
+            db.execute(
+                """
+                UPDATE exchanges
+                SET video_call_active = TRUE,
+                    video_call_started_at = %s,
+                    video_call_ended_at = NULL
+                WHERE id = %s
+                """,
+                (datetime.utcnow(), exchange_id),
+            )
+
+    def end_video_call(self, exchange_id: int, summary: str) -> None:
+        from datetime import datetime
+        with self._db() as db:
+            db.execute(
+                """
+                UPDATE exchanges
+                SET video_call_active = FALSE,
+                    video_call_ended_at = %s,
+                    video_session_summary = %s
+                WHERE id = %s
+                """,
+                (datetime.utcnow(), summary, exchange_id),
+            )
