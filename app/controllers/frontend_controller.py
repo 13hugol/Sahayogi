@@ -712,7 +712,7 @@ class FrontendController(BaseController):
     def notification_counts(self):
         return jsonify(
             {
-                "messages": 0,
+                "messages": self._message_service.count_unread(current_user.id),
                 "notifications": self._notification_service.unread_count(current_user.id),
             }
         )
