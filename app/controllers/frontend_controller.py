@@ -41,9 +41,6 @@ class FrontendController(BaseController):
 
     def _get_filtered_listings(self):
         q = request.args.get("q", "").strip()
-        listings = self._skill_service.search_listings(query=q if q else None, status="approved")
-        for l in listings:
-            l.distance = None
         
         category_ids = []
         raw_cats = request.args.getlist("category") + request.args.getlist("category[]")
@@ -57,6 +54,32 @@ class FrontendController(BaseController):
                 cid = cid.strip()
                 if cid.isdigit():
                     category_ids.append(int(cid))
+                    
+        try:
+            user_lat = float(request.args.get("lat", ""))
+            user_lng = float(request.args.get("lng", ""))
+            radius_km = min(int(request.args.get("radius", 10)), 100)
+            
+            listings = self._skill_service.search_listings_by_location(
+                user_lat=user_lat,
+                user_lng=user_lng,
+                radius_km=radius_km,
+                query=q if q else None,
+                category_ids=category_ids if category_ids else None,
+                status="approved"
+            )
+            
+            session["last_lat"] = user_lat
+            session["last_lng"] = user_lng
+            session["last_loc_label"] = request.args.get("label", "")
+            return listings
+        except (ValueError, TypeError):
+            pass
+
+        listings = self._skill_service.search_listings(query=q if q else None, status="approved")
+        for l in listings:
+            l.distance = None
+            
         if category_ids:
             listings = [l for l in listings if l.category_id in category_ids]
             
@@ -87,6 +110,23 @@ class FrontendController(BaseController):
                     filtered_listings.append(l)
             listings = filtered_listings
         return listings
+
+    @login_required
+    def update_location_coords(self):
+        data = request.get_json(silent=True) or {}
+        try:
+            lat = float(data.get("lat"))
+            lng = float(data.get("lng"))
+            label = str(data.get("label", ""))[:255]
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "Invalid coordinates"}), 400
+
+        if not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+            return jsonify({"ok": False, "error": "Coordinates out of range"}), 400
+
+        self._profile_service.save_location_coords(current_user.id, lat, lng, label)
+        return jsonify({"ok": True, "label": label})
+
 
     def _categories(self):
         return self._skill_service.get_all_categories()
