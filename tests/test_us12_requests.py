@@ -14,40 +14,43 @@ def setup_listing(app, user_factory):
         teacher = user_factory(email="teacher@example.com", full_name="Alice Teacher")
         learner = user_factory(email="learner@example.com", full_name="Bob Learner")
         
-        # create category and listing directly in database with approved status
-        db = Database()
-        cat_id = db.execute(
-            "INSERT INTO categories (name, description) VALUES (%s, %s)",
-            ("Music", "Music skills")
-        )
-        ps_id = db.execute(
-            "INSERT INTO profile_skills (user_id, skill_name, skill_type) VALUES (%s, %s, 'offered')",
-            (teacher.id, "Guitar")
-        )
-        listing_id = db.execute(
-            """
-            INSERT INTO skills (user_id, category_id, skill_id, title, description, exchange_type, credit_cost, availability, location_text, contact_method, status)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'approved')
-            """,
-            (teacher.id, cat_id, ps_id, "Guitar for Beginners", "Learn to play acoustic guitar.", "credit", 10, "Weekends", "Kathmandu", "Platform")
-        )
+        with Database() as db:
+            cat_row = db.fetch_one("SELECT id FROM categories WHERE name = %s", ("Music",))
+            if cat_row:
+                cat_id = cat_row["id"]
+            else:
+                cat_id = db.execute(
+                    "INSERT INTO categories (name, description) VALUES (%s, %s)",
+                    ("Music", "Music skills")
+                )
+            ps_id = db.execute(
+                "INSERT INTO profile_skills (user_id, skill_name, skill_type) VALUES (%s, %s, 'offered')",
+                (teacher.id, "Guitar")
+            )
+            listing_id = db.execute(
+                """
+                INSERT INTO skills (user_id, category_id, skill_id, title, description, exchange_type, credit_cost, availability, location_text, contact_method, status)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'approved')
+                """,
+                (teacher.id, cat_id, ps_id, "Guitar for Beginners", "Learn to play acoustic guitar.", "credit", 10, "Weekends", "Kathmandu", "Platform")
+            )
+            
+            # create a second listing that is expensive to check credit validation
+            expensive_listing_id = db.execute(
+                """
+                INSERT INTO skills (user_id, category_id, skill_id, title, description, exchange_type, credit_cost, availability, location_text, contact_method, status)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'approved')
+                """,
+                (teacher.id, cat_id, ps_id, "Advanced Guitar Masterclass", "Pro level lessons.", "credit", 120, "Weekends", "Kathmandu", "Platform")
+            )
         
-        # create a second listing that is expensive to check credit validation
-        expensive_listing_id = db.execute(
-            """
-            INSERT INTO skills (user_id, category_id, skill_id, title, description, exchange_type, credit_cost, availability, location_text, contact_method, status)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'approved')
-            """,
-            (teacher.id, cat_id, ps_id, "Advanced Guitar Masterclass", "Pro level lessons.", "credit", 120, "Weekends", "Kathmandu", "Platform")
-        )
-        
-        db.close()
         return {
             "teacher": teacher,
             "learner": learner,
             "listing_id": listing_id,
             "expensive_listing_id": expensive_listing_id,
         }
+
 
 
 def test_create_request_validation_and_success(app, client, login, setup_listing):

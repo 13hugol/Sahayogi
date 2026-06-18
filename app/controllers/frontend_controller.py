@@ -56,8 +56,8 @@ class FrontendController(BaseController):
 
     def _get_filtered_listings(self):
         q = request.args.get("q", "").strip()
-        listings = self._skill_service.search_listings(query=q if q else None, status="approved")
-        for l in listings:
+        db_listings = self._skill_service.search_listings(query=q if q else None, status="approved")
+        for l in db_listings:
             l.distance = None
         
         category_ids = []
@@ -73,7 +73,7 @@ class FrontendController(BaseController):
                 if cid.isdigit():
                     category_ids.append(int(cid))
         if category_ids:
-            listings = [l for l in listings if l.category_id in category_ids]
+            db_listings = [l for l in db_listings if l.category_id in category_ids]
             
         location_query = request.args.get("location", "").strip()
         radius_query = request.args.get("radius", "").strip()
@@ -87,7 +87,7 @@ class FrontendController(BaseController):
                 except ValueError:
                     pass
             filtered_listings = []
-            for l in listings:
+            for l in db_listings:
                 l_loc_str = l.location_text.strip() if l.location_text else None
                 if not l_loc_str and l.user and l.user.profile and l.user.profile.location:
                     l_loc_str = l.user.profile.location.strip()
@@ -100,8 +100,25 @@ class FrontendController(BaseController):
                 elif not search_coords and l_loc_str and location_query.lower() in l_loc_str.lower():
                     l.distance = None
                     filtered_listings.append(l)
-            listings = filtered_listings
-        return listings
+            db_listings = filtered_listings
+
+        try:
+            has_db_listings = len(self._skill_service.search_listings(status="approved")) > 0
+            if has_db_listings:
+                return db_listings
+
+            from app.services.listing_catalog import filter_listings as catalog_filter_listings
+            mock_listings = catalog_filter_listings(
+                query=q,
+                category_ids=set(category_ids),
+                radius=radius_query,
+            )
+            for m in mock_listings:
+                if location_query:
+                    m.distance = None
+            return db_listings + mock_listings
+        except Exception:
+            return db_listings
 
     def _categories(self):
         return self._skill_service.get_all_categories()
@@ -120,6 +137,11 @@ class FrontendController(BaseController):
         paginated_listings = listings[start:end]
         
         catalog_total = len(self._skill_service.search_listings(status="approved"))
+        try:
+            from app.services.listing_catalog import all_listings
+            catalog_total += len([l for l in all_listings() if l.status == "approved"])
+        except Exception:
+            pass
         
         return self.render(
             "listings/index.html",
@@ -150,7 +172,7 @@ class FrontendController(BaseController):
         if not skill_choices:
             skill_choices = [("", "Please add offered skills to your profile first")]
         categories = self._skill_service.get_all_categories()
-        category_choices = [(c.id, c.name) for c in categories]
+        category_choices = [("", "Choose one category")] + [(c.id, f"{c.icon} - {c.name}") for c in categories]
         
         if request.method == "POST":
             title = request.form.get("title", "").strip()
@@ -417,6 +439,22 @@ class FrontendController(BaseController):
         if not user.wanted_skills:
             return "Add at least one wanted skill to discover people who can help."
         return None
+
+    def _notify_new_matches(self, user_id: int):
+        from app.models.user import User, Profile
+        from app.models.notification import Notification
+
+        current_matches = Profile.get_mutual_matches(user_id)
+        existing_notified = Notification.get_notified_match_ids(user_id)
+
+        my_profile = User.find_by_id(user_id)
+
+        for match in current_matches:
+            mid = match["matched_user_id"]
+            if mid not in existing_notified:
+                Notification.create_new_match_notification(user_id, match["name"], mid)
+                if my_profile:
+                    Notification.create_new_match_notification(mid, my_profile.full_name, user_id)
 
     @login_required
     def requests(self):

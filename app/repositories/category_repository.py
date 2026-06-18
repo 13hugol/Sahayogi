@@ -137,7 +137,19 @@ class CategoryRepository(BaseRepository):
                 ORDER BY c.sort_order ASC, c.name ASC
                 """
             )
-        return rows or []
+        rows = rows or []
+        try:
+            from app.services.listing_catalog import all_listings
+            mock_counts = {}
+            for l in all_listings():
+                if l.status == 'approved':
+                    mock_counts[l.category_id] = mock_counts.get(l.category_id, 0) + 1
+            for row in rows:
+                cid = row.get("id")
+                row["listing_count"] = row.get("listing_count", 0) + mock_counts.get(cid, 0)
+        except Exception:
+            pass
+        return rows
 
     def name_exists(self, name: str, *, exclude_id: int | None = None) -> bool:
         params: tuple[object, ...]

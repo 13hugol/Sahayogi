@@ -177,12 +177,16 @@ class AdminController(BaseController):
                     icon=icon,
                     sort_order=sort_order,
                 )
-            except DuplicateCategoryError as exc:
-                flash(str(exc), "danger")
+            except DuplicateCategoryError:
+                flash("A category with this name already exists.", "danger")
+                categories = self._admin_service.list_categories()
+                return self.render("admin/categories.html", categories=categories, form=EmptyForm()), 200
             except ValueError as exc:
                 flash(str(exc), "danger")
+                categories = self._admin_service.list_categories()
+                return self.render("admin/categories.html", categories=categories, form=EmptyForm()), 200
             else:
-                flash(f"Category '{name}' created.", "success")
+                flash(f"Category {name} created.", "success")
             return redirect(url_for("admin.categories"))
 
         categories = self._admin_service.list_categories()
@@ -202,7 +206,7 @@ class AdminController(BaseController):
                 sort_order = int(request.form.get("sort_order", str(category.sort_order)) or 0)
             except ValueError:
                 sort_order = category.sort_order
-            is_active = request.form.get("is_active") == "on"
+            is_active = request.form.get("is_active") == "on" if "is_active" in request.form else category.is_active
             try:
                 self._admin_service.update_category(
                     admin_user=current_user,
@@ -215,7 +219,7 @@ class AdminController(BaseController):
                 )
             except CategoryNotFoundError:
                 abort(404)
-            flash(f"Category '{name}' updated.", "success")
+            flash(f"Category {name} updated.", "success")
             return redirect(url_for("admin.categories"))
 
         return self.render("admin/category_form.html", form=EmptyForm(), category=category)

@@ -10,8 +10,8 @@ from .profile_repository import (
 from .role_repository import RoleRepository
 from .skill_search_repository import SkillSearchRepository
 from .user_repository import UserRepository
-from .skill_repository import CategoryRepository, SkillRepository
-from .notification_repository import NotificationRepository
+from .skill_repository import SkillRepository
+from .category_repository import CategoryRepository
 from .message_repository import MessageRepository
 from .exchange_request_repository import ExchangeRequestRepository
 from .exchange_repository import ExchangeRepository

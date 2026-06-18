@@ -248,7 +248,7 @@ class AdminService:
         )
         self._audit_repository.create(
             admin_id=admin_user.id,
-            action="update_category",
+            action="rename_category",
             target_type="Category",
             target_id=category_id,
             detail=f"Category '{updated.name if updated else existing.name}' updated by admin {admin_user.email}",

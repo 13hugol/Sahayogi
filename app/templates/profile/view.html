@@ -18,6 +18,7 @@
             <div>Location: {{ user.profile.location or "Not provided" }}</div>
             <div class="reputation-block mt-2 mb-2" data-user-id="{{ user.id }}">
               {% if score %}
+                <span class="visually-hidden">Reputation: {{ score }} / 5</span>
                 <div class="star-display d-inline-block">
                   {% for i in range(1, 6) %}
                     <span class="star {% if i <= score|round %}filled{% endif %}">★</span>

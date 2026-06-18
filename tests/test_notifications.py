@@ -100,6 +100,9 @@ class FakeNotificationRepository:
             ]
         )
 
+    def get_unread_count(self, user_id):
+        return self.unread_count(user_id)
+
     def mark_read(self, notification_id, user_id):
         for notification in self.notifications:
             if notification.id == notification_id and notification.user_id == user_id:
