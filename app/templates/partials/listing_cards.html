@@ -20,7 +20,14 @@
             <p class="text-muted small mb-2">{{ listing.skill.name }} by {{ listing.user.full_name }}</p>
             <p class="flex-grow-1">{{ listing.description[:160] }}{% if listing.description|length > 160 %}...{% endif %}</p>
             <div class="listing-meta mb-3">
-              <div>Location: {{ listing.location_text or listing.user.profile.location or "Flexible" }}{% if listing.distance is defined and listing.distance is not none %} ({{ listing.distance|round(1) }} km away){% endif %}</div>
+              <div>
+                Location: {{ listing.location_text or listing.user.profile.location or "Flexible" }}
+                {% if listing.distance is defined and listing.distance is not none %}
+                  <span class="badge bg-secondary location-distance-badge ms-1" title="Distance from your location">
+                    <i class="bi bi-geo-alt"></i> {{ "%.1f"|format(listing.distance) }} km away
+                  </span>
+                {% endif %}
+              </div>
               <div class="listing-card-score mt-1 mb-1">
                 {% if listing.user.profile.reputation_score %}
                   <span class="star-mini filled">★</span>
