@@ -15,6 +15,9 @@ class Exchange(BaseModel):
     learner_completed_at: datetime | None = None
     teacher_completed_at: datetime | None = None
     video_session_summary: str | None = None
+    video_call_active: bool = False
+    video_call_started_at: datetime | None = None
+    video_call_ended_at: datetime | None = None
 
     @classmethod
     def from_row(cls, row: dict | None) -> Exchange | None:
@@ -29,6 +32,9 @@ class Exchange(BaseModel):
             learner_completed_at=row.get("learner_completed_at"),
             teacher_completed_at=row.get("teacher_completed_at"),
             video_session_summary=row.get("video_session_summary"),
+            video_call_active=bool(row.get("video_call_active")),
+            video_call_started_at=row.get("video_call_started_at"),
+            video_call_ended_at=row.get("video_call_ended_at"),
         )
 
     @property
