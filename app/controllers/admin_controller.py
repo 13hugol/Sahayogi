@@ -310,9 +310,60 @@ class AdminController(BaseController):
 
     @admin_required
     def skills(self):
+        from app.models.skill import Skill
+        from app.models.profile import ProfileSkill
+        from app.repositories import SkillRepository, CategoryRepository
+        from app.services import SkillService
+
+        skill_service = SkillService(SkillRepository(), CategoryRepository())
+        categories = skill_service.get_all_categories()
+
+        form = SkillForm()
+        form.category_id.choices = [(str(c.id), c.name) for c in categories]
+
         if request.method == "POST":
-            flash("Skill management is frontend-only in the current project scope.", "info")
-        return self.render("admin/skills.html", skills=[], form=EmptyForm())
+            name = request.form.get("name", "").strip()
+            category_id_raw = request.form.get("category_id", "").strip()
+            description = request.form.get("description", "").strip()
+
+            if not name:
+                flash("Skill name is required.", "danger")
+            elif not category_id_raw or not category_id_raw.isdigit():
+                flash("Please select a valid category.", "danger")
+            else:
+                category_id = int(category_id_raw)
+                category = skill_service.get_category_by_id(category_id)
+                if not category:
+                    flash("Selected category does not exist.", "danger")
+                else:
+                    # Ensure admin has a profile skill for this skill name
+                    offered = current_user.offered_skills
+                    profile_skill = next((s for s in offered if s.skill_name.casefold() == name.casefold()), None)
+                    if not profile_skill:
+                        profile_skill = ProfileSkill.create(
+                            current_user.id, name, "offered", sort_order=0
+                        )
+                    try:
+                        skill_service.create_listing(
+                            user_id=current_user.id,
+                            category_id=category_id,
+                            skill_id=profile_skill.id,
+                            title=name,
+                            description=description or name,
+                            exchange_type="credit",
+                            credit_cost=10,
+                            availability="Flexible",
+                            location_text="Remote",
+                            contact_method="In-app messaging",
+                            status="approved",
+                        )
+                        flash(f"Skill '{name}' created successfully.", "success")
+                        return redirect(url_for("admin.skills"))
+                    except Exception as exc:
+                        flash(f"Could not create skill: {exc}", "danger")
+
+        skills = skill_service.search_listings(status=None)
+        return self.render("admin/skills.html", skills=skills, form=form)
 
     @admin_required
     def suspend_user(self, user_id: int):
@@ -492,6 +543,45 @@ def normalize_icon(value: str) -> str:
         return compact[:16].upper()
     words = [word[:1] for word in normalize_spaces(value).split() if word]
     return "".join(words).upper()[:16] or "CAT"
+
+
+class _ShellField:
+    def __init__(self, name: str, label_text: str, field_type: str = "text"):
+        self.name = name
+        self.label_text = label_text
+        self.field_type = field_type
+        self.choices: list[tuple[str, str]] = []
+        self.data = None
+
+    def label(self, **kwargs):
+        attrs = " ".join(f'{k.replace("_", "-")}="{escape(v)}"' for k, v in kwargs.items())
+        return Markup(f'<label for="{self.name}" {attrs}>{escape(self.label_text)}</label>')
+
+    def __call__(self, **kwargs):
+        attrs = " ".join(f'{k.replace("_", "-")}="{escape(v)}"' for k, v in kwargs.items())
+        if self.field_type == "select" and self.choices:
+            options = []
+            for val, lbl in self.choices:
+                selected = ' selected' if self.data is not None and str(val) == str(self.data) else ''
+                options.append(f'<option value="{escape(str(val))}"{selected}>{escape(str(lbl))}</option>')
+            return Markup(f'<select name="{self.name}" {attrs}>{"".join(options)}</select>')
+        if self.field_type == "textarea":
+            val = escape(str(self.data)) if self.data is not None else ""
+            return Markup(f'<textarea name="{self.name}" {attrs}>{val}</textarea>')
+        if self.field_type == "submit":
+            return Markup(f'<button type="submit" {attrs}>{escape(self.label_text)}</button>')
+        return Markup(f'<input type="text" name="{self.name}" {attrs}>')
+
+
+class SkillForm:
+    def __init__(self):
+        self.name = _ShellField("name", "Skill name", "text")
+        self.category_id = _ShellField("category_id", "Category", "select")
+        self.description = _ShellField("description", "Description", "textarea")
+        self.submit = _ShellField("submit", "Create skill", "submit")
+
+    def hidden_tag(self):
+        return Markup(f'<input type="hidden" name="csrf_token" value="{escape(session.get("csrf_token", ""))}">')
 
 
 class EmptyForm:

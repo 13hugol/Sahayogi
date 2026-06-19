@@ -1557,7 +1557,10 @@ class FrontendController(BaseController):
 
         certificates = cert_repo.find_by_user_id(user.id)
         form = CertificateShellForm()
-        form.skill_id.choices = [(s.id, s.skill_name) for s in user.offered_skills]
+        skill_choices = [(s.id, s.skill_name) for s in user.offered_skills]
+        if not skill_choices:
+            skill_choices = [("", "No offered skills — add skills in profile edit first")]
+        form.skill_id.choices = skill_choices
         return self.render("profile/certificates.html", form=form, certificates=certificates)
 
     def profile_view(self, user_id: int):

@@ -112,6 +112,10 @@ class Skill(BaseModel):
         )
 
     @property
+    def name(self) -> str:
+        return self.title
+
+    @property
     def user(self):
         from app.models.user import User
 
