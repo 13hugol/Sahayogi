@@ -448,7 +448,6 @@ class Database:
         try:
             for statement in statements:
                 db.execute(statement)
-<<<<<<< HEAD
             Database.seed_search_listing_examples(db)
             for statement, duplicate_codes in (
                 ("ALTER TABLE profile_reviews ADD COLUMN exchange_id INT NULL AFTER id", {1060}),
