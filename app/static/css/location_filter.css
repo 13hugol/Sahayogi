@@ -5,7 +5,7 @@
 }
 
 #location-filter-panel:hover {
-    box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+    box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
 }
 
 .location-distance-badge {
