@@ -159,7 +159,6 @@ class SkillRepository(BaseRepository):
             rows = db.fetch_all(sql, params)
         return [s for row in rows if (s := Skill.from_row(row))]
 
-<<<<<<< HEAD
     def deactivate_all_for_user(self, user_id: int) -> None:
         with self._db() as db:
             db.execute(
