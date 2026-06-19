@@ -43,7 +43,7 @@
           </div>
           <div class="col-lg-6">
             <label class="form-label" for="category">Category</label>
-            <select class="form-select" id="category" name="category" multiple size="4">
+            <select class="form-select" id="category" name="category">
               {% for category in categories %}
                 <option value="{{ category.id }}" {% if category.id|string in request.args.getlist('category') %}selected{% endif %}>{{ category.name }}</option>
               {% endfor %}
