@@ -8,6 +8,12 @@
     box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
 }
 
+#location-filter-panel .form-control:focus,
+#location-filter-panel .form-select:focus {
+    border-color: var(--orange) !important;
+    box-shadow: 0 0 0 4px rgba(253, 118, 26, 0.15) !important;
+}
+
 .location-distance-badge {
     font-weight: 500;
     letter-spacing: 0.02em;
