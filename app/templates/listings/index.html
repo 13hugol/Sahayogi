@@ -189,15 +189,13 @@
             }
 
             if (catSelect) {
-                Array.from(catSelect.selectedOptions).forEach(function(option) {
-                    if (option.value) {
-                        activeFiltersContainer.appendChild(createTag('Category: ' + option.text, function() {
-                            option.selected = false;
-                            catSelect.value = "";
-                            catSelect.dispatchEvent(new Event("change"));
-                        }));
-                    }
-                });
+                const selectedOption = catSelect.options[catSelect.selectedIndex];
+                if (selectedOption && selectedOption.value) {
+                    activeFiltersContainer.appendChild(createTag('Category: ' + selectedOption.text, function() {
+                        catSelect.value = "";
+                        catSelect.dispatchEvent(new Event("change"));
+                    }));
+                }
             }
 
             if (activeFiltersContainer.children.length > 0) {
