@@ -45,7 +45,6 @@ class ProfileService:
     def get_top_rated_profiles(self, limit: int = 12):
         return self._profile_repository.top_rated(limit)
 
-<<<<<<< HEAD
     def delete_account(self, user_id: int) -> None:
         user = self._user_repository.find_by_id(user_id)
         if not user:
