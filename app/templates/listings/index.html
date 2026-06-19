@@ -124,7 +124,7 @@
       <ul class="pagination">
         {% for number in range(1, total_pages + 1) %}
           <li class="page-item {% if number == page %}active{% endif %}">
-            <a class="page-link" href="{{ url_for('listings.index', page=number, q=request.args.get('q'), location=request.args.get('location'), radius=request.args.get('radius'), category=request.args.getlist('category')) }}">{{ number }}</a>
+            <a class="page-link" href="{{ url_for('listings.index', page=number, q=request.args.get('q'), label=request.args.get('label'), lat=request.args.get('lat'), lng=request.args.get('lng'), radius=request.args.get('radius'), category=request.args.getlist('category')) }}">{{ number }}</a>
           </li>
         {% endfor %}
       </ul>
