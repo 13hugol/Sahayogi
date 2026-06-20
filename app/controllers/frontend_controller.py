@@ -23,6 +23,7 @@ from app.services import (
     SkillSearchService,
 )
 from app.services.listing_catalog import (
+    LISTINGS_PER_PAGE,
     all_listings,
     categories,
     filter_listings,
@@ -168,7 +169,7 @@ class FrontendController(BaseController):
         categories = self._categories()
         
         page = request.args.get("page", 1, type=int)
-        per_page = 6
+        per_page = LISTINGS_PER_PAGE
         total_results = len(listings)
         total_pages = max(1, (total_results + per_page - 1) // per_page)
         
@@ -399,7 +400,7 @@ class FrontendController(BaseController):
         saved_ids = self._saved_listing_ids()
         listings = []
         for lid in saved_ids:
-            l = self._skill_service.get_listing_by_id(lid)
+            l = self._find_listing(lid)
             if l:
                 listings.append(l)
         return self.render(
@@ -410,7 +411,7 @@ class FrontendController(BaseController):
         )
 
     def listing_detail(self, listing_id: int):
-        listing = self._skill_service.get_listing_by_id(listing_id)
+        listing = self._find_listing(listing_id)
         if not listing:
             abort(404)
         form = RequestShellForm()
@@ -428,7 +429,7 @@ class FrontendController(BaseController):
     def api_search(self):
         listings = self._get_filtered_listings()
         page = request.args.get("page", 1, type=int)
-        per_page = 6
+        per_page = LISTINGS_PER_PAGE
         total_results = len(listings)
         start = (page - 1) * per_page
         end = start + per_page
@@ -453,7 +454,7 @@ class FrontendController(BaseController):
         return redirect(url_for("listings.mine"))
 
     def save_listing(self, listing_id: int):
-        if self._skill_service.get_listing_by_id(listing_id) is None:
+        if self._find_listing(listing_id) is None:
             abort(404)
         saved_ids = self._saved_listing_ids()
         saved_ids.add(listing_id)
@@ -467,6 +468,9 @@ class FrontendController(BaseController):
         self._store_saved_listing_ids(saved_ids)
         flash("Listing removed from your saved list.", "info")
         return redirect(request.referrer or url_for("listings.saved"))
+
+    def _find_listing(self, listing_id: int):
+        return self._skill_service.get_listing_by_id(listing_id) or find_listing(listing_id)
 
     @login_required
     def wallet(self):
