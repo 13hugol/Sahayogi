@@ -43,17 +43,62 @@ class ProfileRepository(BaseRepository):
                 """,
                 (limit,),
             )
-        return [
-            TopRatedProfile(
-                user_id=row["user_id"],
-                full_name=row["full_name"],
-                username=row["username"],
-                reputation_score=float(row.get("reputation_score") or 0),
-                review_count=int(row.get("review_count") or 0),
-                completed_exchange_count=int(row.get("completed_exchange_count") or 0),
-            )
-            for row in rows
-        ]
+            
+            result = []
+            for row in rows:
+                user_id = row["user_id"]
+                # Query matching category name from skill listings based on user's offered skills
+                cat_row = db.fetch_one(
+                    """
+                    SELECT category_name
+                    FROM skill_search_listings
+                    WHERE skill_name IN (
+                        SELECT skill_name
+                        FROM profile_skills
+                        WHERE user_id = %s AND skill_type = 'offered'
+                    )
+                    LIMIT 1
+                    """,
+                    (user_id,),
+                )
+                category = cat_row.get("category_name") if cat_row else None
+                
+                # Keyword-based Python fallback if no exact category match found
+                if not category:
+                    skills = db.fetch_all(
+                        "SELECT skill_name FROM profile_skills WHERE user_id = %s AND skill_type = 'offered'",
+                        (user_id,),
+                    )
+                    for s in skills:
+                        name = (s.get("skill_name") or "").lower()
+                        if any(w in name for w in ("python", "flask", "django", "programming", "code", "tech", "web", "sql", "git", "developer")):
+                            category = "Tech"
+                            break
+                        if any(w in name for w in ("music", "guitar", "piano", "singing", "flute", "drum", "instrument", "song")):
+                            category = "Music"
+                            break
+                        if any(w in name for w in ("english", "nepali", "french", "language", "spanish", "german", "translation")):
+                            category = "Language"
+                            break
+                        if any(w in name for w in ("kitchen", "cooking", "momo", "baking", "food", "chef", "recipe")):
+                            category = "Kitchen"
+                            break
+                    if not category and skills:
+                        category = skills[0]["skill_name"]
+                
+                result.append(
+                    TopRatedProfile(
+                        user_id=user_id,
+                        full_name=row["full_name"],
+                        username=row["username"],
+                        reputation_score=float(row.get("reputation_score") or 0),
+                        review_count=int(row.get("review_count") or 0),
+                        completed_exchange_count=int(row.get("completed_exchange_count") or 0),
+                        avatar_path=row.get("avatar_path"),
+                        top_category_name=category or "General",
+                    )
+                )
+            return result
 
 
 class ProfileSkillRepository(BaseRepository):
