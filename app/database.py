@@ -8,6 +8,8 @@ from flask import current_app
 
 
 class Database:
+    _initialized_schema_keys: set[tuple[str, int, str, str]] = set()
+
     def __init__(self):
         self.__connection = pymysql.connect(
             host=current_app.config["MYSQL_HOST"],
@@ -85,6 +87,15 @@ class Database:
 
     @staticmethod
     def create_tables() -> None:
+        schema_key = (
+            current_app.config["MYSQL_HOST"],
+            current_app.config["MYSQL_PORT"],
+            current_app.config["MYSQL_USER"],
+            current_app.config["MYSQL_DATABASE"],
+        )
+        if schema_key in Database._initialized_schema_keys:
+            return
+
         db = Database()
         statements = [
             """
@@ -229,7 +240,6 @@ class Database:
             """
             CREATE TABLE IF NOT EXISTS profile_reviews (
                 id INT AUTO_INCREMENT PRIMARY KEY,
-                exchange_id INT,
                 reviewee_user_id INT NOT NULL,
                 reviewer_id INT,
                 reviewer_name VARCHAR(120) NOT NULL,
@@ -240,7 +250,6 @@ class Database:
                 UNIQUE KEY uq_profile_reviews_exchange_reviewer (exchange_id, reviewer_id),
                 INDEX ix_profile_reviews_exchange (exchange_id),
                 INDEX ix_profile_reviews_reviewee_created (reviewee_user_id, created_at),
-                UNIQUE KEY uq_profile_reviews_exchange_reviewer (exchange_id, reviewer_id),
                 CONSTRAINT fk_profile_reviews_reviewee FOREIGN KEY (reviewee_user_id) REFERENCES users(id) ON DELETE CASCADE,
                 CONSTRAINT fk_profile_reviews_reviewer FOREIGN KEY (reviewer_id) REFERENCES users(id) ON DELETE SET NULL
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
@@ -589,6 +598,7 @@ class Database:
                     raise
             Database._backfill_notifications(db)
             Database._backfill_categories(db)
+            Database._initialized_schema_keys.add(schema_key)
         finally:
             db.close()
 
