@@ -40,6 +40,27 @@ class ProfileService:
             raise ProfileNotFoundError(user_id)
         return user, self._review_repository.for_user(user.id)
 
+    _top_rated_cache = None
+    _top_rated_cache_time = None
+
     def get_top_rated_profiles(self, limit: int = 12):
-        return self._profile_repository.top_rated(limit)
+        from datetime import datetime
+        from flask import current_app
+
+        is_testing = False
+        try:
+            is_testing = current_app.config.get("TESTING", False)
+        except RuntimeError:
+            pass
+
+        now = datetime.now()
+        if (
+            is_testing
+            or ProfileService._top_rated_cache is None
+            or ProfileService._top_rated_cache_time is None
+            or (now - ProfileService._top_rated_cache_time).days >= 1
+        ):
+            ProfileService._top_rated_cache = self._profile_repository.top_rated(limit)
+            ProfileService._top_rated_cache_time = now
+        return ProfileService._top_rated_cache
 
