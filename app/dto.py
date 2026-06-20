@@ -71,4 +71,5 @@ class TopRatedProfile:
     reputation_score: float
     review_count: int
     completed_exchange_count: int
-
+    avatar_path: str | None = None
+    top_category_name: str | None = None
