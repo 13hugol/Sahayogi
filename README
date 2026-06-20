@@ -1,133 +1,181 @@
-# Sahayogi
+# Sahayogi — Peer-to-Peer Credit-Based Skill Exchange Platform
 
-Sahayogi is a Flask, Jinja, and MySQL student project for a skill exchange product.
+Sahayogi (Nepali for "helper" or "collaborator") is a web-based, credit-based skill-sharing platform built with Python, Flask, and MySQL. It is designed to foster a trusted community for practical peer-to-peer learning, allowing members to teach skills to earn credits and spend those credits to learn new skills from others. The platform eliminates the need for monetary payments or direct one-to-one barters.
 
-The implementation is intentionally scoped:
+---
 
-- Active backend: registration, login/logout needed for access, role access, and admin dashboard/user role management.
-- Frontend-only surfaces: listings, profile editing, credits, matches, requests, exchanges, messages, notifications, reviews, reports, certificates, categories, and skills.
+## 🚀 Overview
 
-The frontend-only pages keep the existing templates and navigation, but they do not create, update, delete, or settle backend records.
+Many eager learners cannot afford expensive paid training platforms, while many skilled individuals have no structured way to teach, schedule sessions, build trust, and receive value. **Sahayogi** solves this by providing:
+- A structured credit-based barter model.
+- Live, secure profile and skill listing moderation.
+- A peer-to-peer video calling and messaging environment.
+- Strict security and privacy protections, including GDPR-style account deletion and session lockouts.
 
-## Prerequisites
+---
 
-- Python 3.10+
-- MySQL Server 8.x or 9.x
-- MySQL Workbench
-- Visual Studio Code
+## 🛠️ Required Dependencies
 
-## Quick Setup
+To run the application, you need the following system requirements and Python libraries:
 
-Run from the project root:
+### System Prerequisites
+- **Python 3.10+**
+- **MySQL Server 8.x or 9.x** (with MySQL Workbench)
+- **Visual Studio Code** (or preferred IDE)
 
-```powershell
-py setup.py
-```
+### Python Libraries (`requirements.txt`)
+- **Flask (>=3.1, <4.0)**: Web framework.
+- **Flask-Login (>=0.6, <1.0)**: User session management.
+- **PyMySQL (>=1.1, <2.0)**: MySQL database connector.
+- **pytest (>=8.4, <9.0)**: Testing framework.
+- **pytest-cov (>=7.0, <8.0)**: Test coverage reporting.
+- **python-dotenv (>=1.1, <2.0)**: Environment variables management.
+- **cryptography (>=41.0)**: For secure tokens and cryptographic utilities.
 
-The setup script will:
+---
 
-1. Find MySQL.
-2. Prompt for the MySQL root password.
-3. Create `sahayogi` and `sahayogi_test`.
-4. Create `venv`.
-5. Install Python dependencies.
-6. Generate `.env`.
-7. Ask whether to configure Gmail SMTP or log email locally.
-8. Create the guide-defined MySQL tables.
-9. Seed roles and the default admin account.
+## ⚙️ Setup and Installation
 
-Start the app:
+### Option 1: Quick Setup (Recommended)
+We provide an automated setup script that configures your local environment, installs dependencies, verifies MySQL connections, creates databases, and seeds initial data.
 
-```powershell
-py run.py
-```
+1. Ensure your MySQL server service is running.
+2. Run the setup script from the project root:
+   ```powershell
+   py setup.py
+   ```
+3. The setup script will:
+   - Locates your local MySQL client (`mysql.exe`).
+   - Prompt you for your MySQL root password.
+   - Create the databases `sahayogi` and `sahayogi_test`.
+   - Initialize a Python virtual environment (`venv`).
+   - Install all required libraries from `requirements.txt`.
+   - Generate your local `.env` configuration file.
+   - Prompt you to configure Gmail SMTP or log emails locally in `instance/mail.log`.
+   - Build all database tables.
+   - Seed default roles and the admin user.
 
-Open `http://localhost:5000`.
+4. Start the server:
+   ```powershell
+   py run.py
+   ```
+5. Open your browser and navigate to `http://localhost:5000`.
 
-## Default Admin
+---
 
-| Role | Email | Password |
-| --- | --- | --- |
-| Admin | `admin@example.com` | `Admin123!` |
+### Option 2: Manual Setup
 
-## Manual Setup
+1. **Virtual Environment Setup:**
+   ```powershell
+   py -m venv venv
+   .\venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
 
-```powershell
-py -m venv venv
-.\venv\Scripts\activate
-pip install -r requirements.txt
-```
+2. **Configure Environment:**
+   Copy `.env.example` to `.env` and fill in your MySQL credentials:
+   ```env
+   SECRET_KEY=change-me-to-something-secure
+   DATABASE_URL=mysql+pymysql://root:YOUR_PASSWORD@localhost:3306/sahayogi
+   TEST_DATABASE_URL=mysql+pymysql://root:YOUR_PASSWORD@localhost:3306/sahayogi_test
+   MYSQL_HOST=localhost
+   MYSQL_PORT=3306
+   MYSQL_USER=root
+   MYSQL_PASSWORD="YOUR_PASSWORD"
+   MYSQL_DATABASE=sahayogi
+   TEST_MYSQL_DATABASE=sahayogi_test
+   MAIL_SERVER=
+   MAIL_PORT=587
+   MAIL_USE_TLS=true
+   MAIL_USERNAME=
+   MAIL_PASSWORD=
+   MAIL_DEFAULT_SENDER=noreply@sahayogi.local
+   ```
 
-Create `.env` from `.env.example`, then create the databases:
+3. **Initialize Database and Tables:**
+   Connect to your MySQL instance using MySQL Workbench and run:
+   ```sql
+   CREATE DATABASE sahayogi CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+   CREATE DATABASE sahayogi_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+   ```
 
-```sql
-CREATE DATABASE sahayogi CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE DATABASE sahayogi_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-```
+4. **Run Migrations and Seed Data:**
+   Ensure you are in the virtual environment and execute:
+   ```powershell
+   # Create tables
+   python -m flask --app run init-db
+   # Seed roles and admin account
+   python -m flask --app run seed-reference-data
+   ```
 
-Create tables and seed active backend reference data:
+5. **Start Application:**
+   ```powershell
+   python run.py
+   ```
 
-```powershell
-.\venv\Scripts\python.exe -m flask --app run init-db
-.\venv\Scripts\python.exe -m flask --app run seed-reference-data
-```
+---
 
-## Commands
+## 👥 Project Team & Contributions
 
-| Command | Description |
-| --- | --- |
-| `py setup.py` | Full first-time setup |
-| `py run.py` | Start the app, auto-using `.\venv\Scripts\python.exe` when available |
-| `.\venv\Scripts\python.exe -m flask --app run init-db` | Create the guide-defined MySQL tables |
-| `.\venv\Scripts\python.exe -m flask --app run seed-reference-data` | Seed roles and default admin |
-| `.\venv\Scripts\python.exe -m flask --app run seed-demo-data` | No-op placeholder; demo listing/exchange backend is out of scope |
-| `.\venv\Scripts\python.exe -m flask --app run elevate-user <email>` | Promote a registered user to admin |
-| `.\venv\Scripts\python.exe -m flask --app run test-email you@example.com` | Send or locally log a test email |
-| `Get-Content -Tail 40 instance\mail.log` | Show locally captured emails |
-| `.\venv\Scripts\python.exe -m pytest tests/ -q` | Run the reduced backend test suite |
+Sahayogi was built by an Agile team, with each member owning specific feature branches and user stories:
 
-## Project Structure
+| Developer | GitHub Username |
+| :--- | :--- |
+| **Bhugol Gautam** | `13hugol` |
+| **Chayanga Sherpa** | `cheyangsherpa5-cyber` |
+| **Grishma Pokharel** | `Grishma Pokharel` |
+| **Prashna Bharati** | `prashna07` |
+| **Aayan** | `iMyth1cc` |
+| **Harikrishna Pokhrel** | `HAliveKP` |
+
+---
+
+## 📂 Project Structure
+
+The project follows a strict **Model-View-Controller (MVC)** architectural pattern:
 
 ```text
 Sahayogi/
-    run.py
-    config.py
-    requirements.txt
-    setup.py
-    guide.md
-    app/
-        __init__.py
-        auth.py
-        commands.py
-        database.py
-        models/
-            base_model.py
-            user.py
-            admin_audit.py
-        controllers/
-            base_controller.py
-            auth_controller.py
-            admin_controller.py
-            main_controller.py
-            frontend_controller.py
-        routes/
-            auth_routes.py
-            admin_routes.py
-            main_routes.py
-            frontend_routes.py
-        templates/
-        static/
-        utils/
-            email.py
-            tokens.py
-    tests/
-    Documents/
+├── run.py                 # Application launcher & connection validator
+├── config.py              # Central configuration loader (environment variables)
+├── requirements.txt       # Python dependencies configuration
+├── setup.py               # Interactive developer environment setup script
+├── guide.md               # Prescriptive build rulebook & user story criteria
+├── app/                   # Core application package
+│   ├── __init__.py        # Application factory (`create_app`)
+│   ├── database.py        # Centralized parameterized MySQL query connector
+│   ├── auth.py            # Login/Admin role validation decorators
+│   ├── models/            # Database query classes (BaseModel, User, Profile, etc.)
+│   ├── controllers/       # Business logic (AuthController, AdminController, etc.)
+│   ├── routes/            # Flask blueprints & routing definitions
+│   ├── templates/         # UI templates (Jinja2 HTML layouts)
+│   └── static/            # Static assets (vanilla CSS styles, JS files, uploads)
+└── tests/                 # Full integration test suite
 ```
 
-## Active Backend Rules
+---
 
-Registration validates required fields, hashes passwords, assigns the `user` role, creates a profile shell, and sends or logs email verification.
+## 🛠️ CLI Commands Reference
 
-Role access uses `admin_required` on admin routes. Admins can promote or demote users between `user` and `admin`, and role changes are audit logged.
+Manage your local development instance with the following commands:
 
-The admin dashboard reads only active backend tables: users, roles, profiles, and admin audit logs.
+| Command | Description |
+| :--- | :--- |
+| `py setup.py` | Runs the full automated environment setup. |
+| `py run.py` | Starts the Flask development server on `http://localhost:5000`. |
+| `python -m flask --app run init-db` | Drops and recreates the MySQL schema tables. |
+| `python -m flask --app run seed-reference-data` | Seeds base roles and the default admin user. |
+| `python -m flask --app run elevate-user <email>` | Admin tool to promote a user account to the admin role. |
+| `python -m flask --app run test-email <email>` | Tests SMTP settings or logs a dummy email to the local file. |
+| `python -m pytest tests/` | Executes all integration tests. |
+| `python -m pytest --cov=app tests/` | Runs tests and prints code coverage statistics. |
+
+---
+
+## 🛡️ Security, Privacy & Compliance (LESPI)
+
+- **Authentication Guarding**: Critical actions (such as moderation, suspensions, and role adjustments) are secured at the route level via backend controllers. UI links are hidden, and unauthorized access throws a `403 Forbidden` error.
+- **Lockout Protections**: Accounts are temporarily locked for **10 minutes** after **3 consecutive failed login attempts** to protect against brute-force attacks.
+- **GDPR Rights**: Users have the right to permanently erase their profiles. Initiating account deletion requires password confirmation. Personal identifiers (name, email, avatar, etc.) are purged, and messages/reviews are anonymized to `Deleted User` to protect historical statistics.
+- **Credit Security**: Transactions are checked at the controller level to prevent users from initiating exchanges without sufficient credits. No cash deposits are allowed.
+- **Interactive Calling**: Real-time video calls use peer-to-peer **WebRTC signaling** via a MySQL signal pool. Stale sessions are automatically closed via heartbeats.
